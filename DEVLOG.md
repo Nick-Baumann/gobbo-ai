@@ -8,3 +8,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-05-13: moved a cargo dep to workspace
 - 2025-05-14: candidate failed gate, archived
 - 2025-05-14: switched to AdamW
+- 2025-05-15: tightened type signatures
