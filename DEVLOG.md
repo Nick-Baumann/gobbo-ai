@@ -10,3 +10,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-05-14: switched to AdamW
 - 2025-05-15: tightened type signatures
 - 2025-05-15: swapped to a faster hashmap
+- 2025-05-16: lowered batch size for stability
