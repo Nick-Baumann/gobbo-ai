@@ -13,3 +13,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-05-16: lowered batch size for stability
 - 2025-05-17: fixed a flaky lichess reconnect
 - 2025-05-17: added one more validation check
+- 2025-05-19: added a regression test
