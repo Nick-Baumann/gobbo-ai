@@ -15,3 +15,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-05-17: added one more validation check
 - 2025-05-19: added a regression test
 - 2025-05-21: discovered another sicilian line
+- 2025-05-21: noticed a slow path in the encoder
