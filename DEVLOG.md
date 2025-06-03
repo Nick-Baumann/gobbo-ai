@@ -22,3 +22,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-05-27: coach output is now strict JSON
 - 2025-06-02: swapped to a faster hashmap
 - 2025-06-02: candidate passed at 56%
+- 2025-06-03: discovered another sicilian line
