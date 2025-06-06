@@ -26,3 +26,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-06-03: no regression in selfplay time
 - 2025-06-05: switched to AdamW
 - 2025-06-05: added a quick benchmark
+- 2025-06-06: fixed a panic on empty PGN
