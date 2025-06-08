@@ -29,3 +29,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-06-06: fixed a panic on empty PGN
 - 2025-06-06: engine learned to fianchetto
 - 2025-06-07: added schema validation on coach output
+- 2025-06-08: coach output is now strict JSON
