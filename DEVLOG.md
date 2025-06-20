@@ -35,3 +35,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-06-16: noticed a slow path in MCTS expand
 - 2025-06-18: added more telemetry
 - 2025-06-19: trained for 6 epochs instead of 8
+- 2025-06-20: candidate passed at 56%
