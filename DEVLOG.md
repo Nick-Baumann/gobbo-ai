@@ -40,3 +40,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-06-23: candidate passed at 61%
 - 2025-06-24: promoted
 - 2025-06-24: swapped to a faster hashmap
+- 2025-06-24: fixed an off-by-one in the buffer iter
