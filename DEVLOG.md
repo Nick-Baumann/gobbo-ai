@@ -56,3 +56,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-07-12: fewer allocations in the hot loop
 - 2025-07-13: fewer allocations in the hot loop
 - 2025-07-13: added schema validation on coach output
+- 2025-07-15: found a bug in resign logic
