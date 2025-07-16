@@ -59,3 +59,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-07-15: found a bug in resign logic
 - 2025-07-15: smaller checkpoints on disk now
 - 2025-07-16: added schema validation on coach output
+- 2025-07-16: split a long function
