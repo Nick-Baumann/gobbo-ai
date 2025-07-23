@@ -64,3 +64,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-07-20: candidate passed at 61%
 - 2025-07-22: trained for 6 epochs instead of 8
 - 2025-07-22: swapped to a faster hashmap
+- 2025-07-23: candidate passed at 61%
