@@ -77,3 +77,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-07-30: coach output is now strict JSON
 - 2025-08-02: candidate failed gate, archived
 - 2025-08-05: 1.4x throughput on inference
+- 2025-08-05: clarified a comment
