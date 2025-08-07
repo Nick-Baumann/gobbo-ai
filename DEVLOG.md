@@ -82,3 +82,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-08-06: fixed a panic on empty PGN
 - 2025-08-06: renamed a confusing field
 - 2025-08-07: added a quick benchmark
+- 2025-08-07: engine learned to fianchetto
