@@ -87,3 +87,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-08-08: split a long function
 - 2025-08-10: split a long function
 - 2025-08-11: no regression in selfplay time
+- 2025-08-17: fixed a flaky test
