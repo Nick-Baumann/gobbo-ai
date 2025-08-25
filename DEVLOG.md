@@ -90,3 +90,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-08-17: fixed a flaky test
 - 2025-08-20: noticed a slow path in the encoder
 - 2025-08-25: dropped a buggy feature flag
+- 2025-08-25: fixed a flaky test
