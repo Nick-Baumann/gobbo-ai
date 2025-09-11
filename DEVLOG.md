@@ -98,3 +98,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-09-03: removed noisy log line
 - 2025-09-08: fixed a panic on empty PGN
 - 2025-09-09: tightened the coach prompt
+- 2025-09-11: fixed a flaky test
