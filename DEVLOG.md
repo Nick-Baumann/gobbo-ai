@@ -101,3 +101,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-09-11: fixed a flaky test
 - 2025-09-12: candidate failed gate, archived
 - 2025-09-16: fixed a flaky test
+- 2025-09-20: dropped a buggy feature flag
