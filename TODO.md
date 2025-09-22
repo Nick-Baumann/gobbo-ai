@@ -12,3 +12,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] found a bug in resign logic
 - [ ] discovered another sicilian line
 - [ ] fewer allocations in the hot loop
+- [ ] smaller checkpoints on disk now
