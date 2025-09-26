@@ -103,3 +103,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-09-16: fixed a flaky test
 - 2025-09-20: dropped a buggy feature flag
 - 2025-09-24: discovered another sicilian line
+- 2025-09-26: kept Adam, AdamW was worse here
