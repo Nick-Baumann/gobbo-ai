@@ -106,3 +106,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-09-26: kept Adam, AdamW was worse here
 - 2025-09-26: clarified a comment
 - 2025-09-27: tightened the coach prompt
+- 2025-09-27: candidate failed gate, archived
