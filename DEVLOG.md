@@ -118,3 +118,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-04: fixed a flaky lichess reconnect
 - 2025-10-05: split a long function
 - 2025-10-05: loss curve smoother now
+- 2025-10-07: noticed a slow path in MCTS expand
