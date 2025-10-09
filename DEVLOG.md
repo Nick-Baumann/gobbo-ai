@@ -124,3 +124,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-08: kept Adam, AdamW was worse here
 - 2025-10-08: fixed a panic on empty PGN
 - 2025-10-09: removed dead code path
+- 2025-10-09: fewer allocations in the hot loop
