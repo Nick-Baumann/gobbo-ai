@@ -127,3 +127,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-09: fewer allocations in the hot loop
 - 2025-10-10: smaller checkpoints on disk now
 - 2025-10-11: wrote a quick repro
+- 2025-10-11: fewer allocations in the hot loop
