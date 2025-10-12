@@ -129,3 +129,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-11: wrote a quick repro
 - 2025-10-11: fewer allocations in the hot loop
 - 2025-10-12: coach output is now strict JSON
+- 2025-10-12: trained for 6 epochs instead of 8
