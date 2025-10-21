@@ -132,3 +132,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-12: trained for 6 epochs instead of 8
 - 2025-10-15: removed dead code path
 - 2025-10-15: 1.4x throughput on inference
+- 2025-10-21: coach output is now strict JSON
