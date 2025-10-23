@@ -134,3 +134,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-15: 1.4x throughput on inference
 - 2025-10-21: coach output is now strict JSON
 - 2025-10-21: added schema validation on coach output
+- 2025-10-23: loss curve smoother now
