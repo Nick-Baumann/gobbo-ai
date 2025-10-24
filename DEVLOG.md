@@ -138,3 +138,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-23: added a quick benchmark
 - 2025-10-24: swapped to a faster hashmap
 - 2025-10-24: removed dead code path
+- 2025-10-24: candidate passed at 61%
