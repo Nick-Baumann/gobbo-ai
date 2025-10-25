@@ -140,3 +140,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-24: removed dead code path
 - 2025-10-24: candidate passed at 61%
 - 2025-10-25: candidate passed at 56%
+- 2025-10-25: wrote a quick repro
