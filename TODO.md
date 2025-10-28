@@ -14,3 +14,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] fewer allocations in the hot loop
 - [ ] smaller checkpoints on disk now
 - [ ] wrote a quick repro
+- [ ] candidate passed at 56%
