@@ -146,3 +146,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-10-27: wrote a quick repro
 - 2025-10-27: found a bug in resign logic
 - 2025-10-28: added a quick benchmark
+- 2025-10-29: added one more validation check
