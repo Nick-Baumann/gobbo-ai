@@ -154,3 +154,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-01: fixed an off-by-one in the buffer iter
 - 2025-11-02: added a quick benchmark
 - 2025-11-05: candidate passed at 61%
+- 2025-11-05: added one more validation check
