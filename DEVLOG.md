@@ -158,3 +158,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-08: noticed a slow path in the encoder
 - 2025-11-08: removed dead code path
 - 2025-11-09: engine learned to fianchetto
+- 2025-11-09: noticed a slow path in MCTS expand
