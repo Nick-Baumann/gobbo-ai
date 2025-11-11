@@ -162,3 +162,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-10: added a regression test
 - 2025-11-10: small win in arena
 - 2025-11-11: tightened the coach prompt
+- 2025-11-11: clarified a comment
