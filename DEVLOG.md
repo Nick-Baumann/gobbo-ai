@@ -168,3 +168,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-15: removed noisy log line
 - 2025-11-15: removed dead code path
 - 2025-11-16: added a circuit breaker on coach calls
+- 2025-11-16: candidate failed gate, archived
