@@ -170,3 +170,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-16: added a circuit breaker on coach calls
 - 2025-11-16: candidate failed gate, archived
 - 2025-11-16: no regression in selfplay time
+- 2025-11-17: candidate passed at 56%
