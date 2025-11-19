@@ -175,3 +175,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-18: split a long function
 - 2025-11-18: fewer allocations in the hot loop
 - 2025-11-19: fixed a flaky lichess reconnect
+- 2025-11-19: kept Adam, AdamW was worse here
