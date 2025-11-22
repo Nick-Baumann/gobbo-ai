@@ -180,3 +180,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-21: switched to AdamW
 - 2025-11-21: fixed a panic on empty PGN
 - 2025-11-21: coach output is now strict JSON
+- 2025-11-22: wrote a quick repro
