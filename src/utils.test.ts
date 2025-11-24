@@ -34,7 +34,9 @@ describe("withWhatsAppPrefix", () => {
 
 describe("ensureDir", () => {
 	it("creates nested directory", async () => {
-		const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), "warelay-test-"));
+		const tmp = await fs.promises.mkdtemp(
+			path.join(os.tmpdir(), "warelay-test-"),
+		);
 		const target = path.join(tmp, "nested", "dir");
 		await ensureDir(target);
 		expect(fs.existsSync(target)).toBe(true);
@@ -60,6 +62,8 @@ describe("assertProvider", () => {
 describe("normalizeE164 & toWhatsappJid", () => {
 	it("strips formatting and prefixes", () => {
 		expect(normalizeE164("whatsapp:(555) 123-4567")).toBe("+5551234567");
-		expect(toWhatsappJid("whatsapp:+555 123 4567")).toBe("5551234567@s.whatsapp.net");
+		expect(toWhatsappJid("whatsapp:+555 123 4567")).toBe(
+			"5551234567@s.whatsapp.net",
+		);
 	});
 });
