@@ -81,20 +81,34 @@ const execFileAsync = promisify(execFile);
 
 type ExecResult = { stdout: string; stderr: string };
 
-async function runExec(command: string, args: string[], maxBuffer = 2_000_000): Promise<ExecResult> {
+type ExecOptions = { maxBuffer?: number; timeoutMs?: number };
+
+async function runExec(
+  command: string,
+  args: string[],
+  { maxBuffer = 2_000_000, timeoutMs }: ExecOptions = {}
+): Promise<ExecResult> {
   // Thin wrapper around execFile with utf8 output.
   if (globalVerbose) {
     console.log(`$ ${command} ${args.join(' ')}`);
   }
-  const { stdout, stderr } = await execFileAsync(command, args, {
-    maxBuffer,
-    encoding: 'utf8'
-  });
-  if (globalVerbose) {
-    if (stdout.trim()) console.log(stdout.trim());
-    if (stderr.trim()) console.error(stderr.trim());
+  try {
+    const { stdout, stderr } = await execFileAsync(command, args, {
+      maxBuffer,
+      encoding: 'utf8',
+      timeout: timeoutMs
+    });
+    if (globalVerbose) {
+      if (stdout.trim()) console.log(stdout.trim());
+      if (stderr.trim()) console.error(stderr.trim());
+    }
+    return { stdout, stderr };
+  } catch (err) {
+    if (globalVerbose) {
+      console.error(danger(`Command failed: ${command} ${args.join(' ')}`));
+    }
+    throw err;
   }
-  return { stdout, stderr };
 }
 
 async function ensureBinary(name: string): Promise<void> {
@@ -391,7 +405,10 @@ async function ensureFunnel(port: number) {
     }
 
     logVerbose(`Enabling funnel on port ${port}…`);
-    const { stdout } = await runExec('tailscale', ['funnel', '--yes', '--bg', `${port}`], 200_000);
+    const { stdout } = await runExec('tailscale', ['funnel', '--yes', '--bg', `${port}`], {
+      maxBuffer: 200_000,
+      timeoutMs: 15_000
+    });
     if (stdout.trim()) console.log(stdout.trim());
   } catch (err) {
     console.error('Failed to enable Tailscale Funnel. Is it allowed on your tailnet?', err);
