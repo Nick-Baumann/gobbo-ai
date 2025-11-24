@@ -22,7 +22,7 @@ const WA_WEB_AUTH_FILE = path.join(
 
 export async function createWaSocket(printQr: boolean, verbose: boolean) {
 	await ensureDir(path.dirname(WA_WEB_AUTH_FILE));
-	const { state, saveState } = useSingleFileAuthState(WA_WEB_AUTH_FILE);
+	const { state, saveState } = await useSingleFileAuthState(WA_WEB_AUTH_FILE);
 	const { version } = await fetchLatestBaileysVersion();
 	const logger = pino({ level: verbose ? "info" : "silent" });
 	const sock = makeWASocket({
