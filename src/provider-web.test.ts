@@ -3,17 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockBaileysSocket } from "../test/mocks/baileys.js";
 import { createMockBaileys } from "../test/mocks/baileys.js";
 
-const LAST_SOCKET_KEY = Symbol.for("warelay:lastSocket");
-
 vi.mock("baileys", () => {
 	const created = createMockBaileys();
-	(globalThis as Record<PropertyKey, unknown>)[LAST_SOCKET_KEY] =
-		created.lastSocket;
+	(globalThis as Record<PropertyKey, unknown>)[
+		Symbol.for("warelay:lastSocket")
+	] = created.lastSocket;
 	return created.mod;
 });
 
 function getLastSocket(): MockBaileysSocket {
-	const getter = (globalThis as Record<PropertyKey, unknown>)[LAST_SOCKET_KEY];
+	const getter = (globalThis as Record<PropertyKey, unknown>)[
+		Symbol.for("warelay:lastSocket")
+	];
 	if (typeof getter === "function")
 		return (getter as () => MockBaileysSocket)();
 	if (!getter) throw new Error("Baileys mock not initialized");
@@ -46,8 +47,9 @@ describe("provider-web", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		const recreated = createMockBaileys();
-		(globalThis as Record<PropertyKey, unknown>)[LAST_SOCKET_KEY] =
-			recreated.lastSocket;
+		(globalThis as Record<PropertyKey, unknown>)[
+			Symbol.for("warelay:lastSocket")
+		] = recreated.lastSocket;
 		baileys.makeWASocket.mockImplementation(recreated.mod.makeWASocket);
 		baileys.useSingleFileAuthState.mockImplementation(
 			recreated.mod.useSingleFileAuthState,

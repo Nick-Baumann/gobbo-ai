@@ -214,11 +214,10 @@ describe("twilio interactions", () => {
 	});
 
 	it("waitForFinalStatus exits on failure", async () => {
-		const runtime = {
+		const runtime: index.RuntimeEnv = {
 			error: vi.fn(),
-			exit: ((code: number) => {
-				throw new Error(`exit ${code}`);
-			}) as (code: number) => never,
+			exit: vi.fn() as unknown as (code: number) => never,
+			log: console.log,
 		};
 		const fetch = vi.fn().mockResolvedValue({ status: "failed" });
 		const client = {
@@ -520,9 +519,7 @@ describe("monitoring", () => {
 	it("ensureFunnel failure path exits via runtime", async () => {
 		const runtime: index.RuntimeEnv = {
 			error: vi.fn(),
-			exit: ((code: number) => {
-				throw new Error(`exit ${code}`);
-			}) as (code: number) => never,
+			exit: vi.fn() as unknown as (code: number) => never,
 			log: console.log,
 		};
 		const exec = vi.fn().mockRejectedValue({ stdout: "Funnel is not enabled" });

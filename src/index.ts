@@ -47,6 +47,7 @@ import {
 	normalizeE164,
 	normalizePath,
 	sleep,
+	toWhatsappJid,
 	withWhatsAppPrefix,
 } from "./utils.js";
 
@@ -2161,7 +2162,7 @@ export {
 	uniqueBySid,
 	waitForFinalStatus,
 	waitForever,
-	type toWhatsappJid,
+	toWhatsappJid,
 	program,
 };
 
