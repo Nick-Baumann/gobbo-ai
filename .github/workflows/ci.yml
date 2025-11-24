@@ -23,7 +23,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        env:
+          PNPM_HOME: ~/.pnpm
+          PNPM_IGNORE_SCRIPTS: "false"
+        run: pnpm install --frozen-lockfile --ignore-scripts=false
 
       - name: Lint
         run: pnpm lint
