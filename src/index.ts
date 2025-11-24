@@ -44,6 +44,7 @@ type TwilioRequestOptions = {
 	params?: Record<string, string | number>;
 	form?: Record<string, string>;
 	body?: unknown;
+	contentType?: string;
 };
 
 type TwilioSender = { sid: string; sender_id: string };
@@ -64,6 +65,12 @@ type TwilioChannelsSender = {
 	sid?: string;
 	senderId?: string;
 	sender_id?: string;
+	webhook?: {
+		callback_url?: string;
+		callback_method?: string;
+		fallback_url?: string;
+		fallback_method?: string;
+	};
 };
 
 type ChannelSenderUpdater = {
@@ -569,7 +576,7 @@ async function autoReplyIfConfigured(
 			);
 		}
 	} catch (err) {
-		console.error("Failed to auto-reply", err);
+		logTwilioSendError(err, replyTo ?? undefined);
 	}
 }
 
@@ -747,7 +754,7 @@ async function startWebhook(
 					console.log(success(`↩️  Auto-replied to ${From}`));
 				}
 			} catch (err) {
-				console.error("Failed to auto-reply", err);
+				logTwilioSendError(err, From ?? undefined);
 			}
 		}
 
@@ -1044,8 +1051,13 @@ async function setMessagingServiceWebhook(
 			InboundRequestUrl: url,
 			InboundRequestMethod: method,
 		});
-		if (globalVerbose)
-			console.log(chalk.gray(`Updated Messaging Service ${msid} inbound URL`));
+		const fetched = await client.messaging.v1.services(msid).fetch();
+		const stored = fetched?.inboundRequestUrl;
+		console.log(
+			success(
+				`✅ Messaging Service webhook set to ${stored ?? url} (service ${msid})`,
+			),
+		);
 		return true;
 	} catch (err) {
 		if (globalVerbose) console.error("Messaging Service update failed", err);
@@ -1063,22 +1075,67 @@ async function updateWebhook(
 	const requester = client as unknown as TwilioRequester;
 	const clientTyped = client as unknown as TwilioSenderListClient;
 
-	// 1) Raw request (Channels/Senders) with explicit form fields (canonical for WA senders)
+	// 1) Raw request (Channels/Senders) with JSON webhook payload — most reliable for WA
+	try {
+		await requester.request({
+			method: "post",
+			uri: `https://messaging.twilio.com/v2/Channels/Senders/${senderSid}`,
+			body: {
+				webhook: {
+					callback_url: url,
+					callback_method: method,
+				},
+			},
+			contentType: "application/json",
+		});
+		// Fetch to verify what Twilio stored
+		const fetched = await clientTyped.messaging.v2
+			.channelsSenders(senderSid)
+			.fetch();
+		const storedUrl =
+			fetched?.webhook?.callback_url || fetched?.webhook?.fallback_url;
+		if (storedUrl) {
+			console.log(success(`✅ Twilio sender webhook set to ${storedUrl}`));
+			return;
+		}
+		if (globalVerbose)
+			console.error(
+				"Sender updated but webhook callback_url missing; will try fallbacks",
+			);
+	} catch (err) {
+		if (globalVerbose)
+			console.error(
+				"channelsSenders request update failed, will try client helpers",
+				err,
+			);
+	}
+
+	// 1b) Form-encoded fallback for older Twilio stacks
 	try {
 		await requester.request({
 			method: "post",
 			uri: `https://messaging.twilio.com/v2/Channels/Senders/${senderSid}`,
 			form: {
-				CallbackUrl: url,
-				CallbackMethod: method,
+				"Webhook.CallbackUrl": url,
+				"Webhook.CallbackMethod": method,
 			},
 		});
-		console.log(success(`✅ Twilio sender webhook set to ${url}`));
-		return;
+		const fetched =
+			await clientTyped.messaging.v2.channelsSenders(senderSid).fetch();
+		const storedUrl =
+			fetched?.webhook?.callback_url || fetched?.webhook?.fallback_url;
+		if (storedUrl) {
+			console.log(success(`✅ Twilio sender webhook set to ${storedUrl}`));
+			return;
+		}
+		if (globalVerbose)
+			console.error(
+				"Form update succeeded but callback_url missing; will try helper fallback",
+			);
 	} catch (err) {
 		if (globalVerbose)
 			console.error(
-				"channelsSenders request update failed, will try client helpers",
+				"Form channelsSenders update failed, will try helper fallback",
 				err,
 			);
 	}
@@ -1090,7 +1147,15 @@ async function updateWebhook(
 				callbackUrl: url,
 				callbackMethod: method,
 			});
-			console.log(success(`✅ Twilio sender webhook set to ${url}`));
+			const fetched =
+				await clientTyped.messaging.v2.channelsSenders(senderSid).fetch();
+			const storedUrl =
+				fetched?.webhook?.callback_url || fetched?.webhook?.fallback_url;
+			console.log(
+				success(
+					`✅ Twilio sender webhook set to ${storedUrl ?? url} (helper API)`,
+				),
+			);
 			return;
 		}
 	} catch (err) {
@@ -1142,6 +1207,35 @@ async function updateWebhook(
 function sleep(ms: number) {
 	// Promise-based sleep utility.
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type TwilioApiError = {
+	code?: number | string;
+	status?: number | string;
+	message?: string;
+	moreInfo?: string;
+	response?: { body?: unknown };
+};
+
+function formatTwilioError(err: unknown): string {
+	const e = err as TwilioApiError;
+	const pieces = [];
+	if (e.code != null) pieces.push(`code ${e.code}`);
+	if (e.status != null) pieces.push(`status ${e.status}`);
+	if (e.message) pieces.push(e.message);
+	if (e.moreInfo) pieces.push(`more: ${e.moreInfo}`);
+	return pieces.length ? pieces.join(" | ") : String(err);
+}
+
+function logTwilioSendError(err: unknown, destination?: string) {
+	const prefix = destination ? `to ${destination}: ` : "";
+	console.error(
+		danger(`❌ Twilio send failed ${prefix}${formatTwilioError(err)}`),
+	);
+	const body = (err as TwilioApiError)?.response?.body;
+	if (body) {
+		console.error(info("Response body:"), JSON.stringify(body, null, 2));
+	}
 }
 
 async function monitor(intervalSeconds: number, lookbackMinutes: number) {
