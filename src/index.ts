@@ -476,17 +476,20 @@ async function findWhatsappSenderSid(
     return explicitSenderSid;
   }
   try {
-    const resp = await (client as unknown as TwilioRequester).request({
-      method: 'get',
-      uri: 'https://messaging.twilio.com/v2/Channels/Senders',
-      params: { Channel: 'whatsapp', PageSize: 50 }
-    });
-    const senders = resp.data?.senders;
+    // Prefer official SDK list helper to avoid request-shape mismatches.
+    // Twilio helper types are broad; we narrow to expected shape.
+    const senders = (await (client as any).messaging.v2.channelsSenders.list({
+      channel: 'whatsapp',
+      pageSize: 50
+    })) as Array<{ sid?: string; senderId?: string; sender_id?: string }>;
     if (!senders) {
       throw new Error('List senders response missing "senders" array');
     }
     const match = senders.find(
-      (s) => typeof s?.sender_id === 'string' && s.sender_id === withWhatsAppPrefix(from)
+      (s) =>
+        typeof (s as any)?.senderId === 'string'
+          ? (s as any).senderId === withWhatsAppPrefix(from)
+          : typeof (s as any)?.sender_id === 'string' && (s as any).sender_id === withWhatsAppPrefix(from)
     );
     if (!match || typeof match.sid !== 'string') {
       throw new Error(`Could not find sender ${withWhatsAppPrefix(from)} in Twilio account`);
