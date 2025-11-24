@@ -418,7 +418,27 @@ async function ensureFunnel(port: number) {
     });
     if (stdout.trim()) console.log(stdout.trim());
   } catch (err) {
-    console.error('Failed to enable Tailscale Funnel. Is it allowed on your tailnet?', err);
+    const anyErr = err as Record<string, unknown>;
+    const stdout = typeof anyErr['stdout'] === 'string' ? (anyErr['stdout'] as string) : '';
+    const stderr = typeof anyErr['stderr'] === 'string' ? (anyErr['stderr'] as string) : '';
+    if (stdout.includes('Funnel is not enabled')) {
+      console.error(danger('Funnel is not enabled on this tailnet/device.'));
+      const linkMatch = stdout.match(/https?:\/\/\S+/);
+      if (linkMatch) {
+        console.error(info(`Enable it here: ${linkMatch[0]}`));
+      } else {
+        console.error(info('Enable in admin console: https://login.tailscale.com/admin (see https://tailscale.com/kb/1223/funnel)'));
+      }
+    }
+    if (stderr.includes('client version') || stdout.includes('client version')) {
+      console.error(warn('Tailscale client/server version mismatch detected; try updating tailscale/tailscaled.'));
+    }
+    console.error('Failed to enable Tailscale Funnel. Is it allowed on your tailnet?');
+    if (globalVerbose) {
+      if (stdout.trim()) console.error(chalk.gray(`stdout: ${stdout.trim()}`));
+      if (stderr.trim()) console.error(chalk.gray(`stderr: ${stderr.trim()}`));
+      console.error(err);
+    }
     process.exit(1);
   }
 }
@@ -644,14 +664,14 @@ program
     const env = readEnv();
     await ensureBinary('tailscale');
 
-    // Start webhook locally
-    await startWebhook(port, opts.path, undefined, Boolean(opts.verbose));
-
-    // Enable Funnel and derive public URL
+    // Enable Funnel first so we don't keep a webhook running on failure
     await ensureFunnel(port);
     const host = await getTailnetHostname();
     const publicUrl = `https://${host}${opts.path}`;
     console.log(`🌐 Public webhook URL (via Funnel): ${publicUrl}`);
+
+    // Start webhook locally (after funnel success)
+    await startWebhook(port, opts.path, undefined, Boolean(opts.verbose));
 
     // Configure Twilio sender webhook
     const client = createClient(env);
