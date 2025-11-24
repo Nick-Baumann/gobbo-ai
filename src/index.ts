@@ -5,6 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import process, { stdin as input, stdout as output } from "node:process";
+import { fileURLToPath } from "node:url";
 import readline from "node:readline/promises";
 import { promisify } from "node:util";
 import bodyParser from "body-parser";
@@ -384,8 +385,7 @@ type Provider = "twilio" | "web";
 
 function assertProvider(input: string): asserts input is Provider {
 	if (input !== "twilio" && input !== "web") {
-		console.error("Provider must be 'twilio' or 'web'");
-		process.exit(1);
+		throw new Error("Provider must be 'twilio' or 'web'");
 	}
 }
 
@@ -1818,4 +1818,11 @@ program
 		await waitForever();
 	});
 
-program.parseAsync(process.argv);
+export { normalizeE164, toWhatsappJid, assertProvider };
+
+const isMain =
+	process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isMain) {
+	program.parseAsync(process.argv);
+}
