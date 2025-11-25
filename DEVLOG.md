@@ -185,3 +185,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-11-23: candidate passed at 61%
 - 2025-11-23: fixed a flaky lichess reconnect
 - 2025-11-24: small win in arena
+- 2025-11-25: swapped to a faster hashmap
