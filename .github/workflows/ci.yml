@@ -11,22 +11,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node 22.9.0
+      - name: Install Node 22.21.1
         run: |
-          NODE_VERSION=22.9.0
+          set -euo pipefail
+          NODE_VERSION=22.21.1
           mkdir -p "$RUNNER_TEMP/node"
           curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
             | tar -xJ -C "$RUNNER_TEMP/node" --strip-components=1
           echo "$RUNNER_TEMP/node/bin" >> "$GITHUB_PATH"
 
       - name: Node version
-        run: node -v
+        run: |
+          export PATH="$RUNNER_TEMP/node/bin:$PATH"
+          node -v
+          npm -v
 
       - name: Install pnpm
-        run: npm install -g pnpm@10.23.0
+        run: |
+          export PATH="$RUNNER_TEMP/node/bin:$PATH"
+          npm install -g pnpm@10.23.0
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts=false
+        env:
+          CI: true
+        run: |
+          export PATH="$RUNNER_TEMP/node/bin:$PATH"
+          pnpm install --frozen-lockfile --ignore-scripts=false
 
       - name: Lint
         run: pnpm lint
