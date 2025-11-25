@@ -171,8 +171,15 @@ const mediaNote =
 		? `[media attached: ${ctx.MediaPath}${ctx.MediaType ? ` (${ctx.MediaType})` : ""}${ctx.MediaUrl ? ` | ${ctx.MediaUrl}` : ""}]`
 		: undefined;
 	// For command prompts we prepend the media note so Claude et al. see it; text replies stay clean.
+	const mediaReplyHint =
+		mediaNote && reply?.mode === "command"
+			? "To send an image back, add a line like: MEDIA:https://example.com/image.jpg (no spaces). Keep caption in the text body."
+			: undefined;
 	const commandBody = mediaNote
-		? `${mediaNote}\n${prefixedBody ?? ""}`.trim()
+		? [mediaNote, mediaReplyHint, prefixedBody ?? ""]
+				.filter(Boolean)
+				.join("\n")
+				.trim()
 		: prefixedBody;
 	const templatingCtx: TemplateContext = {
 		...sessionCtx,
@@ -282,10 +289,36 @@ const mediaNote =
 			const rawStdout = stdout.trim();
 			let trimmed = rawStdout;
 			let mediaFromCommand: string | undefined;
-			const mediaMatch = /MEDIA:\s*(.+)$/im.exec(rawStdout);
-			if (mediaMatch?.[1]) {
-				mediaFromCommand = mediaMatch[1].trim();
-				trimmed = rawStdout.replace(mediaMatch[0], "").trim();
+			const mediaLine = rawStdout
+				.split("\n")
+				.find((line) => /^MEDIA:/i.test(line));
+			if (mediaLine) {
+				const after = mediaLine.replace(/^MEDIA:\s*/i, "");
+				const parts = after.trim().split(/\s+/);
+				if (parts.length === 1 && parts[0]) {
+					mediaFromCommand = parts[0];
+				}
+				trimmed = rawStdout
+					.split("\n")
+					.filter((line) => !/^MEDIA:/i.test(line))
+					.join("\n")
+					.trim();
+				// Basic sanity: accept only URLs or existing file paths without whitespace.
+				const hasWhitespace = mediaFromCommand
+					? /\s/.test(mediaFromCommand)
+					: false;
+				const looksLikeUrl = mediaFromCommand
+					? /^https?:\/\//i.test(mediaFromCommand)
+					: false;
+				if (
+					!mediaFromCommand ||
+					hasWhitespace ||
+					(!looksLikeUrl && mediaFromCommand.length > 1024)
+				) {
+					mediaFromCommand = undefined;
+				}
+			} else {
+				trimmed = rawStdout;
 			}
 			if (stderr?.trim()) {
 				logVerbose(`Command auto-reply stderr: ${stderr.trim()}`);
