@@ -30,6 +30,6 @@ Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tag
 
 6) **Post-publish**
 - [ ] Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z` (or `git push --tags`).
-- [ ] Create/refresh the GitHub release for `vX.Y.Z` with **title `warelay X.Y.Z`** (not just the tag); body should inline the product-facing bullets from the changelog (no bare links); attach the `npm pack` tarball + checksums if you generated them.
+- [ ] Create/refresh the GitHub release for `vX.Y.Z` with **title `warelay X.Y.Z`** (not just the tag); body should inline the product-facing bullets from the changelog (no bare links) **and must not repeat the title inside the body**; attach the `npm pack` tarball + checksums if you generated them.
 - [ ] From a clean temp directory (no `package.json`), run `npx -y warelay@X.Y.Z send --help` to confirm install/CLI entrypoints work.
 - [ ] Announce/share release notes.
