@@ -39,14 +39,19 @@ export async function sendCommand(
 		if (waitSeconds !== 0) {
 			runtime.log(info("Wait/poll are Twilio-only; ignored for provider=web."));
 		}
-		const res = await deps.sendMessageWeb(
-			opts.to,
-			opts.message,
-			{
-				verbose: false,
-				mediaUrl: opts.media,
-			},
-		);
+		const res = await deps
+			.sendMessageWeb(
+				opts.to,
+				opts.message,
+				{
+					verbose: false,
+					mediaUrl: opts.media,
+				},
+			)
+			.catch((err) => {
+				runtime.error(`❌ Web send failed: ${String(err)}`);
+				throw err;
+			});
 		if (opts.json) {
 			runtime.log(
 				JSON.stringify(

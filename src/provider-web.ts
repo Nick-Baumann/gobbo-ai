@@ -106,6 +106,7 @@ export async function sendMessageWeb(
 ): Promise<{ messageId: string; toJid: string }> {
 	const sock = await createWaSocket(false, options.verbose);
 	try {
+		logInfo("🔌 Connecting to WhatsApp Web…");
 		await waitForWaConnection(sock);
 		const jid = toWhatsappJid(to);
 		try {
