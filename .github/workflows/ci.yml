@@ -22,6 +22,9 @@ jobs:
           node -v
           npm -v
 
+      - name: Capture node path
+        run: echo "NODE_BIN=$(dirname \"$(node -p \"process.execPath\")\")" >> "$GITHUB_ENV"
+
       - name: Enable corepack and pin pnpm
         run: |
           corepack enable
@@ -32,6 +35,7 @@ jobs:
         env:
           CI: true
         run: |
+          export PATH="$NODE_BIN:$PATH"
           which node
           node -v
           pnpm -v
