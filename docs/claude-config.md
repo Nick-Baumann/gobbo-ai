@@ -70,7 +70,7 @@ Notes on this configuration:
 ## Troubleshooting tips
 - Command takes too long: lower `timeoutSeconds` or simplify the prompt. Timeouts kill the Claude process.
 - No reply: ensure the sender number is in `allowFrom` (or remove the allowlist), and confirm `claude login` was run in the same environment.
-- Media fails on Twilio: run `warelay up` (or `warelay webhook --serve-media` via `send --serve-media`) so the media host is reachable over HTTPS.
+- Media fails on Twilio: run `warelay webhook --ingress tailscale` (or `warelay webhook --serve-media` via `send --serve-media`) so the media host is reachable over HTTPS.
 - Stuck queue: enable `--verbose` to see “queued for …ms” messages and confirm commands are draining. Use `pnpm vitest` to run unit tests if you change queue logic.
 
 ## Minimal text-only variant

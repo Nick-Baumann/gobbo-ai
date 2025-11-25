@@ -28,12 +28,12 @@ This document defines how `warelay` should handle sending and replying with imag
 ### Twilio
 - Twilio API requires a public HTTPS `MediaUrl`; it will not accept local paths.
 - Hosting strategy: reuse the webhook/Funnel port.
-  - When `--media` is a local path, copy to temp dir (`~/.warelay/media/<uuid>`), serve at `/media/<uuid>` on the existing Express app started for webhook/up, or spin up a short-lived server on demand for `send`.
+- When `--media` is a local path, copy to temp dir (`~/.warelay/media/<uuid>`), serve at `/media/<uuid>` on the existing Express app started for webhook, or spin up a short-lived server on demand for `send`.
   - `MediaUrl` = `https://<tailnet-host>.ts.net/media/<uuid>`.
   - Files auto-removed after TTL (default 2 minutes) or after first successful fetch (best-effort).
   - Enforce size limit 5 MB; reject early with clear error.
 - If `--media` is already an HTTPS URL, pass through unchanged.
-- Fallback: if Funnel is not enabled (or host unknown) and a local path is provided, fail with guidance to run `warelay up` (or pass a URL instead).
+- Fallback: if Funnel is not enabled (or host unknown) and a local path is provided, fail with guidance to run `warelay webhook --ingress tailscale` (or pass a URL instead).
 
 ## Hosting/Server Details
 - Extend `startWebhook` Express app:
@@ -58,7 +58,7 @@ This document defines how `warelay` should handle sending and replying with imag
 - Size guard: only download if ≤5 MB; else skip and log.
 
 ## Errors & Messaging
-- Local path with twilio + Funnel disabled → error: “Twilio media needs a public URL; start `warelay up`/`warelay webhook` with Funnel or pass an https:// URL.”
+- Local path with twilio + Funnel disabled → error: “Twilio media needs a public URL; start `warelay webhook --ingress tailscale` or pass an https:// URL.”
 - File too large (>5 MB) → “Media exceeds 5 MB limit; resize or host elsewhere.”
 - Download failure for web provider → “Failed to load media from <source>; skipping send.”
 
@@ -71,4 +71,4 @@ This document defines how `warelay` should handle sending and replying with imag
 ## Open Decisions (confirm before coding)
 - TTL for temp media (proposal: 2 minutes, cleanup at start + interval).
 - One-file-per-send vs. batching: default to one-file-per-send; multi-attach not supported.
-- Should `warelay send --provider twilio --media` implicitly start the media server (even if webhook not running), or require `warelay up/webhook` already active? (Proposal: auto-start lightweight server on demand, auto-stop after media is fetched or TTL.)
+- Should `warelay send --provider twilio --media` implicitly start the media server (even if webhook not running), or require `warelay webhook` already active? (Proposal: auto-start lightweight server on demand, auto-stop after media is fetched or TTL.)

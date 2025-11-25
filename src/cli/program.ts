@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import { sendCommand } from "../commands/send.js";
 import { statusCommand } from "../commands/status.js";
-import { upCommand } from "../commands/up.js";
 import { webhookCommand } from "../commands/webhook.js";
 import { ensureTwilioEnv } from "../env.js";
 import { danger, info, setVerbose, setYes, warn } from "../globals.js";
@@ -206,44 +205,6 @@ Examples:
 					defaultRuntime.log(
 						info("Webhook dry-run complete; no server started."),
 					);
-					return;
-				}
-				process.on("SIGINT", () => {
-					server.close(() => {
-						console.log("\n👋 Webhook stopped");
-						defaultRuntime.exit(0);
-					});
-				});
-				await deps.waitForever();
-			} catch (err) {
-				defaultRuntime.error(String(err));
-				defaultRuntime.exit(1);
-			}
-		});
-
-	program
-		.command("up")
-		.description(
-			"Alias: webhook --ingress tailscale (Funnel + Twilio callback)",
-		)
-		.option("-p, --port <port>", "Port to listen on", "42873")
-		.option("--path <path>", "Webhook path", "/webhook/whatsapp")
-		.option("--verbose", "Verbose logging during setup/webhook", false)
-		.option("-y, --yes", "Auto-confirm prompts when possible", false)
-		.option(
-			"--dry-run",
-			"Print planned actions without touching network",
-			false,
-		)
-		// istanbul ignore next
-		.action(async (opts) => {
-			setVerbose(Boolean(opts.verbose));
-			setYes(Boolean(opts.yes));
-			const deps = createDefaultDeps();
-			try {
-				const { server } = await upCommand(opts, deps, defaultRuntime);
-				if (!server) {
-					defaultRuntime.log(info("Up dry-run complete; no server started."));
 					return;
 				}
 				process.on("SIGINT", () => {

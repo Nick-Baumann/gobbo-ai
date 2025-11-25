@@ -3,14 +3,14 @@
 ## 0.1.0 — 2025-11-25
 
 ### CLI & Providers
-- Bundles a single `warelay` CLI with commands for `send`, `relay`, `status`, `webhook`, `up`, `login`, and tmux helpers `relay:tmux` / `relay:tmux:attach` (see `src/cli/program.ts`); `webhook` now accepts `--ingress tailscale|none` with `up` as an alias for the Tailscale path.
+- Bundles a single `warelay` CLI with commands for `send`, `relay`, `status`, `webhook`, `login`, and tmux helpers `relay:tmux` / `relay:tmux:attach` (see `src/cli/program.ts`); `webhook` accepts `--ingress tailscale|none`.
 - Supports two messaging backends: **Twilio** (default) and **personal WhatsApp Web**; `relay --provider auto` selects Web when a cached login exists, otherwise falls back to Twilio polling (`provider-web.ts`, `cli/program.ts`).
 - `send` can target either provider, optionally wait for delivery status (Twilio only), output JSON, dry-run payloads, and attach media (`commands/send.ts`).
 - `status` merges inbound + outbound Twilio traffic with formatted lines or JSON output (`commands/status.ts`, `twilio/messages.ts`).
 
 ### Webhook, Funnel & Port Management
 - `webhook` starts an Express server for inbound Twilio callbacks, logs requests, and optionally auto-replies with static text or config-driven replies (`twilio/webhook.ts`, `commands/webhook.ts`).
-- `up` automates end-to-end webhook setup: ensures required binaries, enables Tailscale Funnel, starts the webhook on the chosen port/path, discovers the WhatsApp sender SID, and updates Twilio webhook URLs with multiple fallbacks (`commands/up.ts`, `infra/tailscale.ts`, `twilio/update-webhook.ts`, `twilio/senders.ts`).
+- `webhook --ingress tailscale` automates end-to-end webhook setup: ensures required binaries, enables Tailscale Funnel, starts the webhook on the chosen port/path, discovers the WhatsApp sender SID, and updates Twilio webhook URLs with multiple fallbacks (`commands/up.ts`, `infra/tailscale.ts`, `twilio/update-webhook.ts`, `twilio/senders.ts`).
 - Guardrails detect busy ports with helpful diagnostics and aborts when conflicts are found (`infra/ports.ts`).
 
 ### Auto-Reply Engine

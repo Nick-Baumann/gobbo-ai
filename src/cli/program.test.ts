@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendCommand = vi.fn();
 const statusCommand = vi.fn();
-const upCommand = vi.fn().mockResolvedValue({ server: undefined });
 const webhookCommand = vi.fn().mockResolvedValue(undefined);
 const ensureTwilioEnv = vi.fn();
 const loginWeb = vi.fn();
@@ -24,7 +23,6 @@ const runtime = {
 
 vi.mock("../commands/send.js", () => ({ sendCommand }));
 vi.mock("../commands/status.js", () => ({ statusCommand }));
-vi.mock("../commands/up.js", () => ({ upCommand }));
 vi.mock("../commands/webhook.js", () => ({ webhookCommand }));
 vi.mock("../env.js", () => ({ ensureTwilioEnv }));
 vi.mock("../runtime.js", () => ({ defaultRuntime: runtime }));

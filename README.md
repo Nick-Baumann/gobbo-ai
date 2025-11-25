@@ -15,7 +15,7 @@ Install from npm (global): `npm install -g warelay` (Node 22+). Then choose **on
 2. Send a message: `warelay send --to +12345550000 --message "Hi from warelay"`.
 3. Receive replies:
    - Polling (no ingress): `warelay relay --provider twilio --interval 5 --lookback 10`
-   - Webhook + public URL via Tailscale Funnel: `warelay webhook --ingress tailscale --port 42873 --path /webhook/whatsapp --verbose` (alias: `warelay up`)
+   - Webhook + public URL via Tailscale Funnel: `warelay webhook --ingress tailscale --port 42873 --path /webhook/whatsapp --verbose`
 
 > Already developing locally? You can still run `pnpm install` and `pnpm warelay ...` from the repo, but end users only need the npm package.
 
@@ -23,7 +23,7 @@ Install from npm (global): `npm install -g warelay` (Node 22+). Then choose **on
 - **Two providers:** Twilio (default) for reliable delivery + status; Web provider for quick personal sends/receives via QR login.
 - **Auto-replies:** Static templates or external commands (Claude-aware), with per-sender or global sessions and `/new` resets.
 - Claude setup guide: see `docs/claude-config.md` for the exact Claude CLI configuration we support.
-- **Webhook in one go:** `warelay webhook --ingress tailscale` enables Tailscale Funnel, runs the webhook server, and updates the Twilio sender callback URL (alias: `warelay up`).
+- **Webhook in one go:** `warelay webhook --ingress tailscale` enables Tailscale Funnel, runs the webhook server, and updates the Twilio sender callback URL.
 - **Polling fallback:** `relay` polls Twilio when webhooks aren’t available; works headless.
 - **Status + delivery tracking:** `status` shows recent inbound/outbound; `send` can wait for final Twilio status.
 
@@ -34,11 +34,10 @@ Install from npm (global): `npm install -g warelay` (Node 22+). Then choose **on
 | `warelay relay` | Auto-reply loop (poll Twilio or listen on Web) | `--provider <auto\|twilio\|web>` `--interval <sec>` `--lookback <min>` `--verbose` |
 | `warelay status` | Show recent sent/received messages | `--limit <n>` `--lookback <min>` `--json` |
 | `warelay webhook` | Run inbound webhook (`ingress=tailscale` updates Twilio; `none` is local-only) | `--ingress tailscale\|none` `--port <port>` `--path <path>` `--reply <text>` `--verbose` `--yes` `--dry-run` |
-| `warelay up` | Alias: `warelay webhook --ingress tailscale` | `--port <port>` `--path <path>` `--verbose` `--yes` `--dry-run` |
 | `warelay login` | Link personal WhatsApp Web via QR | `--verbose` |
 
 ### Sending images
-- Twilio: `warelay send --to +1... --message "Hi" --media ./pic.jpg --serve-media` (needs `warelay webhook`/`up` or `--serve-media` to auto-host via Funnel; max 5 MB).
+- Twilio: `warelay send --to +1... --message "Hi" --media ./pic.jpg --serve-media` (needs `warelay webhook --ingress tailscale` or `--serve-media` to auto-host via Funnel; max 5 MB).
 - Web: `warelay send --provider web --media ./pic.jpg --message "Hi"` (local path or URL; no hosting needed).
 - Auto-replies can attach `mediaUrl` in `~/.warelay/warelay.json` (used alongside `text` when present).
 
@@ -111,7 +110,7 @@ Templating tokens: `{{Body}}`, `{{BodyStripped}}`, `{{From}}`, `{{To}}`, `{{Mess
 
 ## Webhook & Tailscale Flow
 - `warelay webhook --ingress none` starts the local Express server on your chosen port/path; add `--reply "Got it"` for a static reply when no config file is present.
-- `warelay webhook --ingress tailscale` (alias: `warelay up`) enables Tailscale Funnel, prints the public URL (`https://<tailnet-host><path>`), starts the webhook, discovers the WhatsApp sender SID, and updates Twilio callbacks to the Funnel URL.
+- `warelay webhook --ingress tailscale` enables Tailscale Funnel, prints the public URL (`https://<tailnet-host><path>`), starts the webhook, discovers the WhatsApp sender SID, and updates Twilio callbacks to the Funnel URL.
 - If Funnel is not allowed on your tailnet, the CLI exits with guidance; you can still use `relay --provider twilio` to poll without webhooks.
 
 ## Troubleshooting Tips
@@ -125,5 +124,5 @@ Templating tokens: `{{Body}}`, `{{BodyStripped}}`, `{{From}}`, `{{To}}`, `{{Mess
 - Does this store my messages? Warelay only writes `~/.warelay/warelay.json` (config), `~/.warelay/credentials/` (WhatsApp Web auth), and `~/.warelay/sessions.json` (session IDs + timestamps). It does **not** persist message bodies beyond the session store. Logs print to stdout/stderr; redirect or rotate if needed.
 - Personal WhatsApp safety: Automation on personal accounts can be rate-limited or logged out by WhatsApp. Use `--provider web` sparingly, keep messages human-like, and re-run `login` if the session is dropped.
 - Limits to remember: WhatsApp text limit ~1600 chars; avoid rapid bursts—space sends by a few seconds; keep webhook replies under a couple seconds for good UX; command auto-replies time out after 600s by default.
-- Deploy / keep running: Use `tmux` or `screen` for ad-hoc (`tmux new -s warelay -- pnpm warelay relay --provider twilio`). For long-running hosts, wrap `pnpm warelay relay ...` or `pnpm warelay up ...` in a systemd service or macOS LaunchAgent; ensure environment variables are loaded in that context.
+- Deploy / keep running: Use `tmux` or `screen` for ad-hoc (`tmux new -s warelay -- pnpm warelay relay --provider twilio`). For long-running hosts, wrap `pnpm warelay relay ...` or `pnpm warelay webhook --ingress tailscale ...` in a systemd service or macOS LaunchAgent; ensure environment variables are loaded in that context.
 - Rotating credentials: Update `.env` (Twilio keys), rerun your process; for Web provider, delete `~/.warelay/credentials/` and rerun `pnpm warelay login` to relink.
