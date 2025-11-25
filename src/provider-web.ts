@@ -21,6 +21,7 @@ import { loadConfig } from "./config/config.js";
 import { danger, info, isVerbose, logVerbose, success } from "./globals.js";
 import { logInfo } from "./logger.js";
 import { getChildLogger } from "./logging.js";
+import { maxBytesForKind, mediaKindFromMime } from "./media/constants.js";
 import { saveMediaBuffer } from "./media/store.js";
 import { defaultRuntime, type RuntimeEnv } from "./runtime.js";
 import type { Provider } from "./utils.js";
@@ -485,12 +486,39 @@ export async function monitorWebProvider(
 								logVerbose(
 									`Web auto-reply media size: ${(media.buffer.length / (1024 * 1024)).toFixed(2)}MB`,
 								);
+								logVerbose(
+									`Web auto-reply media source: ${replyResult.mediaUrl} (kind ${media.kind})`,
+								);
 							}
-							await msg.sendMedia({
-								image: media.buffer,
-								caption: replyResult.text || undefined,
-								mimetype: media.contentType,
-							});
+							if (media.kind === "image") {
+								await msg.sendMedia({
+									image: media.buffer,
+									caption: replyResult.text || undefined,
+									mimetype: media.contentType,
+								});
+							} else if (media.kind === "audio") {
+								await msg.sendMedia({
+									audio: media.buffer,
+									ptt: true,
+									mimetype: media.contentType,
+									caption: replyResult.text || undefined,
+								} as AnyMessageContent);
+							} else if (media.kind === "video") {
+								await msg.sendMedia({
+									video: media.buffer,
+									caption: replyResult.text || undefined,
+									mimetype: media.contentType,
+								});
+							} else {
+								const fileName =
+									replyResult.mediaUrl.split("/").pop() ?? "file";
+								await msg.sendMedia({
+									document: media.buffer,
+									fileName,
+									caption: replyResult.text || undefined,
+									mimetype: media.contentType,
+								} as AnyMessageContent);
+							}
 							logInfo(
 								`✅ Sent web media reply to ${msg.from} (${(media.buffer.length / (1024 * 1024)).toFixed(2)}MB)`,
 								runtime,
@@ -502,6 +530,7 @@ export async function monitorWebProvider(
 									text: replyResult.text ?? null,
 									mediaUrl: replyResult.mediaUrl,
 									mediaSizeBytes: media.buffer.length,
+									mediaKind: media.kind,
 									durationMs: Date.now() - replyStarted,
 								},
 								"auto-reply sent (media)",
@@ -727,22 +756,21 @@ async function downloadInboundMedia(
 
 async function loadWebMedia(
 	mediaUrl: string,
-	maxBytes: number = DEFAULT_WEB_MEDIA_BYTES,
-): Promise<{ buffer: Buffer; contentType?: string }> {
-	// Hard cap to avoid Anthropic/WhatsApp 5MB image limit that triggers API 400s.
+	maxBytes?: number,
+): Promise<{ buffer: Buffer; contentType?: string; kind: MediaKind }> {
 	if (mediaUrl.startsWith("file://")) {
 		mediaUrl = mediaUrl.replace("file://", "");
 	}
 
-	const optimizeAndClamp = async (buffer: Buffer) => {
+	const optimizeAndClampImage = async (buffer: Buffer, cap: number) => {
 		const originalSize = buffer.length;
-		const optimized = await optimizeImageToJpeg(buffer, maxBytes);
+		const optimized = await optimizeImageToJpeg(buffer, cap);
 		if (optimized.optimizedSize < originalSize && isVerbose()) {
 			logVerbose(
 				`Optimized media from ${(originalSize / (1024 * 1024)).toFixed(2)}MB to ${(optimized.optimizedSize / (1024 * 1024)).toFixed(2)}MB (side≤${optimized.resizeSide}px, q=${optimized.quality})`,
 			);
 		}
-		if (optimized.buffer.length > maxBytes) {
+		if (optimized.buffer.length > cap) {
 			throw new Error(
 				`Media could not be reduced below ${(maxBytes / (1024 * 1024)).toFixed(0)}MB (got ${(
 					optimized.buffer.length / (1024 * 1024)
@@ -752,6 +780,7 @@ async function loadWebMedia(
 		return {
 			buffer: optimized.buffer,
 			contentType: "image/jpeg",
+			kind: "image" as const,
 		};
 	};
 
@@ -761,11 +790,60 @@ async function loadWebMedia(
 			throw new Error(`Failed to fetch media: HTTP ${res.status}`);
 		}
 		const array = Buffer.from(await res.arrayBuffer());
-		return optimizeAndClamp(array);
+		const contentType = res.headers.get("content-type");
+		const kind = mediaKindFromMime(contentType);
+		const cap = Math.min(
+			maxBytes ?? maxBytesForKind(kind),
+			maxBytesForKind(kind),
+		);
+		if (kind === "image") {
+			return optimizeAndClampImage(array, cap);
+		}
+		if (array.length > cap) {
+			throw new Error(
+				`Media exceeds ${(cap / (1024 * 1024)).toFixed(0)}MB limit (got ${(
+					array.length / (1024 * 1024)
+				).toFixed(2)}MB)`,
+			);
+		}
+		return { buffer: array, contentType: contentType ?? undefined, kind };
 	}
 	// Local path
 	const data = await fs.readFile(mediaUrl);
-	return optimizeAndClamp(data);
+	const ext = path.extname(mediaUrl);
+	const mime =
+		(ext &&
+			(
+				{
+					".jpg": "image/jpeg",
+					".jpeg": "image/jpeg",
+					".png": "image/png",
+					".webp": "image/webp",
+					".gif": "image/gif",
+					".ogg": "audio/ogg",
+					".opus": "audio/ogg",
+					".mp3": "audio/mpeg",
+					".mp4": "video/mp4",
+					".pdf": "application/pdf",
+				} as Record<string, string | undefined>
+			)[ext.toLowerCase()]) ??
+		undefined;
+	const kind = mediaKindFromMime(mime);
+	const cap = Math.min(
+		maxBytes ?? maxBytesForKind(kind),
+		maxBytesForKind(kind),
+	);
+	if (kind === "image") {
+		return optimizeAndClampImage(data, cap);
+	}
+	if (data.length > cap) {
+		throw new Error(
+			`Media exceeds ${(cap / (1024 * 1024)).toFixed(0)}MB limit (got ${(
+				data.length / (1024 * 1024)
+			).toFixed(2)}MB)`,
+		);
+	}
+	return { buffer: data, contentType: mime, kind };
 }
 
 function getStatusCode(err: unknown) {

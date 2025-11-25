@@ -143,11 +143,11 @@ describe("config and templating", () => {
 			killed: false,
 		});
 
-		const result = await index.getReplyFromConfig(
-			{
-				Body: "<media:audio>",
-				From: "+1",
-				To: "+2",
+	const result = await index.getReplyFromConfig(
+		{
+			Body: "<media:audio>",
+			From: "+1",
+			To: "+2",
 				MediaPath: "/tmp/voice.ogg",
 				MediaType: "audio/ogg",
 			},
@@ -156,15 +156,15 @@ describe("config and templating", () => {
 			commandRunner,
 		);
 
-		expect(runExec).toHaveBeenCalled();
-		expect(commandRunner).toHaveBeenCalled();
-		const argv = commandRunner.mock.calls[0][0];
-		const prompt = argv[argv.length - 1] as string;
-		expect(prompt).toContain("/tmp/voice.ogg");
-		expect(prompt).toContain("Transcript:");
-		expect(prompt).toContain("voice transcript");
-		expect(result?.text).toBeUndefined();
-	});
+	expect(runExec).toHaveBeenCalled();
+	expect(commandRunner).toHaveBeenCalled();
+	const argv = commandRunner.mock.calls[0][0];
+	const prompt = argv[argv.length - 1] as string;
+	expect(prompt).toContain("/tmp/voice.ogg");
+	expect(prompt).toContain("Transcript:");
+	expect(prompt).toContain("voice transcript");
+	expect(result?.text).toBe("ok");
+});
 
 	it("getReplyFromConfig skips transcription when not configured", async () => {
 		const cfg = {

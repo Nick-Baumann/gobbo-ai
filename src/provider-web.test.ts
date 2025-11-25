@@ -719,8 +719,16 @@ describe("provider-web", () => {
 			sendMedia,
 		});
 
-		expect(sendMedia).not.toHaveBeenCalled();
-		expect(reply).toHaveBeenCalledWith("hi");
+		expect(sendMedia).toHaveBeenCalledTimes(1);
+		const payload = sendMedia.mock.calls[0][0] as {
+			document?: Buffer;
+			caption?: string;
+			fileName?: string;
+		};
+		expect(payload.document).toBeInstanceOf(Buffer);
+		expect(payload.fileName).toBe("file.pdf");
+		expect(payload.caption).toBe("hi");
+		expect(reply).not.toHaveBeenCalled();
 
 		fetchMock.mockRestore();
 	});
