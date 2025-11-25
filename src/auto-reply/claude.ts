@@ -88,6 +88,8 @@ const ClaudeJsonSchema = z
 		{ message: "Not a Claude JSON payload" },
 	);
 
+type ClaudeSafeParse = ReturnType<typeof ClaudeJsonSchema.safeParse>;
+
 export function parseClaudeJson(
 	raw: string,
 ): ClaudeJsonParseResult | undefined {
@@ -104,9 +106,7 @@ export function parseClaudeJson(
 		try {
 			const parsed = JSON.parse(candidate);
 			if (firstParsed === undefined) firstParsed = parsed;
-			let validation:
-				| z.SafeParseReturnType<unknown, z.infer<typeof ClaudeJsonSchema>>
-				| { success: false };
+			let validation: ClaudeSafeParse | { success: false };
 			try {
 				validation = ClaudeJsonSchema.safeParse(parsed);
 			} catch {
@@ -133,9 +133,7 @@ export function parseClaudeJson(
 		}
 	}
 	if (firstParsed !== undefined) {
-		let validation:
-			| z.SafeParseReturnType<unknown, z.infer<typeof ClaudeJsonSchema>>
-			| { success: false };
+		let validation: ClaudeSafeParse | { success: false };
 		try {
 			validation = ClaudeJsonSchema.safeParse(firstParsed);
 		} catch {

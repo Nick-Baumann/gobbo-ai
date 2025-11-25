@@ -23,6 +23,7 @@ import { sendTypingIndicator } from "../twilio/typing.js";
 import {
 	CLAUDE_BIN,
 	CLAUDE_IDENTITY_PREFIX,
+	type ClaudeJsonParseResult,
 	parseClaudeJson,
 } from "./claude.js";
 import {
