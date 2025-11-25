@@ -53,7 +53,7 @@ export async function createWaSocket(printQr: boolean, verbose: boolean) {
 		version,
 		logger,
 		printQRInTerminal: false,
-		browser: ["warelay", "cli", "0.1.3"],
+		browser: ["warelay", "cli", "0.1.4"],
 		syncFullHistory: false,
 		markOnlineOnConnect: false,
 	});

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] 0.1.4
+
+### Pending
+- (add entries here)
+
 ## 0.1.3 — 2025-11-25
 
 ### Features
