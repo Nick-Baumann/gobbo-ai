@@ -47,7 +47,7 @@ export async function upCommand(
 	}
 	const twilioClient = deps.createClient(env);
 	const senderSid = await deps.findWhatsappSenderSid(
-		twilioClient,
+		twilioClient as unknown as import("../twilio/types.js").TwilioSenderListClient,
 		env.whatsappFrom,
 		env.whatsappSenderSid,
 		runtime,

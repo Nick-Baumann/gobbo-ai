@@ -114,7 +114,7 @@ async function handleMessages(
 		if (!m.from || !m.to) continue;
 		try {
 			await deps.autoReplyIfConfigured(
-				client as unknown as {
+				client as unknown as import("./types.js").TwilioRequester & {
 					messages: { create: (opts: unknown) => Promise<unknown> };
 				},
 				m as unknown as MessageInstance,

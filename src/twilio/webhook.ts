@@ -43,7 +43,7 @@ export async function startWebhook(
       replyText = await getReplyFromConfig(
         { Body, From, To, MessageSid },
         {
-          onReplyStart: () => sendTypingIndicator(client, MessageSid, runtime),
+          onReplyStart: () => sendTypingIndicator(client, runtime, MessageSid),
         },
       );
     }

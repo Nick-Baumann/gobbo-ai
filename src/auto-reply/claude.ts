@@ -70,8 +70,8 @@ const ClaudeJsonSchema = z
 		num_turns: z.number().optional(),
 		session_id: z.string().optional(),
 		total_cost_usd: z.number().optional(),
-		usage: z.record(z.any()).optional(),
-		modelUsage: z.record(z.any()).optional(),
+		usage: z.record(z.string(), z.any()).optional(),
+		modelUsage: z.record(z.string(), z.any()).optional(),
 	})
 	.passthrough()
 	.refine(

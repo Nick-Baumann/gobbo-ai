@@ -16,8 +16,8 @@ type TwilioRequester = {
 
 export async function sendTypingIndicator(
 	client: TwilioRequester,
-	messageSid?: string,
 	runtime: RuntimeEnv,
+	messageSid?: string,
 ) {
 	// Best-effort WhatsApp typing indicator (public beta as of Nov 2025).
 	if (!messageSid) {

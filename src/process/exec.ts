@@ -1,18 +1,27 @@
 import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 
 import { danger, isVerbose } from "../globals.js";
 import { logDebug, logError } from "../logger.js";
+
+const execFileAsync = promisify(execFile);
 
 // Simple promise-wrapped execFile with optional verbosity logging.
 export async function runExec(
 	command: string,
 	args: string[],
-	timeoutMs = 10_000,
+	opts: number | { timeoutMs?: number; maxBuffer?: number } = 10_000,
 ): Promise<{ stdout: string; stderr: string }> {
+	const options =
+		typeof opts === "number"
+			? { timeout: opts, encoding: "utf8" as const }
+			: {
+					timeout: opts.timeoutMs,
+					maxBuffer: opts.maxBuffer,
+					encoding: "utf8" as const,
+				};
 	try {
-		const { stdout, stderr } = await execFile(command, args, {
-			timeout: timeoutMs,
-		});
+		const { stdout, stderr } = await execFileAsync(command, args, options);
 		if (isVerbose()) {
 			if (stdout.trim()) logDebug(stdout.trim());
 			if (stderr.trim()) logError(stderr.trim());

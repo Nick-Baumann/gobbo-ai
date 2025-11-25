@@ -197,6 +197,10 @@ With Tailscale:
 			const deps = createDefaultDeps();
 			try {
 				const server = await webhookCommand(opts, deps, defaultRuntime);
+				if (!server) {
+					defaultRuntime.log(info("Webhook dry-run complete; no server started."));
+					return;
+				}
 				process.on("SIGINT", () => {
 					server.close(() => {
 						console.log("\n👋 Webhook stopped");
@@ -227,6 +231,10 @@ With Tailscale:
 			const deps = createDefaultDeps();
 			try {
 				const { server } = await upCommand(opts, deps, defaultRuntime);
+				if (!server) {
+					defaultRuntime.log(info("Up dry-run complete; no server started."));
+					return;
+				}
 				process.on("SIGINT", () => {
 					server.close(() => {
 						console.log("\n👋 Webhook stopped");

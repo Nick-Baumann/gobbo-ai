@@ -25,8 +25,9 @@ const WA_WEB_AUTH_DIR = path.join(os.homedir(), ".warelay", "credentials");
 export async function createWaSocket(printQr: boolean, verbose: boolean) {
 	const logger = pino({ level: verbose ? "info" : "silent" });
 	// Some Baileys internals call logger.trace even when silent; ensure it's present.
-	if (typeof (logger as Record<string, unknown>).trace !== "function") {
-		(logger as unknown as { trace: () => void }).trace = () => {};
+	const loggerAny = logger as unknown as Record<string, unknown>;
+	if (typeof loggerAny.trace !== "function") {
+		loggerAny.trace = () => {};
 	}
 	await ensureDir(WA_WEB_AUTH_DIR);
 	const { state, saveCreds } = await useMultiFileAuthState(WA_WEB_AUTH_DIR);
@@ -81,7 +82,7 @@ export async function waitForWaConnection(
 
 		const handler = (...args: unknown[]) => {
 			const update = (args[0] ?? {}) as Partial<
-				import("baileys").ConnectionState
+				import("@whiskeysockets/baileys").ConnectionState
 			>;
 			if (update.connection === "open") {
 				evWithOff.off?.("connection.update", handler);
@@ -235,7 +236,7 @@ export async function monitorWebInbox(options: {
 				continue;
 			const from = jidToE164(remoteJid);
 			if (!from) continue;
-			const body = extractText(msg.message);
+			const body = extractText(msg.message ?? undefined);
 			if (!body) continue;
 			const chatJid = remoteJid;
 			const sendComposing = async () => {
