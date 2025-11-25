@@ -153,6 +153,7 @@ describe("provider-web", () => {
 
 		const listener = await monitorWebInbox({ verbose: false, onMessage });
 		const sock = getLastSocket();
+		expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("available");
 		const upsert = {
 			type: "notify",
 			messages: [
@@ -174,10 +175,8 @@ describe("provider-web", () => {
 		expect(sock.readMessages).toHaveBeenCalledWith([
 			{ remoteJid: "999@s.whatsapp.net", id: "abc", participant: undefined, fromMe: false },
 		]);
-		expect(sock.sendPresenceUpdate).toHaveBeenCalledWith(
-			"composing",
-			"999@s.whatsapp.net",
-		);
+		expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("available");
+		expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("composing", "999@s.whatsapp.net");
 		expect(sock.sendMessage).toHaveBeenCalledWith("999@s.whatsapp.net", {
 			text: "pong",
 		});
@@ -218,6 +217,7 @@ describe("provider-web", () => {
 				fromMe: false,
 			},
 		]);
+		expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("available");
 		await listener.close();
 	});
 
