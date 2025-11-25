@@ -2,15 +2,22 @@
 
 Send, receive, auto-reply, and inspect WhatsApp messages over **Twilio** or your personal **WhatsApp Web** session. Ships with a one-command webhook setup (Tailscale Funnel + Twilio callback) and a configurable auto-reply engine (plain text or command/Claude driven).
 
-## Quick Start (5 steps)
-1) Prereqs: Node 22+, `pnpm`, a Twilio account with a WhatsApp-enabled number; Tailscale optional for webhooks.
-2) Install deps: `pnpm install`
-3) Copy `.env.example` → `.env`; set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` **or** `TWILIO_API_KEY`/`TWILIO_API_SECRET`, and `TWILIO_WHATSAPP_FROM=whatsapp:+15551234567` (plus optional `TWILIO_SENDER_SID`).
-4) Send a test: `pnpm warelay send --to +12345550000 --message "Hi from warelay"`
-5) Choose how to receive replies:
-   - Polling (no ingress): `pnpm warelay relay --provider twilio --interval 5 --lookback 10`
-   - Webhook (automatic): `pnpm warelay up --port 42873 --path /webhook/whatsapp --verbose`
-   - Personal WhatsApp (no Twilio): `pnpm warelay web:login` then `pnpm warelay send --provider web ...`
+## Quick Start (pick your engine)
+Install from npm (global): `npm install -g warelay` (Node 22+). Then choose **one** path:
+
+**A) Personal WhatsApp Web (preferred: no Twilio creds, fastest setup)**
+1. Link your account: `warelay web:login` (scan the QR).
+2. Send a message: `warelay send --provider web --to +12345550000 --message "Hi from warelay"`.
+3. Stay online & auto-reply: `warelay relay --provider web --verbose`.
+
+**B) Twilio WhatsApp number (for delivery status + webhooks)**
+1. Copy `.env.example` → `.env`; set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` **or** `TWILIO_API_KEY`/`TWILIO_API_SECRET`, and `TWILIO_WHATSAPP_FROM=whatsapp:+15551234567` (optional `TWILIO_SENDER_SID`).
+2. Send a message: `warelay send --to +12345550000 --message "Hi from warelay"`.
+3. Receive replies:
+   - Polling (no ingress): `warelay relay --provider twilio --interval 5 --lookback 10`
+   - Webhook + public URL via Tailscale Funnel: `warelay up --port 42873 --path /webhook/whatsapp --verbose`
+
+> Already developing locally? You can still run `pnpm install` and `pnpm warelay ...` from the repo, but end users only need the npm package.
 
 ## Main Features
 - **Two providers:** Twilio (default) for reliable delivery + status; Web provider for quick personal sends/receives via QR login.
@@ -23,7 +30,7 @@ Send, receive, auto-reply, and inspect WhatsApp messages over **Twilio** or your
 | Command | What it does | Core flags |
 | --- | --- | --- |
 | `warelay send` | Send a WhatsApp message (Twilio or Web) | `--to <e164>` `--message <text>` `--wait <sec>` `--poll <sec>` `--provider twilio|web` `--json` `--dry-run` |
-| `warelay relay` | Auto-reply loop (poll Twilio or listen on Web) | `--provider auto|twilio|web` `--interval <sec>` `--lookback <min>` `--verbose` |
+| `warelay relay` | Auto-reply loop (poll Twilio or listen on Web) | `--provider <auto|twilio|web>` `--interval <sec>` `--lookback <min>` `--verbose` |
 | `warelay status` | Show recent sent/received messages | `--limit <n>` `--lookback <min>` `--json` |
 | `warelay webhook` | Run local inbound webhook server | `--port <port>` `--path <path>` `--reply <text>` `--verbose` `--yes` `--dry-run` |
 | `warelay up` | Turn on webhook + Tailscale Funnel + Twilio callback | `--port <port>` `--path <path>` `--verbose` `--yes` `--dry-run` |
