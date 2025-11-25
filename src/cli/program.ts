@@ -63,6 +63,7 @@ export function buildProgram() {
 		.option("--provider <provider>", "Provider: twilio | web", "twilio")
 		.option("--dry-run", "Print payload and skip sending", false)
 		.option("--json", "Output result as JSON", false)
+		.option("--verbose", "Verbose logging", false)
 		.addHelpText(
 			"after",
 			`
@@ -73,6 +74,7 @@ Examples:
   warelay send --to +15551234567 --message "Hi" --wait 60 --poll 3`,
 		)
 		.action(async (opts) => {
+			setVerbose(Boolean(opts.verbose));
 			const deps = createDefaultDeps();
 			try {
 				await sendCommand(opts, deps, defaultRuntime);
@@ -151,6 +153,7 @@ Examples:
 		.option("-l, --limit <count>", "Number of messages to show", "20")
 		.option("-b, --lookback <minutes>", "How far back to fetch messages", "240")
 		.option("--json", "Output JSON instead of text", false)
+		.option("--verbose", "Verbose logging", false)
 		.addHelpText(
 			"after",
 			`
@@ -160,6 +163,7 @@ Examples:
   warelay status --json --limit 50          # machine-readable output`,
 		)
 		.action(async (opts) => {
+			setVerbose(Boolean(opts.verbose));
 			const deps = createDefaultDeps();
 			try {
 				await statusCommand(opts, deps, defaultRuntime);
