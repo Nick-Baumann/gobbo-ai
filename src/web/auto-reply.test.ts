@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -135,6 +137,46 @@ describe("runWebHeartbeatOnce", () => {
       replyResolver: resolver,
     });
     expect(sender).toHaveBeenCalledWith("+1333", "ALERT", { verbose: false });
+  });
+
+  it("does not refresh updatedAt when heartbeat is skipped", async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "warelay-heartbeat-"),
+    );
+    const storePath = path.join(tmpDir, "sessions.json");
+    const now = Date.now();
+    const originalUpdated = now - 30 * 60 * 1000;
+    const store = {
+      "+1555": { sessionId: "sess1", updatedAt: originalUpdated },
+    };
+    await fs.writeFile(storePath, JSON.stringify(store));
+
+    const sender: typeof sendMessageWeb = vi.fn();
+    const resolver = vi.fn(async () => ({ text: HEARTBEAT_TOKEN }));
+    setLoadConfigMock({
+      inbound: {
+        allowFrom: ["+1555"],
+        reply: {
+          mode: "command",
+          session: {
+            store: storePath,
+            idleMinutes: 60,
+            heartbeatIdleMinutes: 10,
+          },
+        },
+      },
+    });
+
+    await runWebHeartbeatOnce({
+      to: "+1555",
+      verbose: false,
+      sender,
+      replyResolver: resolver,
+    });
+
+    const after = JSON.parse(await fs.readFile(storePath, "utf-8"));
+    expect(after["+1555"].updatedAt).toBe(originalUpdated);
+    expect(sender).not.toHaveBeenCalled();
   });
 });
 
