@@ -27,6 +27,19 @@ export type LoggingConfig = {
   file?: string;
 };
 
+export type WebReconnectConfig = {
+  initialMs?: number;
+  maxMs?: number;
+  factor?: number;
+  jitter?: number;
+  maxAttempts?: number; // 0 = unlimited
+};
+
+export type WebConfig = {
+  heartbeatSeconds?: number;
+  reconnect?: WebReconnectConfig;
+};
+
 export type WarelayConfig = {
   logging?: LoggingConfig;
   inbound?: {
@@ -51,6 +64,7 @@ export type WarelayConfig = {
       typingIntervalSeconds?: number; // how often to refresh typing indicator while command runs
     };
   };
+  web?: WebConfig;
 };
 
 export const CONFIG_PATH = path.join(os.homedir(), ".warelay", "warelay.json");
@@ -127,6 +141,20 @@ const WarelaySchema = z.object({
         })
         .optional(),
       reply: ReplySchema.optional(),
+    })
+    .optional(),
+  web: z
+    .object({
+      heartbeatSeconds: z.number().int().positive().optional(),
+      reconnect: z
+        .object({
+          initialMs: z.number().positive().optional(),
+          maxMs: z.number().positive().optional(),
+          factor: z.number().positive().optional(),
+          jitter: z.number().min(0).max(1).optional(),
+          maxAttempts: z.number().int().min(0).optional(),
+        })
+        .optional(),
     })
     .optional(),
 });

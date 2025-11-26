@@ -3,6 +3,7 @@
 export {
   DEFAULT_WEB_MEDIA_BYTES,
   monitorWebProvider,
+  type WebMonitorTuning,
 } from "./web/auto-reply.js";
 export {
   extractMediaPlaceholder,

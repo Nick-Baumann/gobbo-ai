@@ -36,7 +36,10 @@ function makeRunner(result: RunnerResult, capture: ReplyPayload[] = []) {
 }
 
 const enqueueImmediate = vi.fn(
-  async <T>(task: () => Promise<T>, opts?: { onWait?: (ms: number, ahead: number) => void }) => {
+  async <T>(
+    task: () => Promise<T>,
+    opts?: { onWait?: (ms: number, ahead: number) => void },
+  ) => {
     opts?.onWait?.(25, 2);
     return task();
   },
@@ -49,7 +52,7 @@ describe("summarizeClaudeMetadata", () => {
       num_turns: 3,
       total_cost_usd: 0.012345,
       usage: { server_tool_use: { a: 1, b: 2 } },
-      modelUsage: { "claude-3": 2, "haiku": 1 },
+      modelUsage: { "claude-3": 2, haiku: 1 },
     });
     expect(meta).toContain("duration=1200ms");
     expect(meta).toContain("turns=3");

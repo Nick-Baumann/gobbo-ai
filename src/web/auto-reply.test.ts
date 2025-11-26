@@ -25,8 +25,8 @@ describe("web auto-reply", () => {
   });
 
   it("reconnects after a connection close", async () => {
-    vi.useFakeTimers();
     const closeResolvers: Array<() => void> = [];
+    const sleep = vi.fn(async () => {});
     const listenerFactory = vi.fn(async () => {
       let _resolve!: () => void;
       const onClose = new Promise<void>((res) => {
@@ -48,23 +48,76 @@ describe("web auto-reply", () => {
       async () => ({ text: "ok" }),
       runtime as never,
       controller.signal,
+      {
+        heartbeatSeconds: 1,
+        reconnect: { initialMs: 10, maxMs: 10, maxAttempts: 3, factor: 1.1 },
+        sleep,
+      },
     );
 
     await Promise.resolve();
     expect(listenerFactory).toHaveBeenCalledTimes(1);
 
     closeResolvers[0]?.();
-    await Promise.resolve();
-    await vi.runOnlyPendingTimersAsync();
+    const waitForSecondCall = async () => {
+      const started = Date.now();
+      while (listenerFactory.mock.calls.length < 2 && Date.now() - started < 200) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    };
+    await waitForSecondCall();
     expect(listenerFactory).toHaveBeenCalledTimes(2);
     expect(runtime.error).toHaveBeenCalledWith(
-      expect.stringContaining("Reconnecting"),
+      expect.stringContaining("Retry 1"),
     );
 
     controller.abort();
     closeResolvers[1]?.();
-    await vi.runAllTimersAsync();
+    await new Promise((resolve) => setTimeout(resolve, 5));
     await run;
+  });
+
+  it("stops after hitting max reconnect attempts", async () => {
+    const closeResolvers: Array<() => void> = [];
+    const sleep = vi.fn(async () => {});
+    const listenerFactory = vi.fn(async () => {
+      const onClose = new Promise<void>((res) => closeResolvers.push(res));
+      return { close: vi.fn(), onClose };
+    });
+    const runtime = {
+      log: vi.fn(),
+      error: vi.fn(),
+      exit: vi.fn(),
+    };
+
+    const run = monitorWebProvider(
+      false,
+      listenerFactory,
+      true,
+      async () => ({ text: "ok" }),
+      runtime as never,
+      undefined,
+      {
+        heartbeatSeconds: 1,
+        reconnect: { initialMs: 5, maxMs: 5, maxAttempts: 2, factor: 1.1 },
+        sleep,
+      },
+    );
+
+    await Promise.resolve();
+    expect(listenerFactory).toHaveBeenCalledTimes(1);
+
+    closeResolvers.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(listenerFactory).toHaveBeenCalledTimes(2);
+
+    closeResolvers.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await run;
+
+    expect(runtime.error).toHaveBeenCalledWith(
+      expect.stringContaining("Reached max retries"),
+    );
   });
 
   it("falls back to text when media send fails", async () => {
@@ -429,6 +482,49 @@ describe("web auto-reply", () => {
     expect(reply).not.toHaveBeenCalled();
 
     fetchMock.mockRestore();
+  });
+
+  it("emits heartbeat logs with connection metadata", async () => {
+    vi.useFakeTimers();
+    const logPath = `/tmp/warelay-heartbeat-${crypto.randomUUID()}.log`;
+    setLoggerOverride({ level: "trace", file: logPath });
+
+    const runtime = {
+      log: vi.fn(),
+      error: vi.fn(),
+      exit: vi.fn(),
+    };
+
+    const controller = new AbortController();
+    const listenerFactory = vi.fn(async () => {
+      const onClose = new Promise<void>(() => {
+        // never resolves; abort will short-circuit
+      });
+      return { close: vi.fn(), onClose };
+    });
+
+    const run = monitorWebProvider(
+      false,
+      listenerFactory,
+      true,
+      async () => ({ text: "ok" }),
+      runtime as never,
+      controller.signal,
+      {
+        heartbeatSeconds: 1,
+        reconnect: { initialMs: 5, maxMs: 5, maxAttempts: 1, factor: 1.1 },
+      },
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    controller.abort();
+    await vi.runAllTimersAsync();
+    await run.catch(() => {});
+
+    const content = await fs.readFile(logPath, "utf-8");
+    expect(content).toContain('"module":"web-heartbeat"');
+    expect(content).toMatch(/connectionId/);
+    expect(content).toMatch(/messagesHandled/);
   });
 
   it("logs outbound replies to file", async () => {

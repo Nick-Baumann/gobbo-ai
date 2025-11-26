@@ -57,7 +57,11 @@ describe("transcribeInboundAudio", () => {
   });
 
   it("returns undefined when no transcription command", async () => {
-    const res = await transcribeInboundAudio({ inbound: {} } as never, {} as never, runtime as never);
+    const res = await transcribeInboundAudio(
+      { inbound: {} } as never,
+      {} as never,
+      runtime as never,
+    );
     expect(res).toBeUndefined();
   });
 });

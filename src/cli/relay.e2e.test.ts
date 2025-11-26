@@ -38,7 +38,8 @@ describe("CLI relay command (e2e-ish)", () => {
 
     expect(pickProvider).toHaveBeenCalledWith("web");
     expect(logWebSelfId).toHaveBeenCalledTimes(1);
-    expect(monitorWebProvider).toHaveBeenCalledWith(false);
+    expect(monitorWebProvider).toHaveBeenCalledTimes(1);
+    expect(monitorWebProvider.mock.calls[0][0]).toBe(false);
     expect(monitorTwilio).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -163,6 +164,24 @@ function readWebSelfId() {
   } catch {
     return { e164: null, jid: null } as const;
   }
+}
+
+/**
+ * Return the age (in milliseconds) of the cached WhatsApp web auth state, or null when missing.
+ * Helpful for heartbeats/observability to spot stale credentials.
+ */
+export function getWebAuthAgeMs(): number | null {
+  const credsPath = path.join(WA_WEB_AUTH_DIR, "creds.json");
+  try {
+    const stats = fsSync.statSync(credsPath);
+    return Date.now() - stats.mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+export function newConnectionId() {
+  return randomUUID();
 }
 
 export function logWebSelfId(

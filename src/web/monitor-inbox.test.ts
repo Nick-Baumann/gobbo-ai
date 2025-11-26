@@ -1,11 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { resetLogger, setLoggerOverride } from "../logging.js";
+import { vi } from "vitest";
 
 vi.mock("../media/store.js", () => ({
-  saveMediaBuffer: vi
-    .fn()
-    .mockResolvedValue({ id: "mid", path: "/tmp/mid", size: 1, contentType: "image/jpeg" }),
+  saveMediaBuffer: vi.fn().mockResolvedValue({
+    id: "mid",
+    path: "/tmp/mid",
+    size: 1,
+    contentType: "image/jpeg",
+  }),
 }));
 
 vi.mock("./session.js", () => {
@@ -28,15 +29,16 @@ vi.mock("./session.js", () => {
   };
 });
 
-import { monitorWebInbox } from "./inbound.js";
 const { createWaSocket } = await import("./session.js");
-const getSock = () => (createWaSocket as unknown as () => Promise<ReturnType<typeof mockSock>>)();
+const _getSock = () =>
+  (createWaSocket as unknown as () => Promise<ReturnType<typeof mockSock>>)();
+
 import crypto from "node:crypto";
 import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetLogger, setLoggerOverride } from "../logging.js";
 import { monitorWebInbox } from "./inbound.js";

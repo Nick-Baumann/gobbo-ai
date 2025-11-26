@@ -1248,11 +1248,12 @@ describe("monitoring", () => {
     const replySpy = vi.fn();
     const sendMediaSpy = vi.fn();
     const listenerFactory = vi.fn(
-      async (
-        opts: Parameters<typeof index.monitorWebProvider>[1] extends undefined
-          ? never
-          : NonNullable<Parameters<typeof index.monitorWebProvider>[1]>,
-      ) => {
+      async (opts: {
+        verbose: boolean;
+        onMessage: (
+          msg: import("./web/inbound.js").WebInboundMessage,
+        ) => Promise<void>;
+      }) => {
         await opts.onMessage({
           body: "hello",
           from: "+1",

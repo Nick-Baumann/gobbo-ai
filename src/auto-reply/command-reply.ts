@@ -6,7 +6,7 @@ import { isVerbose, logVerbose } from "../globals.js";
 import { logError } from "../logger.js";
 import { splitMediaFromOutput } from "../media/parse.js";
 import { enqueueCommand } from "../process/command-queue.js";
-import { runCommandWithTimeout } from "../process/exec.js";
+import type { runCommandWithTimeout } from "../process/exec.js";
 import {
   CLAUDE_BIN,
   CLAUDE_IDENTITY_PREFIX,
@@ -116,6 +116,10 @@ export async function runCommandReply(
     enqueue = enqueueCommand,
   } = params;
 
+  if (!reply.command?.length) {
+    throw new Error("reply.command is required for mode=command");
+  }
+
   let argv = reply.command.map((part) => applyTemplate(part, templatingCtx));
   const templatePrefix =
     reply.template && (!sendSystemOnce || isFirstTurnInSession || !systemSent)
@@ -132,7 +136,8 @@ export async function runCommandReply(
     path.basename(argv[0]) === CLAUDE_BIN
   ) {
     const hasOutputFormat = argv.some(
-      (part) => part === "--output-format" || part.startsWith("--output-format="),
+      (part) =>
+        part === "--output-format" || part.startsWith("--output-format="),
     );
     const insertBeforeBody = Math.max(argv.length - 1, 0);
     if (!hasOutputFormat) {
@@ -211,12 +216,17 @@ export async function runCommandReply(
       logVerbose(`Command auto-reply stderr: ${stderr.trim()}`);
     }
     let parsed: ClaudeJsonParseResult | undefined;
-    if (trimmed && (reply.claudeOutputFormat === "json" || isClaudeInvocation)) {
+    if (
+      trimmed &&
+      (reply.claudeOutputFormat === "json" || isClaudeInvocation)
+    ) {
       parsed = parseClaudeJson(trimmed);
       if (parsed?.parsed && isVerbose()) {
         const summary = summarizeClaudeMetadata(parsed.parsed);
         if (summary) logVerbose(`Claude JSON meta: ${summary}`);
-        logVerbose(`Claude JSON raw: ${JSON.stringify(parsed.parsed, null, 2)}`);
+        logVerbose(
+          `Claude JSON raw: ${JSON.stringify(parsed.parsed, null, 2)}`,
+        );
       }
       if (parsed?.text) {
         logVerbose(
@@ -256,7 +266,9 @@ export async function runCommandReply(
           exitCode: code,
           signal,
           killed,
-          claudeMeta: parsed ? summarizeClaudeMetadata(parsed.parsed) : undefined,
+          claudeMeta: parsed
+            ? summarizeClaudeMetadata(parsed.parsed)
+            : undefined,
         },
       };
     }
@@ -273,7 +285,9 @@ export async function runCommandReply(
           exitCode: code,
           signal,
           killed,
-          claudeMeta: parsed ? summarizeClaudeMetadata(parsed.parsed) : undefined,
+          claudeMeta: parsed
+            ? summarizeClaudeMetadata(parsed.parsed)
+            : undefined,
         },
       };
     }
@@ -344,7 +358,9 @@ export async function runCommandReply(
         `${timeoutSeconds}s${reply.cwd ? ` (cwd: ${reply.cwd})` : ""}. Try a shorter prompt or split the request.`;
       const partial = errorObj.stdout?.trim();
       const partialSnippet =
-        partial && partial.length > 800 ? `${partial.slice(0, 800)}...` : partial;
+        partial && partial.length > 800
+          ? `${partial.slice(0, 800)}...`
+          : partial;
       const text = partialSnippet
         ? `${baseMsg}\n\nPartial output before timeout:\n${partialSnippet}`
         : baseMsg;

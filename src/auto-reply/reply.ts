@@ -17,14 +17,15 @@ import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import type { TwilioRequester } from "../twilio/types.js";
 import { sendTypingIndicator } from "../twilio/typing.js";
 import { runCommandReply } from "./command-reply.js";
-import { transcribeInboundAudio, isAudio } from "./transcription.js";
 import {
   applyTemplate,
   type MsgContext,
   type TemplateContext,
 } from "./templating.js";
+import { isAudio, transcribeInboundAudio } from "./transcription.js";
 import type { GetReplyOptions, ReplyPayload } from "./types.js";
-export type { ReplyPayload, GetReplyOptions } from "./types.js";
+
+export type { GetReplyOptions, ReplyPayload } from "./types.js";
 
 export async function getReplyFromConfig(
   ctx: MsgContext,
@@ -238,11 +239,16 @@ export async function getReplyFromConfig(
     return result;
   }
 
-  if (reply.mode === "command" && reply.command?.length) {
+  if (reply && reply.mode === "command" && reply.command?.length) {
     await onReplyStart();
+    const commandReply = {
+      ...reply,
+      command: reply.command,
+      mode: "command" as const,
+    };
     try {
       const { payload, meta } = await runCommandReply({
-        reply,
+        reply: commandReply,
         templatingCtx,
         sendSystemOnce,
         isNewSession,

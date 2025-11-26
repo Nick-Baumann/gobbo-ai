@@ -20,6 +20,7 @@ vi.mock("./session.js", () => {
 
 import { loginWeb } from "./login.js";
 import type { waitForWaConnection } from "./session.js";
+
 const { createWaSocket } = await import("./session.js");
 
 describe("web login", () => {

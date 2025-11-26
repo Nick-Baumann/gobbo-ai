@@ -18,6 +18,7 @@ vi.mock("./session.js", () => {
 });
 
 import { sendMessageWeb } from "./outbound.js";
+
 const { createWaSocket } = await import("./session.js");
 
 describe("web outbound", () => {

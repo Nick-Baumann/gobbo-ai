@@ -1,14 +1,12 @@
+import { EventEmitter } from "node:events";
+import fsSync from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   baileys,
   getLastSocket,
   resetBaileysMocks,
   resetLoadConfigMock,
 } from "./test-helpers.js";
-import { EventEmitter } from "node:events";
-import fsSync from "node:fs";
-
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { resetLogger, setLoggerOverride } from "../logging.js";
 import {
   createWaSocket,

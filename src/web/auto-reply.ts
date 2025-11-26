@@ -1,33 +1,126 @@
+import { randomUUID } from "node:crypto";
+
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import { waitForever } from "../cli/wait.js";
-import { loadConfig } from "../config/config.js";
+import { loadConfig, type WarelayConfig } from "../config/config.js";
 import { danger, isVerbose, logVerbose, success } from "../globals.js";
 import { logInfo } from "../logger.js";
 import { getChildLogger } from "../logging.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { monitorWebInbox } from "./inbound.js";
 import { loadWebMedia } from "./media.js";
+import { getWebAuthAgeMs, newConnectionId } from "./session.js";
 
 const DEFAULT_WEB_MEDIA_BYTES = 5 * 1024 * 1024;
+const DEFAULT_HEARTBEAT_SECONDS = 60;
+const DEFAULT_RECONNECT_POLICY: ReconnectPolicy = {
+  initialMs: 2_000,
+  maxMs: 30_000,
+  factor: 1.8,
+  jitter: 0.25,
+  maxAttempts: 12,
+};
+
+type ReconnectPolicy = {
+  initialMs: number;
+  maxMs: number;
+  factor: number;
+  jitter: number;
+  maxAttempts: number;
+};
+
+export type WebMonitorTuning = {
+  reconnect?: Partial<ReconnectPolicy>;
+  heartbeatSeconds?: number;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+};
 
 const formatDuration = (ms: number) =>
   ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms}ms`;
 
+const clamp = (val: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, val));
+
+function resolveHeartbeatSeconds(
+  cfg: WarelayConfig,
+  tuning?: WebMonitorTuning,
+): number {
+  const candidate = tuning?.heartbeatSeconds ?? cfg.web?.heartbeatSeconds;
+  if (typeof candidate === "number" && candidate > 0) return candidate;
+  return DEFAULT_HEARTBEAT_SECONDS;
+}
+
+function resolveReconnectPolicy(
+  cfg: WarelayConfig,
+  tuning?: WebMonitorTuning,
+): ReconnectPolicy {
+  const merged = {
+    ...DEFAULT_RECONNECT_POLICY,
+    ...(cfg.web?.reconnect ?? {}),
+    ...(tuning?.reconnect ?? {}),
+  } as ReconnectPolicy;
+
+  // Keep the values sane to avoid runaway retries.
+  merged.initialMs = Math.max(250, merged.initialMs);
+  merged.maxMs = Math.max(merged.initialMs, merged.maxMs);
+  merged.factor = clamp(merged.factor, 1.1, 10);
+  merged.jitter = clamp(merged.jitter, 0, 1);
+  merged.maxAttempts = Math.max(0, Math.floor(merged.maxAttempts));
+  return merged;
+}
+
+function computeBackoff(policy: ReconnectPolicy, attempt: number) {
+  // attempt is 1-based.
+  const base = policy.initialMs * policy.factor ** (attempt - 1);
+  const jitter = base * policy.jitter * Math.random();
+  return Math.min(policy.maxMs, Math.round(base + jitter));
+}
+
+function sleepWithAbort(ms: number, abortSignal?: AbortSignal) {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("aborted"));
+    };
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      abortSignal?.removeEventListener("abort", onAbort);
+    };
+
+    if (abortSignal) {
+      abortSignal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+}
+
 export async function monitorWebProvider(
   verbose: boolean,
-  listenerFactory = monitorWebInbox,
+  listenerFactory: typeof monitorWebInbox | undefined = monitorWebInbox,
   keepAlive = true,
-  replyResolver: typeof getReplyFromConfig = getReplyFromConfig,
+  replyResolver: typeof getReplyFromConfig | undefined = getReplyFromConfig,
   runtime: RuntimeEnv = defaultRuntime,
   abortSignal?: AbortSignal,
+  tuning: WebMonitorTuning = {},
 ) {
-  const replyLogger = getChildLogger({ module: "web-auto-reply" });
+  const runId = randomUUID();
+  const replyLogger = getChildLogger({ module: "web-auto-reply", runId });
+  const heartbeatLogger = getChildLogger({ module: "web-heartbeat", runId });
   const cfg = loadConfig();
   const configuredMaxMb = cfg.inbound?.reply?.mediaMaxMb;
   const maxMediaBytes =
     typeof configuredMaxMb === "number" && configuredMaxMb > 0
       ? configuredMaxMb * 1024 * 1024
       : DEFAULT_WEB_MEDIA_BYTES;
+  const heartbeatSeconds = resolveHeartbeatSeconds(cfg, tuning);
+  const reconnectPolicy = resolveReconnectPolicy(cfg, tuning);
+  const sleep = tuning.sleep ?? ((ms: number, signal?: AbortSignal) => sleepWithAbort(ms, signal ?? abortSignal));
   const stopRequested = () => abortSignal?.aborted === true;
   const abortPromise =
     abortSignal &&
@@ -37,22 +130,49 @@ export async function monitorWebProvider(
       }),
     );
 
-  const sleep = (ms: number) =>
-    new Promise<void>((resolve) => setTimeout(resolve, ms));
+  let sigintStop = false;
+  const handleSigint = () => {
+    sigintStop = true;
+  };
+  process.once("SIGINT", handleSigint);
+
+  let reconnectAttempts = 0;
 
   while (true) {
     if (stopRequested()) break;
 
-    const listener = await listenerFactory({
+    const connectionId = newConnectionId();
+    const startedAt = Date.now();
+    let heartbeat: NodeJS.Timeout | null = null;
+    let lastMessageAt: number | null = null;
+    let handledMessages = 0;
+
+    const listener = await (listenerFactory ?? monitorWebInbox)({
       verbose,
       onMessage: async (msg) => {
+        handledMessages += 1;
+        lastMessageAt = Date.now();
         const ts = msg.timestamp
           ? new Date(msg.timestamp).toISOString()
           : new Date().toISOString();
+        const correlationId = msg.id ?? randomUUID();
+        replyLogger.info(
+          {
+            connectionId,
+            correlationId,
+            from: msg.from,
+            to: msg.to,
+            body: msg.body,
+            mediaType: msg.mediaType ?? null,
+            mediaPath: msg.mediaPath ?? null,
+          },
+          "inbound web message",
+        );
+
         console.log(`\n[${ts}] ${msg.from} -> ${msg.to}: ${msg.body}`);
 
         const replyStarted = Date.now();
-        const replyResult = await replyResolver(
+        const replyResult = await (replyResolver ?? getReplyFromConfig)(
           {
             Body: msg.body,
             From: msg.from,
@@ -137,6 +257,8 @@ export async function monitorWebProvider(
                 );
                 replyLogger.info(
                   {
+                    connectionId,
+                    correlationId,
                     to: msg.from,
                     from: msg.to,
                     text: index === 0 ? (replyResult.text ?? null) : null,
@@ -182,6 +304,8 @@ export async function monitorWebProvider(
           }
           replyLogger.info(
             {
+              connectionId,
+              correlationId,
               to: msg.from,
               from: msg.to,
               text: replyResult.text ?? null,
@@ -200,28 +324,54 @@ export async function monitorWebProvider(
       },
     });
 
+    const closeListener = async () => {
+      if (heartbeat) clearInterval(heartbeat);
+      try {
+        await listener.close();
+      } catch (err) {
+        logVerbose(`Socket close failed: ${String(err)}`);
+      }
+    };
+
+    if (keepAlive) {
+      heartbeat = setInterval(() => {
+        const authAgeMs = getWebAuthAgeMs();
+        heartbeatLogger.info(
+          {
+            connectionId,
+            reconnectAttempts,
+            messagesHandled: handledMessages,
+            lastMessageAt,
+            authAgeMs,
+            uptimeMs: Date.now() - startedAt,
+          },
+          "web relay heartbeat",
+        );
+      }, heartbeatSeconds * 1000);
+    }
+
     logInfo(
       "📡 Listening for personal WhatsApp Web inbound messages. Leave this running; Ctrl+C to stop.",
       runtime,
     );
-    let stop = false;
-    process.on("SIGINT", () => {
-      stop = true;
-      void listener.close().finally(() => {
-        logInfo("👋 Web monitor stopped", runtime);
-        runtime.exit(0);
-      });
-    });
 
-    if (!keepAlive) return;
+    if (!keepAlive) {
+      await closeListener();
+      return;
+    }
 
     const reason = await Promise.race([
       listener.onClose ?? waitForever(),
       abortPromise ?? waitForever(),
     ]);
 
-    if (stopRequested() || stop || reason === "aborted") {
-      await listener.close();
+    const uptimeMs = Date.now() - startedAt;
+    if (uptimeMs > heartbeatSeconds * 1000) {
+      reconnectAttempts = 0; // Healthy stretch; reset the backoff.
+    }
+
+    if (stopRequested() || sigintStop || reason === "aborted") {
+      await closeListener();
       break;
     }
 
@@ -241,17 +391,39 @@ export async function monitorWebProvider(
           "WhatsApp session logged out. Run `warelay login --provider web` to relink.",
         ),
       );
+      await closeListener();
       break;
     }
 
+    reconnectAttempts += 1;
+    if (
+      reconnectPolicy.maxAttempts > 0 &&
+      reconnectAttempts >= reconnectPolicy.maxAttempts
+    ) {
+      runtime.error(
+        danger(
+          `WhatsApp Web connection closed (status ${status}). Reached max retries (${reconnectPolicy.maxAttempts}); exiting so you can relink.`,
+        ),
+      );
+      await closeListener();
+      break;
+    }
+
+    const delay = computeBackoff(reconnectPolicy, reconnectAttempts);
     runtime.error(
       danger(
-        `WhatsApp Web connection closed (status ${status}). Reconnecting in 2s…`,
+        `WhatsApp Web connection closed (status ${status}). Retry ${reconnectAttempts}/${reconnectPolicy.maxAttempts || "∞"} in ${formatDuration(delay)}…`,
       ),
     );
-    await listener.close();
-    await sleep(2_000);
+    await closeListener();
+    try {
+      await sleep(delay, abortSignal);
+    } catch {
+      break;
+    }
   }
+
+  process.removeListener("SIGINT", handleSigint);
 }
 
 export { DEFAULT_WEB_MEDIA_BYTES };

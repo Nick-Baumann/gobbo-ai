@@ -10,6 +10,7 @@ import {
   logoutWeb,
   monitorWebProvider,
   pickProvider,
+  type WebMonitorTuning,
 } from "../provider-web.js";
 import { defaultRuntime } from "../runtime.js";
 import type { Provider } from "../utils.js";
@@ -178,6 +179,19 @@ Examples:
       "Initial lookback window for twilio mode",
       "5",
     )
+    .option(
+      "--web-heartbeat <seconds>",
+      "Heartbeat interval for web relay health logs (seconds)",
+    )
+    .option(
+      "--web-retries <count>",
+      "Max consecutive web reconnect attempts before exit (0 = unlimited)",
+    )
+    .option(
+      "--web-retry-initial <ms>",
+      "Initial reconnect backoff for web relay (ms)",
+    )
+    .option("--web-retry-max <ms>", "Max reconnect backoff for web relay (ms)")
     .option("--verbose", "Verbose logging", false)
     .addHelpText(
       "after",
@@ -198,6 +212,22 @@ Examples:
       }
       const intervalSeconds = Number.parseInt(opts.interval, 10);
       const lookbackMinutes = Number.parseInt(opts.lookback, 10);
+      const webHeartbeat =
+        opts.webHeartbeat !== undefined
+          ? Number.parseInt(String(opts.webHeartbeat), 10)
+          : undefined;
+      const webRetries =
+        opts.webRetries !== undefined
+          ? Number.parseInt(String(opts.webRetries), 10)
+          : undefined;
+      const webRetryInitial =
+        opts.webRetryInitial !== undefined
+          ? Number.parseInt(String(opts.webRetryInitial), 10)
+          : undefined;
+      const webRetryMax =
+        opts.webRetryMax !== undefined
+          ? Number.parseInt(String(opts.webRetryMax), 10)
+          : undefined;
       if (Number.isNaN(intervalSeconds) || intervalSeconds <= 0) {
         defaultRuntime.error("Interval must be a positive integer");
         defaultRuntime.exit(1);
@@ -206,13 +236,67 @@ Examples:
         defaultRuntime.error("Lookback must be >= 0 minutes");
         defaultRuntime.exit(1);
       }
+      if (
+        webHeartbeat !== undefined &&
+        (Number.isNaN(webHeartbeat) || webHeartbeat <= 0)
+      ) {
+        defaultRuntime.error("--web-heartbeat must be a positive integer");
+        defaultRuntime.exit(1);
+      }
+      if (
+        webRetries !== undefined &&
+        (Number.isNaN(webRetries) || webRetries < 0)
+      ) {
+        defaultRuntime.error("--web-retries must be >= 0");
+        defaultRuntime.exit(1);
+      }
+      if (
+        webRetryInitial !== undefined &&
+        (Number.isNaN(webRetryInitial) || webRetryInitial <= 0)
+      ) {
+        defaultRuntime.error("--web-retry-initial must be a positive integer");
+        defaultRuntime.exit(1);
+      }
+      if (
+        webRetryMax !== undefined &&
+        (Number.isNaN(webRetryMax) || webRetryMax <= 0)
+      ) {
+        defaultRuntime.error("--web-retry-max must be a positive integer");
+        defaultRuntime.exit(1);
+      }
+      if (
+        webRetryMax !== undefined &&
+        webRetryInitial !== undefined &&
+        webRetryMax < webRetryInitial
+      ) {
+        defaultRuntime.error("--web-retry-max must be >= --web-retry-initial");
+        defaultRuntime.exit(1);
+      }
+
+      const webTuning: WebMonitorTuning = {};
+      if (webHeartbeat !== undefined) webTuning.heartbeatSeconds = webHeartbeat;
+      const reconnect: WebMonitorTuning["reconnect"] = {};
+      if (webRetries !== undefined) reconnect.maxAttempts = webRetries;
+      if (webRetryInitial !== undefined) reconnect.initialMs = webRetryInitial;
+      if (webRetryMax !== undefined) reconnect.maxMs = webRetryMax;
+      if (Object.keys(reconnect).length > 0) {
+        webTuning.reconnect = reconnect;
+      }
 
       const provider = await pickProvider(providerPref as Provider | "auto");
 
       if (provider === "web") {
         logWebSelfId(defaultRuntime, true);
         try {
-          await monitorWebProvider(Boolean(opts.verbose));
+          await monitorWebProvider(
+            Boolean(opts.verbose),
+            undefined,
+            true,
+            undefined,
+            defaultRuntime,
+            undefined,
+            webTuning,
+          );
           return;
         } catch (err) {
           defaultRuntime.error(
