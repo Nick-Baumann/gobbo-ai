@@ -181,6 +181,11 @@ Examples:
     .description("Trigger a heartbeat poll once (web provider, no tmux)")
     .option("--provider <provider>", "auto | web", "auto")
     .option("--to <number>", "Override target E.164; defaults to allowFrom[0]")
+    .option(
+      "--all",
+      "Send heartbeat to all active sessions (or allowFrom entries when none)",
+      false,
+    )
     .option("--verbose", "Verbose logging", false)
     .addHelpText(
       "after",
@@ -188,21 +193,35 @@ Examples:
 Examples:
   warelay heartbeat                 # uses web session + first allowFrom contact
   warelay heartbeat --verbose       # prints detailed heartbeat logs
-  warelay heartbeat --to +1555123   # override destination`,
+  warelay heartbeat --to +1555123   # override destination
+  warelay heartbeat --all           # send to every active session recipient`,
     )
     .action(async (opts) => {
       setVerbose(Boolean(opts.verbose));
       const cfg = loadConfig();
-      const to =
-        opts.to ??
-        (Array.isArray(cfg.inbound?.allowFrom) &&
-        cfg.inbound?.allowFrom?.length > 0
-          ? cfg.inbound.allowFrom[0]
-          : null);
-      if (!to) {
+      const allowAll = Boolean(opts.all);
+      const resolution = resolveHeartbeatRecipients(cfg, {
+        to: opts.to,
+        all: allowAll,
+      });
+      if (
+        !opts.to &&
+        !allowAll &&
+        resolution.source === "session-ambiguous" &&
+        resolution.recipients.length > 1
+      ) {
         defaultRuntime.error(
           danger(
-            "No destination found. Set inbound.allowFrom in ~/.warelay/warelay.json or pass --to <E.164>.",
+            `Multiple active sessions found (${resolution.recipients.join(", ")}). Pass --to <E.164> or --all to send to all.`,
+          ),
+        );
+        defaultRuntime.exit(1);
+      }
+      const recipients = resolution.recipients;
+      if (!recipients || recipients.length === 0) {
+        defaultRuntime.error(
+          danger(
+            "No destination found. Add inbound.allowFrom numbers or pass --to <E.164>.",
           ),
         );
         defaultRuntime.exit(1);
@@ -222,11 +241,13 @@ Examples:
         defaultRuntime.exit(1);
       }
       try {
-        await runWebHeartbeatOnce({
-          to,
-          verbose: Boolean(opts.verbose),
-          runtime: defaultRuntime,
-        });
+        for (const to of recipients) {
+          await runWebHeartbeatOnce({
+            to,
+            verbose: Boolean(opts.verbose),
+            runtime: defaultRuntime,
+          });
+        }
       } catch {
         defaultRuntime.exit(1);
       }

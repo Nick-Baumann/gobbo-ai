@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
+import { isVerbose, logVerbose } from "./globals.js";
 
 export async function ensureDir(dir: string) {
   await fs.promises.mkdir(dir, { recursive: true });
@@ -53,6 +54,11 @@ export function jidToE164(jid: string): string | null {
       const phone = JSON.parse(data);
       if (phone) return `+${phone}`;
     } catch {
+      if (isVerbose()) {
+        logVerbose(
+          `LID mapping not found for ${lid}; skipping inbound message`,
+        );
+      }
       // Mapping not found, fall through
     }
   }

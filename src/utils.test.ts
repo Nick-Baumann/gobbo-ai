@@ -4,7 +4,9 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   assertProvider,
+  CONFIG_DIR,
   ensureDir,
+  jidToE164,
   normalizeE164,
   normalizePath,
   sleep,
@@ -65,5 +67,21 @@ describe("normalizeE164 & toWhatsappJid", () => {
     expect(toWhatsappJid("whatsapp:+555 123 4567")).toBe(
       "5551234567@s.whatsapp.net",
     );
+  });
+});
+
+describe("jidToE164", () => {
+  it("maps @lid using reverse mapping file", () => {
+    const mappingPath = `${CONFIG_DIR}/credentials/lid-mapping-123_reverse.json`;
+    const original = fs.readFileSync;
+    const spy = vi
+      .spyOn(fs, "readFileSync")
+      // biome-ignore lint/suspicious/noExplicitAny: forwarding to native signature
+      .mockImplementation((path: any, encoding?: any) => {
+        if (path === mappingPath) return `"5551234"`;
+        return original(path, encoding);
+      });
+    expect(jidToE164("123@lid")).toBe("+5551234");
+    spy.mockRestore();
   });
 });

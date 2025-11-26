@@ -5,6 +5,7 @@ export {
   HEARTBEAT_PROMPT,
   HEARTBEAT_TOKEN,
   monitorWebProvider,
+  resolveHeartbeatRecipients,
   runWebHeartbeatOnce,
   type WebMonitorTuning,
 } from "./web/auto-reply.js";

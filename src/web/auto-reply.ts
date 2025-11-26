@@ -75,13 +75,14 @@ export function stripHeartbeatToken(raw?: string) {
 }
 
 export async function runWebHeartbeatOnce(opts: {
+  cfg?: ReturnType<typeof loadConfig>;
   to: string;
   verbose?: boolean;
   replyResolver?: typeof getReplyFromConfig;
   runtime?: RuntimeEnv;
   sender?: typeof sendMessageWeb;
 }) {
-  const { to, verbose = false } = opts;
+  const { cfg: cfgOverride, to, verbose = false } = opts;
   const _runtime = opts.runtime ?? defaultRuntime;
   const replyResolver = opts.replyResolver ?? getReplyFromConfig;
   const sender = opts.sender ?? sendMessageWeb;
@@ -92,7 +93,7 @@ export async function runWebHeartbeatOnce(opts: {
     to,
   });
 
-  const cfg = loadConfig();
+  const cfg = cfgOverride ?? loadConfig();
   const sessionSnapshot = getSessionSnapshot(cfg, to, true);
   if (verbose) {
     heartbeatLogger.info(
@@ -184,15 +185,65 @@ function getFallbackRecipient(cfg: ReturnType<typeof loadConfig>) {
   const store = loadSessionStore(storePath);
   const candidates = Object.entries(store).filter(([key]) => key !== "global");
   if (candidates.length === 0) {
-    return (
-      (Array.isArray(cfg.inbound?.allowFrom) && cfg.inbound.allowFrom[0]) ||
-      null
-    );
+    const allowFrom =
+      Array.isArray(cfg.inbound?.allowFrom) && cfg.inbound.allowFrom.length > 0
+        ? cfg.inbound.allowFrom.filter((v) => v !== "*")
+        : [];
+    if (allowFrom.length === 0) return null;
+    return allowFrom[0] ? normalizeE164(allowFrom[0]) : null;
   }
   const mostRecent = candidates.sort(
     (a, b) => (b[1]?.updatedAt ?? 0) - (a[1]?.updatedAt ?? 0),
   )[0];
   return mostRecent ? normalizeE164(mostRecent[0]) : null;
+}
+
+function getSessionRecipients(cfg: ReturnType<typeof loadConfig>) {
+  const sessionCfg = cfg.inbound?.reply?.session;
+  const scope = sessionCfg?.scope ?? "per-sender";
+  if (scope === "global") return [];
+  const storePath = resolveStorePath(sessionCfg?.store);
+  const store = loadSessionStore(storePath);
+  return Object.entries(store)
+    .filter(([key]) => key !== "global" && key !== "unknown")
+    .map(([key, entry]) => ({
+      to: normalizeE164(key),
+      updatedAt: entry?.updatedAt ?? 0,
+    }))
+    .filter(({ to }) => Boolean(to))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export function resolveHeartbeatRecipients(
+  cfg: ReturnType<typeof loadConfig>,
+  opts: { to?: string; all?: boolean } = {},
+) {
+  if (opts.to) return { recipients: [normalizeE164(opts.to)], source: "flag" };
+
+  const sessionRecipients = getSessionRecipients(cfg);
+  const allowFrom =
+    Array.isArray(cfg.inbound?.allowFrom) && cfg.inbound.allowFrom.length > 0
+      ? cfg.inbound.allowFrom.filter((v) => v !== "*").map(normalizeE164)
+      : [];
+
+  const unique = (list: string[]) => [...new Set(list.filter(Boolean))];
+
+  if (opts.all) {
+    const all = unique([...sessionRecipients.map((s) => s.to), ...allowFrom]);
+    return { recipients: all, source: "all" as const };
+  }
+
+  if (sessionRecipients.length === 1) {
+    return { recipients: [sessionRecipients[0].to], source: "session-single" };
+  }
+  if (sessionRecipients.length > 1) {
+    return {
+      recipients: sessionRecipients.map((s) => s.to),
+      source: "session-ambiguous" as const,
+    };
+  }
+
+  return { recipients: allowFrom, source: "allowFrom" as const };
 }
 
 function getSessionSnapshot(
@@ -551,8 +602,8 @@ export async function monitorWebProvider(
       }
 
       try {
+        const snapshot = getSessionSnapshot(cfg, lastInboundMsg.from);
         if (isVerbose()) {
-          const snapshot = getSessionSnapshot(cfg, lastInboundMsg.from);
           heartbeatLogger.info(
             {
               connectionId,
@@ -570,7 +621,7 @@ export async function monitorWebProvider(
             Body: HEARTBEAT_PROMPT,
             From: lastInboundMsg.from,
             To: lastInboundMsg.to,
-            MessageSid: undefined,
+            MessageSid: snapshot.entry?.sessionId,
             MediaPath: undefined,
             MediaUrl: undefined,
             MediaType: undefined,

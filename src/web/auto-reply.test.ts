@@ -9,8 +9,10 @@ import type { WarelayConfig } from "../config/config.js";
 import { resolveStorePath } from "../config/sessions.js";
 import { resetLogger, setLoggerOverride } from "../logging.js";
 import {
+  HEARTBEAT_PROMPT,
   HEARTBEAT_TOKEN,
   monitorWebProvider,
+  resolveHeartbeatRecipients,
   resolveReplyHeartbeatMinutes,
   runWebHeartbeatOnce,
   stripHeartbeatToken,
@@ -72,6 +74,80 @@ describe("heartbeat helpers", () => {
         inbound: { reply: { mode: "text" } },
       }),
     ).toBeNull();
+  });
+});
+
+describe("resolveHeartbeatRecipients", () => {
+  const makeStore = async (entries: Record<string, { updatedAt: number }>) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "warelay-heartbeat-"));
+    const storePath = path.join(dir, "sessions.json");
+    await fs.writeFile(storePath, JSON.stringify(entries));
+    return {
+      storePath,
+      cleanup: async () => fs.rm(dir, { recursive: true, force: true }),
+    };
+  };
+
+  it("returns the sole session recipient", async () => {
+    const now = Date.now();
+    const store = await makeStore({ "+1000": { updatedAt: now } });
+    const cfg: WarelayConfig = {
+      inbound: {
+        allowFrom: ["+1999"],
+        reply: { mode: "command", session: { store: store.storePath } },
+      },
+    };
+    const result = resolveHeartbeatRecipients(cfg);
+    expect(result.source).toBe("session-single");
+    expect(result.recipients).toEqual(["+1000"]);
+    await store.cleanup();
+  });
+
+  it("surfaces ambiguity when multiple sessions exist", async () => {
+    const now = Date.now();
+    const store = await makeStore({
+      "+1000": { updatedAt: now },
+      "+2000": { updatedAt: now - 10 },
+    });
+    const cfg: WarelayConfig = {
+      inbound: {
+        allowFrom: ["+1999"],
+        reply: { mode: "command", session: { store: store.storePath } },
+      },
+    };
+    const result = resolveHeartbeatRecipients(cfg);
+    expect(result.source).toBe("session-ambiguous");
+    expect(result.recipients).toEqual(["+1000", "+2000"]);
+    await store.cleanup();
+  });
+
+  it("filters wildcard allowFrom when no sessions exist", async () => {
+    const store = await makeStore({});
+    const cfg: WarelayConfig = {
+      inbound: {
+        allowFrom: ["*"],
+        reply: { mode: "command", session: { store: store.storePath } },
+      },
+    };
+    const result = resolveHeartbeatRecipients(cfg);
+    expect(result.recipients).toHaveLength(0);
+    expect(result.source).toBe("allowFrom");
+    await store.cleanup();
+  });
+
+  it("merges sessions and allowFrom when --all is set", async () => {
+    const now = Date.now();
+    const store = await makeStore({ "+1000": { updatedAt: now } });
+    const cfg: WarelayConfig = {
+      inbound: {
+        allowFrom: ["+1999"],
+        reply: { mode: "command", session: { store: store.storePath } },
+      },
+    };
+    const result = resolveHeartbeatRecipients(cfg, { all: true });
+    expect(result.source).toBe("all");
+    expect(result.recipients.sort()).toEqual(["+1000", "+1999"].sort());
+    await store.cleanup();
   });
 });
 
@@ -178,6 +254,56 @@ describe("runWebHeartbeatOnce", () => {
     const after = JSON.parse(await fs.readFile(storePath, "utf-8"));
     expect(after["+1555"].updatedAt).toBe(originalUpdated);
     expect(sender).not.toHaveBeenCalled();
+  });
+
+  it("heartbeat reuses existing session id when last inbound is present", async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "warelay-heartbeat-session-"),
+    );
+    const storePath = path.join(tmpDir, "sessions.json");
+    const sessionId = "sess-keep";
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        "+4367": { sessionId, updatedAt: Date.now(), systemSent: false },
+      }),
+    );
+
+    setLoadConfigMock(() => ({
+      inbound: {
+        allowFrom: ["+4367"],
+        reply: {
+          mode: "command",
+          heartbeatMinutes: 0.001,
+          session: { store: storePath, idleMinutes: 60 },
+        },
+      },
+    }));
+
+    const replyResolver = vi.fn().mockResolvedValue({ text: HEARTBEAT_TOKEN });
+    const runtime = { log: vi.fn(), error: vi.fn(), exit: vi.fn() } as never;
+    const cfg: WarelayConfig = {
+      inbound: {
+        allowFrom: ["+4367"],
+        reply: {
+          mode: "command",
+          session: { store: storePath, idleMinutes: 60 },
+        },
+      },
+    };
+
+    await runWebHeartbeatOnce({
+      cfg,
+      to: "+4367",
+      verbose: false,
+      replyResolver,
+      runtime,
+    });
+
+    const heartbeatCall = replyResolver.mock.calls.find(
+      (call) => call[0]?.Body === HEARTBEAT_PROMPT,
+    );
+    expect(heartbeatCall?.[0]?.MessageSid).toBe(sessionId);
   });
 });
 
