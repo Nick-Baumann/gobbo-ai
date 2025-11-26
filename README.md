@@ -123,7 +123,8 @@ Best practice: use a dedicated WhatsApp account (separate SIM/eSIM or business a
 #### Heartbeat pings (command mode)
 - When `heartbeatMinutes` is set (default 30 for `mode: "command"`), the relay periodically runs your command/Claude session with a heartbeat prompt.
 - If Claude replies exactly `HEARTBEAT_OK`, the message is suppressed; otherwise the reply (or media) is forwarded. Suppressions are still logged so you know the heartbeat ran.
-- Trigger one manually with `warelay heartbeat` (web provider only). Use `--heartbeat-now` to fire once at relay start.
+- Override session freshness for heartbeats with `session.heartbeatIdleMinutes` (defaults to `session.idleMinutes`). Heartbeat skips do **not** bump `updatedAt`, so sessions still expire normally.
+- Trigger one manually with `warelay heartbeat` (web provider only, `--verbose` prints session info). Use `--heartbeat-now` to fire once at relay start.
 
 ### Logging (optional)
 - File logs are written to `/tmp/warelay/warelay.log` by default. Levels: `silent | fatal | error | warn | info | debug | trace` (CLI `--verbose` forces `debug`). Web-provider inbound/outbound entries include message bodies and auto-reply text for easier auditing.

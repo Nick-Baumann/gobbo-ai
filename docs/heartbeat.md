@@ -9,6 +9,7 @@ Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven)
 ## Config & defaults
 - New config key: `inbound.reply.heartbeatMinutes` (number of minutes; `0` or undefined disables).
 - Default: 30 minutes when a command-mode reply is configured.
+- New optional idle override for heartbeats: `inbound.reply.session.heartbeatIdleMinutes` (defaults to `idleMinutes`). Heartbeat skips do **not** update the session `updatedAt` so idle expiry still works.
 
 ## Poller behavior
 - When relay runs with command-mode auto-reply, start a timer with the resolved heartbeat interval.

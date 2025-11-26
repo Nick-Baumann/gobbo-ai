@@ -20,6 +20,7 @@ import {
   resetLoadConfigMock,
   setLoadConfigMock,
 } from "./test-helpers.js";
+import { resolveStorePath } from "../config/sessions.js";
 
 describe("heartbeat helpers", () => {
   it("strips heartbeat token and skips when only token", () => {
