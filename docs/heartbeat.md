@@ -40,3 +40,4 @@ Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven)
   - `warelay relay:heartbeat` to run the relay loop with an immediate heartbeat (no tmux)
   - `warelay relay:heartbeat:tmux` to run the same in tmux (detached, attachable)
   - Relay supports `--heartbeat-now` to fire once at startup (including the tmux helper).
+  - When multiple sessions are active or `allowFrom` is only `"*"`, require `--to <E.164>` or `--all` for manual heartbeats to avoid ambiguous targets.
