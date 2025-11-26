@@ -7,6 +7,7 @@
 - New `warelay heartbeat` CLI triggers a one-off heartbeat (web provider, auto-detects logged-in session; optional `--to` override). Relay gains `--heartbeat-now` to fire an immediate heartbeat on startup.
 - Added `warelay relay:heartbeat` (no tmux) and `warelay relay:heartbeat:tmux` helpers to start relay with an immediate startup heartbeat.
 - Relay now prints the active file log path and level on startup so you can tail logs without attaching.
+- Heartbeat CLI accepts `--session-id` to force resuming a specific Claude session; fallback heartbeats skip instead of creating a new session when no stored session exists.
 - Heartbeat session handling now supports `inbound.reply.session.heartbeatIdleMinutes` and does not refresh `updatedAt` on skipped heartbeats, so sessions still expire on idle.
 - Web inbound now resolves WhatsApp Linked IDs (`@lid`) using Baileys’ reverse mapping files, so new-format senders are no longer dropped.
 - `allowFrom: ["*"]` is honored for auto-replies; manual heartbeats require `--to` or `--all` when multiple sessions exist or the allowlist is wildcard-only.

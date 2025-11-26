@@ -14,6 +14,7 @@ Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven)
 ## Poller behavior
 - When relay runs with command-mode auto-reply, start a timer with the resolved heartbeat interval.
 - Each tick invokes the configured command with a short heartbeat body (e.g., “(heartbeat) summarize any important changes since last turn”) while reusing the active session args so Claude context stays warm.
+- Heartbeats never create a new session implicitly: if there’s no stored session for the target (fallback path), the heartbeat is skipped instead of starting a fresh Claude session.
 - Abort timer on SIGINT/abort of the relay.
 
 ## Sentinel handling
@@ -37,6 +38,7 @@ Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven)
 - Add a short README snippet under configuration showing `heartbeatMinutes` and the sentinel rule.
 - Expose CLI triggers:
   - `warelay heartbeat` (web provider, defaults to first `allowFrom`; optional `--to` override)
+    - `--session-id <uuid>` forces resuming a specific session for that heartbeat
   - `warelay relay:heartbeat` to run the relay loop with an immediate heartbeat (no tmux)
   - `warelay relay:heartbeat:tmux` to run the same in tmux (detached, attachable)
   - Relay supports `--heartbeat-now` to fire once at startup (including the tmux helper).
