@@ -103,7 +103,7 @@ export async function runWebHeartbeatOnce(opts: {
       sessionId,
       updatedAt: Date.now(),
     };
-    saveSessionStore(storePath, store);
+    await saveSessionStore(storePath, store);
   }
   const sessionSnapshot = getSessionSnapshot(cfg, to, true);
   if (verbose) {

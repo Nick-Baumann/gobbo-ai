@@ -346,7 +346,10 @@ describe("runWebHeartbeatOnce", () => {
       (call) => call[0]?.Body === HEARTBEAT_PROMPT,
     );
     expect(heartbeatCall?.[0]?.MessageSid).toBe(sessionId);
-    // We only need to assert the resolver saw the override; store seeding is a best-effort.
+    const raw = await fs.readFile(storePath, "utf-8");
+    const stored = raw ? JSON.parse(raw) : {};
+    expect(stored["+1999"]?.sessionId).toBe(sessionId);
+    expect(stored["+1999"]?.updatedAt).toBeDefined();
   });
 });
 
