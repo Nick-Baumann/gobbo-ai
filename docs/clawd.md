@@ -424,4 +424,4 @@ Check out these tweets showing warelay + Clawd in the wild:
 
 ---
 
-*Built by [@steipete](https://twitter.com/steipete). PRs welcome!*
+*Built by [@steipete](https://twitter.com/steipete) and Clawd (they/them) — yes, Clawd helped write their own docs. PRs welcome!*
