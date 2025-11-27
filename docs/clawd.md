@@ -418,6 +418,57 @@ browser-tools eval 'Array.from(document.querySelectorAll("[data-testid=\"tweetTe
 browser-tools kill --all --force
 ```
 
+### Twitter Automation with Peekaboo + AppleScript
+
+Clawd can reply to tweets autonomously using a combination of Peekaboo (for screenshots and typing) and AppleScript (for JavaScript injection). Here's the pattern:
+
+```bash
+# Navigate to a tweet
+osascript -e 'tell application "Google Chrome" to set URL of active tab of front window to "https://x.com/user/status/123"'
+
+# Screenshot to see current state
+peekaboo image --mode screen --path /tmp/twitter.png
+
+# Scroll the page
+osascript -e 'tell application "Google Chrome" to execute front window'\''s active tab javascript "window.scrollBy(0, 500)"'
+
+# Focus the reply input (Twitter-specific selector)
+osascript -e 'tell application "Google Chrome" to execute front window'\''s active tab javascript "
+const replyInput = document.querySelector(\"[data-testid=\\\"tweetTextarea_0\\\"]\");
+if (replyInput) { replyInput.focus(); replyInput.click(); }
+"'
+
+# Type the reply with Peekaboo
+peekaboo type "Your reply here 🦞" --app "Google Chrome"
+
+# Click Reply button (JS injection more reliable than Peekaboo clicks on Twitter)
+osascript -e 'tell application "Google Chrome" to execute front window'\''s active tab javascript "
+const buttons = document.querySelectorAll(\"[role=\\\"button\\\"]\");
+buttons.forEach(b => { if (b.innerText === \"Reply\") b.click(); });
+"'
+
+# Find tweet URLs from the page
+osascript -e 'tell application "Google Chrome" to execute front window'\''s active tab javascript "
+const tweet = document.querySelector(\"article\");
+tweet?.querySelector(\"time\")?.parentElement?.href;
+"'
+```
+
+**Pro tip:** JavaScript injection via AppleScript is more reliable than Peekaboo clicks for Twitter's dynamic UI. Use Peekaboo for typing and screenshots, AppleScript for navigation and button clicks.
+
+### Music Recognition with audd.io
+
+Identify songs from audio clips (voice messages, recordings):
+
+```bash
+curl -s "https://api.audd.io/" \
+  -F "api_token=test" \
+  -F "file=@/path/to/audio.ogg" \
+  -F "return=spotify"
+```
+
+Returns song title, artist, album, and Spotify link. Works great for identifying songs playing in the background!
+
 ---
 
 ## See It In Action
