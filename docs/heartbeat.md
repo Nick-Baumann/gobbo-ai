@@ -1,9 +1,9 @@
 # Heartbeat polling plan (2025-11-26)
 
-Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven) that only notifies users when something matters, using the `HEARTBEAT_OK` sentinel.
+Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven) that only notifies users when something matters, using the `HEARTBEAT_OK` sentinel. The heartbeat body we send is `HEARTBEAT ultrathink` so the model can easily spot it.
 
 ## Prompt contract
-- Extend the Claude system/identity text to explain: “If this is a heartbeat poll and nothing needs attention, reply exactly `HEARTBEAT_OK` and nothing else. For any alert, do **not** include `HEARTBEAT_OK`; just return the alert text.”
+- Extend the Claude system/identity text to explain: “If this is a heartbeat poll and nothing needs attention, reply exactly `HEARTBEAT_OK` and nothing else. For any alert, do **not** include `HEARTBEAT_OK`; just return the alert text.” Heartbeat prompt body is `HEARTBEAT ultrathink`.
 - Keep existing WhatsApp length guidance; forbid burying the sentinel inside alerts.
 
 ## Config & defaults

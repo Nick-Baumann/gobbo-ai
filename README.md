@@ -115,7 +115,7 @@ Best practice: use a dedicated WhatsApp account (separate SIM/eSIM or business a
       command: ["claude", "--dangerously-skip-permissions", "{{BodyStripped}}"],
       claudeOutputFormat: "text",
       session: { scope: "per-sender", resetTriggers: ["/new"], idleMinutes: 60 },
-      heartbeatMinutes: 30 // optional; pings Claude every 30m and only sends if it omits HEARTBEAT_OK
+      heartbeatMinutes: 30 // optional; pings Claude every 30m with "HEARTBEAT ultrathink" and only sends if it omits HEARTBEAT_OK
     }
   }
 }
@@ -123,7 +123,7 @@ Best practice: use a dedicated WhatsApp account (separate SIM/eSIM or business a
 
 #### Heartbeat pings (command mode)
 - When `heartbeatMinutes` is set (default 30 for `mode: "command"`), the relay periodically runs your command/Claude session with a heartbeat prompt.
-- If Claude replies exactly `HEARTBEAT_OK`, the message is suppressed; otherwise the reply (or media) is forwarded. Suppressions are still logged so you know the heartbeat ran.
+- Heartbeat body is `HEARTBEAT ultrathink` (so the model can recognize the probe); if Claude replies exactly `HEARTBEAT_OK`, the message is suppressed; otherwise the reply (or media) is forwarded. Suppressions are still logged so you know the heartbeat ran.
 - Override session freshness for heartbeats with `session.heartbeatIdleMinutes` (defaults to `session.idleMinutes`). Heartbeat skips do **not** bump `updatedAt`, so sessions still expire normally.
 - Trigger one manually with `warelay heartbeat` (web provider only, `--verbose` prints session info). Use `--session-id <uuid>` to force resuming a specific Claude session, `--all` to ping every active session, `warelay relay:heartbeat` for a full relay run with an immediate heartbeat, or `--heartbeat-now` on `relay`/`relay:heartbeat:tmux`.
 - When multiple active sessions exist, `warelay heartbeat` requires `--to <E.164>` or `--all`; if `allowFrom` is just `"*"`, you must choose a target with one of those flags.
