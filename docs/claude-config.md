@@ -25,6 +25,40 @@ This is experimental software running experimental AI. The author uses it daily,
 
 ---
 
+## Prerequisites: The Two-Phone Setup
+
+**Important:** You need a **separate phone number** for your AI assistant. Here's why and how:
+
+### Why a Dedicated Number?
+
+warelay uses WhatsApp Web to receive messages. If you link your personal WhatsApp, *you* become the assistant - every message to you goes to Claude. Instead, give Claude its own identity:
+
+- 📱 **Get a second SIM** - cheap prepaid SIM, eSIM, or old phone with a number
+- 💬 **Install WhatsApp** on that phone and verify the number
+- 🔗 **Link to warelay** - run `warelay login` and scan the QR with that phone's WhatsApp
+- ✉️ **Message your AI** - now you (and others) can text that number to reach Claude
+
+### The Setup
+
+```
+Your Phone (personal)          Second Phone (AI)
+┌─────────────────┐           ┌─────────────────┐
+│  Your WhatsApp  │  ──────▶  │  AI's WhatsApp  │
+│  +1-555-YOU     │  message  │  +1-555-CLAWD   │
+└─────────────────┘           └────────┬────────┘
+                                       │ linked via QR
+                                       ▼
+                              ┌─────────────────┐
+                              │  Your Mac       │
+                              │  (warelay)      │
+                              │  Claude Code    │
+                              └─────────────────┘
+```
+
+The second phone just needs to stay on and connected to the internet occasionally (WhatsApp Web stays linked for ~14 days without the phone being online).
+
+---
+
 ## Meet Clawd 👋
 
 Clawd is @steipete's personal AI assistant built on warelay. Here's what makes it special:
