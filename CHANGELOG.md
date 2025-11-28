@@ -1,9 +1,13 @@
 # Changelog
 
+## 1.2.2 — Unreleased
+
+### Changes
+- **Manual heartbeat sends:** `warelay heartbeat` accepts `--message/--body` with `--provider web|twilio` to push real outbound messages through the same plumbing; `--dry-run` previews payloads without sending.
+
 ## 1.2.1 — 2025-11-28
 
 ### Changes
-- **Manual heartbeat sends:** `warelay heartbeat` now accepts `--message/--body` with `--provider web|twilio` to push real outbound messages through the same plumbing; `--dry-run` previews payloads without sending.
 - **Media MIME-first handling:** Media loading now sniffs magic bytes/header before trusting extensions for both providers; local files with the wrong suffix still get correct MIME and image recompression.
 - **Hosted media extensions:** Saved/hosted media (web inbound, webhook hosting, Twilio hosting) now writes files with an extension derived from detected MIME (e.g., `.jpg`, `.png`, `.mp4`), so downstream CLI sends carry the right Content-Type. Added tests covering inbound Baileys downloads and buffer saves.
 
