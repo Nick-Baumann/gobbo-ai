@@ -945,4 +945,73 @@ describe("web auto-reply", () => {
     expect(content).toContain('"module":"web-auto-reply"');
     expect(content).toContain('"text":"auto"');
   });
+
+  it("prefixes body with same-phone marker when from === to", async () => {
+    let capturedOnMessage:
+      | ((msg: import("./inbound.js").WebInboundMessage) => Promise<void>)
+      | undefined;
+    const listenerFactory = async (opts: {
+      onMessage: (
+        msg: import("./inbound.js").WebInboundMessage,
+      ) => Promise<void>;
+    }) => {
+      capturedOnMessage = opts.onMessage;
+      return { close: vi.fn() };
+    };
+
+    const resolver = vi.fn().mockResolvedValue({ text: "reply" });
+
+    await monitorWebProvider(false, listenerFactory, false, resolver);
+    expect(capturedOnMessage).toBeDefined();
+
+    await capturedOnMessage?.({
+      body: "hello",
+      from: "+1555",
+      to: "+1555", // Same phone!
+      id: "msg1",
+      sendComposing: vi.fn(),
+      reply: vi.fn(),
+      sendMedia: vi.fn(),
+    });
+
+    // The resolver should receive a prefixed body (the exact marker depends on config)
+    // Key test: body should start with some marker and end with original message
+    const callArg = resolver.mock.calls[0]?.[0] as { Body?: string };
+    expect(callArg?.Body).toBeDefined();
+    expect(callArg?.Body).toMatch(/^\[.*\] hello$/);
+    expect(callArg?.Body).not.toBe("hello"); // Should be prefixed
+  });
+
+  it("does not prefix body when from !== to", async () => {
+    let capturedOnMessage:
+      | ((msg: import("./inbound.js").WebInboundMessage) => Promise<void>)
+      | undefined;
+    const listenerFactory = async (opts: {
+      onMessage: (
+        msg: import("./inbound.js").WebInboundMessage,
+      ) => Promise<void>;
+    }) => {
+      capturedOnMessage = opts.onMessage;
+      return { close: vi.fn() };
+    };
+
+    const resolver = vi.fn().mockResolvedValue({ text: "reply" });
+
+    await monitorWebProvider(false, listenerFactory, false, resolver);
+    expect(capturedOnMessage).toBeDefined();
+
+    await capturedOnMessage?.({
+      body: "hello",
+      from: "+1555",
+      to: "+2666", // Different phones
+      id: "msg1",
+      sendComposing: vi.fn(),
+      reply: vi.fn(),
+      sendMedia: vi.fn(),
+    });
+
+    // Body should NOT be prefixed
+    const callArg = resolver.mock.calls[0]?.[0] as { Body?: string };
+    expect(callArg?.Body).toBe("hello");
+  });
 });

@@ -93,6 +93,64 @@ describe("config and templating", () => {
     expect(onReplyStart).toHaveBeenCalled();
   });
 
+  it("getReplyFromConfig allows same-phone mode (from === to) without allowFrom", async () => {
+    const cfg = {
+      inbound: {
+        // No allowFrom configured
+        reply: {
+          mode: "text" as const,
+          text: "Echo: {{Body}}",
+        },
+      },
+    };
+
+    const result = await index.getReplyFromConfig(
+      { Body: "hello", From: "+1555", To: "+1555" },
+      undefined,
+      cfg,
+    );
+    expect(result?.text).toBe("Echo: hello");
+  });
+
+  it("getReplyFromConfig allows same-phone mode even when not in allowFrom list", async () => {
+    const cfg = {
+      inbound: {
+        allowFrom: ["+9999"], // Different number
+        reply: {
+          mode: "text" as const,
+          text: "Reply: {{Body}}",
+        },
+      },
+    };
+
+    // Same-phone mode should bypass allowFrom check
+    const result = await index.getReplyFromConfig(
+      { Body: "test", From: "+1555", To: "+1555" },
+      undefined,
+      cfg,
+    );
+    expect(result?.text).toBe("Reply: test");
+  });
+
+  it("getReplyFromConfig rejects non-same-phone when not in allowFrom", async () => {
+    const cfg = {
+      inbound: {
+        allowFrom: ["+9999"],
+        reply: {
+          mode: "text" as const,
+          text: "Should not see this",
+        },
+      },
+    };
+
+    const result = await index.getReplyFromConfig(
+      { Body: "test", From: "+1555", To: "+2666" },
+      undefined,
+      cfg,
+    );
+    expect(result).toBeUndefined();
+  });
+
   it("getReplyFromConfig templating includes media fields", async () => {
     const cfg = {
       inbound: {

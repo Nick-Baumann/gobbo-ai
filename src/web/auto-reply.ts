@@ -501,6 +501,10 @@ export async function monitorWebProvider(
 
   let reconnectAttempts = 0;
 
+  // Track recently sent messages to prevent echo loops
+  const recentlySent = new Set<string>();
+  const MAX_RECENT_MESSAGES = 100;
+
   while (true) {
     if (stopRequested()) break;
 
@@ -536,11 +540,38 @@ export async function monitorWebProvider(
 
         console.log(`\n[${ts}] ${msg.from} -> ${msg.to}: ${msg.body}`);
 
+        // Detect same-phone mode (self-messaging)
+        const isSamePhoneMode = msg.from === msg.to;
+        if (isSamePhoneMode) {
+          logVerbose(`📱 Same-phone mode detected (from === to: ${msg.from})`);
+        }
+
+        // Skip if this is a message we just sent (echo detection)
+        if (recentlySent.has(msg.body)) {
+          console.log(`⏭️  Skipping echo: detected recently sent message`);
+          logVerbose(
+            `Skipping auto-reply: detected echo (message matches recently sent text)`,
+          );
+          recentlySent.delete(msg.body); // Remove from set to allow future identical messages
+          return;
+        }
+
+        logVerbose(
+          `Echo check: message not in recent set (size: ${recentlySent.size})`,
+        );
+
         lastInboundMsg = msg;
+
+        // Prefix body with marker in same-phone mode so the assistant knows to prefix replies
+        // The marker can be customized via config (default: "[same-phone]")
+        const samePhoneMarker = cfg.inbound?.samePhoneMarker ?? "[same-phone]";
+        const bodyForCommand = isSamePhoneMode
+          ? `${samePhoneMarker} ${msg.body}`
+          : msg.body;
 
         const replyResult = await (replyResolver ?? getReplyFromConfig)(
           {
-            Body: msg.body,
+            Body: bodyForCommand,
             From: msg.from,
             To: msg.to,
             MessageSid: msg.id,
@@ -572,6 +603,20 @@ export async function monitorWebProvider(
             runtime,
             connectionId,
           });
+
+          // Track sent message to prevent echo loops
+          if (replyResult.text) {
+            recentlySent.add(replyResult.text);
+            logVerbose(
+              `Added to echo detection set (size now: ${recentlySent.size}): ${replyResult.text.substring(0, 50)}...`,
+            );
+            // Keep set bounded - remove oldest if too large
+            if (recentlySent.size > MAX_RECENT_MESSAGES) {
+              const firstKey = recentlySent.values().next().value;
+              if (firstKey) recentlySent.delete(firstKey);
+            }
+          }
+
           if (isVerbose()) {
             console.log(
               success(

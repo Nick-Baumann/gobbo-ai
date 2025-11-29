@@ -93,6 +93,16 @@ Install from npm (global): `npm install -g warelay` (Node 22+). Then choose **on
 
 Best practice: use a dedicated WhatsApp account (separate SIM/eSIM or business account) for automation instead of your primary personal account to avoid unexpected logouts or rate limits.
 
+### Same-phone mode (self-messaging)
+warelay supports running on the same phone number you message from—you chat with yourself and an AI assistant replies in the same bubble. This requires:
+- Adding your own number to `allowFrom` in `warelay.json`
+- The `fromMe` filter is disabled; echo detection in `auto-reply.ts` prevents loops
+
+**Gotchas:**
+- Messages appear in the same chat bubble (WhatsApp "Note to self")
+- Echo detection relies on exact text matching; if the reply is identical to your input, it may be skipped
+- Works best with a dedicated WhatsApp account
+
 ## Configuration
 
 ### Environment (.env)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3 — Unreleased
+
+### Changes
+- **Same-phone mode (self-messaging):** warelay now supports running on the same phone number you message from. This enables setups where you chat with yourself to control an AI assistant. Same-phone mode (`from === to`) is always allowed, even without configuring `allowFrom`. Echo detection prevents infinite loops by tracking recently sent message text and skipping auto-replies when incoming messages match.
+- **Echo detection:** The `fromMe` filter in `inbound.ts` is deliberately removed for same-phone setups; instead, text-based echo detection in `auto-reply.ts` tracks sent messages in a bounded Set (max 100 entries) and skips processing when a match is found.
+- **Same-phone detection logging:** Verbose mode now logs `📱 Same-phone mode detected` when `from === to`.
+- **Configurable same-phone marker:** New `inbound.samePhoneMarker` config option to customize the prefix added to messages in same-phone mode (default: `[same-phone]`). Set it to something cute like `[🦞 same-phone]` to help distinguish bot replies.
+
 ## 1.2.2 — 2025-11-28
 
 ### Changes

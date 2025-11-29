@@ -70,7 +70,7 @@ export async function monitorWebInbox(options: {
       // De-dupe on message id; Baileys can emit retries.
       if (id && seen.has(id)) continue;
       if (id) seen.add(id);
-      if (msg.key?.fromMe) continue;
+      // Note: not filtering fromMe here - echo detection happens in auto-reply layer
       const remoteJid = msg.key?.remoteJid;
       if (!remoteJid) continue;
       // Ignore status/broadcast traffic; we only care about direct chats.
