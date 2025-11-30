@@ -518,7 +518,8 @@ export async function monitorWebProvider(
     let lastInboundMsg: WebInboundMsg | null = null;
 
     // Watchdog to detect stuck message processing (e.g., event emitter died)
-    const MESSAGE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes without any messages
+    // Should be significantly longer than heartbeatMinutes to avoid false positives
+    const MESSAGE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes without any messages
     const WATCHDOG_CHECK_MS = 60 * 1000; // Check every minute
 
     const listener = await (listenerFactory ?? monitorWebInbox)({
