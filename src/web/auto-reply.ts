@@ -656,67 +656,70 @@ export async function monitorWebProvider(
         },
       );
 
-      if (
-        !replyResult ||
-        (!replyResult.text &&
-          !replyResult.mediaUrl &&
-          !replyResult.mediaUrls?.length)
-      ) {
+      const replyList = replyResult
+        ? Array.isArray(replyResult)
+          ? replyResult
+          : [replyResult]
+        : [];
+
+      if (replyList.length === 0) {
         logVerbose("Skipping auto-reply: no text/media returned from resolver");
         return;
       }
 
       // Apply response prefix if configured (skip for HEARTBEAT_OK to preserve exact match)
       const responsePrefix = cfg.inbound?.responsePrefix;
-      if (
-        responsePrefix &&
-        replyResult.text &&
-        replyResult.text.trim() !== HEARTBEAT_TOKEN
-      ) {
-        if (!replyResult.text.startsWith(responsePrefix)) {
-          replyResult.text = `${responsePrefix} ${replyResult.text}`;
+
+      for (const replyPayload of replyList) {
+        if (
+          responsePrefix &&
+          replyPayload.text &&
+          replyPayload.text.trim() !== HEARTBEAT_TOKEN &&
+          !replyPayload.text.startsWith(responsePrefix)
+        ) {
+          replyPayload.text = `${responsePrefix} ${replyPayload.text}`;
         }
-      }
 
-      try {
-        await deliverWebReply({
-          replyResult,
-          msg: latest,
-          maxMediaBytes,
-          replyLogger,
-          runtime,
-          connectionId,
-        });
+        try {
+          await deliverWebReply({
+            replyResult: replyPayload,
+            msg: latest,
+            maxMediaBytes,
+            replyLogger,
+            runtime,
+            connectionId,
+          });
 
-        if (replyResult.text) {
-          recentlySent.add(replyResult.text);
-          recentlySent.add(combinedBody); // Prevent echo on the batch text itself
-          logVerbose(
-            `Added to echo detection set (size now: ${recentlySent.size}): ${replyResult.text.substring(0, 50)}...`,
-          );
-          if (recentlySent.size > MAX_RECENT_MESSAGES) {
-            const firstKey = recentlySent.values().next().value;
-            if (firstKey) recentlySent.delete(firstKey);
+          if (replyPayload.text) {
+            recentlySent.add(replyPayload.text);
+            recentlySent.add(combinedBody); // Prevent echo on the batch text itself
+            logVerbose(
+              `Added to echo detection set (size now: ${recentlySent.size}): ${replyPayload.text.substring(0, 50)}...`,
+            );
+            if (recentlySent.size > MAX_RECENT_MESSAGES) {
+              const firstKey = recentlySent.values().next().value;
+              if (firstKey) recentlySent.delete(firstKey);
+            }
           }
-        }
 
-        if (isVerbose()) {
-          console.log(
-            success(
-              `↩️  Auto-replied to ${from} (web${replyResult.mediaUrl || replyResult.mediaUrls?.length ? ", media" : ""}; batched ${messages.length})`,
-            ),
-          );
-        } else {
-          console.log(
-            success(
-              `↩️  ${replyResult.text ?? "<media>"}${replyResult.mediaUrl || replyResult.mediaUrls?.length ? " (media)" : ""}`,
-            ),
+          if (isVerbose()) {
+            console.log(
+              success(
+                `↩️  Auto-replied to ${from} (web${replyPayload.mediaUrl || replyPayload.mediaUrls?.length ? ", media" : ""}; batched ${messages.length})`,
+              ),
+            );
+          } else {
+            console.log(
+              success(
+                `↩️  ${replyPayload.text ?? "<media>"}${replyPayload.mediaUrl || replyPayload.mediaUrls?.length ? " (media)" : ""}`,
+              ),
+            );
+          }
+        } catch (err) {
+          console.error(
+            danger(`Failed sending web auto-reply to ${from}: ${String(err)}`),
           );
         }
-      } catch (err) {
-        console.error(
-          danger(`Failed sending web auto-reply to ${from}: ${String(err)}`),
-        );
       }
     };
 
