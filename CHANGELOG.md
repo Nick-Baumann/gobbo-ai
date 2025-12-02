@@ -15,6 +15,8 @@
 - Media downloads now follow up to 5 redirects and still derive MIME/extension from sniffed content or headers; added regression test for redirected downloads.
 - Hosted media responses set `Content-Type` from sniffed MIME (not the file name) and still clean up single-use files after send.
 - Claude system prompt is guaranteed to be included on the first session turn even when `sendSystemOnce` is enabled, while later turns stay system-free.
+- Media server deletes served files right after the response finishes (instead of a fixed timeout) while keeping MIME sniffing and single-use semantics.
+- Tau RPC result typing now exposes `signal`/`killed` fields so TS builds align with runtime data.
 
 ## 1.3.0 — 2025-12-02
 
