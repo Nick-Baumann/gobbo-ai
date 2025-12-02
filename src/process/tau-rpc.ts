@@ -7,7 +7,13 @@ type TauRpcOptions = {
   timeoutMs: number;
 };
 
-type TauRpcResult = { stdout: string; stderr: string; code: number };
+type TauRpcResult = {
+  stdout: string;
+  stderr: string;
+  code: number;
+  signal?: NodeJS.Signals | null;
+  killed?: boolean;
+};
 
 class TauRpcClient {
   private child: ChildProcessWithoutNullStreams | null = null;

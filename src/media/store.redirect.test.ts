@@ -31,7 +31,7 @@ describe("media store redirects", () => {
 
   it("follows redirects and keeps detected mime/extension", async () => {
     let call = 0;
-    mockRequest.mockImplementation((url, _opts, cb) => {
+    mockRequest.mockImplementation((_url, _opts, cb) => {
       call += 1;
       const res = new PassThrough();
       const req = {
