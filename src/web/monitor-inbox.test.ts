@@ -251,7 +251,11 @@ describe("web monitor inbox", () => {
       type: "notify",
       messages: [
         {
-          key: { id: "unauth1", fromMe: false, remoteJid: "999@s.whatsapp.net" },
+          key: {
+            id: "unauth1",
+            fromMe: false,
+            remoteJid: "999@s.whatsapp.net",
+          },
           message: { conversation: "unauthorized message" },
           messageTimestamp: 1_700_000_000,
         },
