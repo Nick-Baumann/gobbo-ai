@@ -25,6 +25,8 @@ import {
   stripHeartbeatToken,
 } from "./auto-reply.js";
 import type { sendMessageWeb } from "./outbound.js";
+import * as commandQueue from "../process/command-queue.js";
+import { getQueueSize } from "../process/command-queue.js";
 
 const makeSessionStore = async (
   entries: Record<string, unknown> = {},
@@ -571,6 +573,78 @@ describe("web auto-reply", () => {
     } finally {
       queueSpy.mockRestore();
     }
+  });
+
+  it("batches inbound messages while queue is busy and preserves timestamps", async () => {
+    vi.useFakeTimers();
+    const originalMax = process.getMaxListeners();
+    process.setMaxListeners?.(1); // force low to confirm bump
+
+    const sendMedia = vi.fn();
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const sendComposing = vi.fn();
+    const resolver = vi.fn().mockResolvedValue({ text: "batched" });
+
+    let capturedOnMessage:
+      | ((msg: import("./inbound.js").WebInboundMessage) => Promise<void>)
+      | undefined;
+    const listenerFactory = async (opts: {
+      onMessage: (
+        msg: import("./inbound.js").WebInboundMessage,
+      ) => Promise<void>;
+    }) => {
+      capturedOnMessage = opts.onMessage;
+      return { close: vi.fn() };
+    };
+
+    // Queue starts busy, then frees after one polling tick.
+    let queueBusy = true;
+    const queueSpy = vi
+      .spyOn(commandQueue, "getQueueSize")
+      .mockImplementation(() => (queueBusy ? 1 : 0));
+
+    setLoadConfigMock(() => ({ inbound: { timestampPrefix: "UTC" } }));
+
+    await monitorWebProvider(false, listenerFactory, false, resolver);
+    expect(capturedOnMessage).toBeDefined();
+
+    // Two messages from the same sender with fixed timestamps
+    await capturedOnMessage?.({
+      body: "first",
+      from: "+1",
+      to: "+2",
+      id: "m1",
+      timestamp: 1735689600000, // Jan 1 2025 00:00:00 UTC
+      sendComposing,
+      reply,
+      sendMedia,
+    });
+    await capturedOnMessage?.({
+      body: "second",
+      from: "+1",
+      to: "+2",
+      id: "m2",
+      timestamp: 1735693200000, // Jan 1 2025 01:00:00 UTC
+      sendComposing,
+      reply,
+      sendMedia,
+    });
+
+    // Let the queued batch flush once the queue is free
+    queueBusy = false;
+    vi.advanceTimersByTime(200);
+
+    expect(resolver).toHaveBeenCalledTimes(1);
+    const args = resolver.mock.calls[0][0];
+    expect(args.Body).toContain("[Jan 1 00:00] [warelay] first");
+    expect(args.Body).toContain("[Jan 1 01:00] [warelay] second");
+
+    // Max listeners bumped to avoid warnings in multi-instance test runs
+    expect(process.getMaxListeners?.()).toBeGreaterThanOrEqual(50);
+
+    queueSpy.mockRestore();
+    process.setMaxListeners?.(originalMax);
+    vi.useRealTimers();
   });
 
   it("falls back to text when media send fails", async () => {
