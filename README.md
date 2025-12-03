@@ -90,7 +90,10 @@ Create `~/.clawdis/clawdis.json`:
 
 CLAWDIS was built for **Clawd**, a space lobster AI assistant. See the full setup in [`docs/clawd.md`](./docs/clawd.md).
 
-Follow the journey: [@steipete](https://twitter.com/steipete) | [clawd.me](https://clawd.me)
+- 🦞 **Clawd's Home:** [clawd.me](https://clawd.me)
+- 📜 **Clawd's Soul:** [soul.md](https://soul.md)
+- 👨‍💻 **Peter's Blog:** [steipete.me](https://steipete.me)
+- 🐦 **Twitter:** [@steipete](https://twitter.com/steipete)
 
 ## Providers
 
