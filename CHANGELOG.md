@@ -26,6 +26,7 @@
 - MIME sniffing and redirect handling for downloads/hosted media.
 - Response prefix applied to heartbeat alerts; heartbeat array payloads handled for both providers.
 - Tau RPC typing exposes `signal`/`killed`; NDJSON parsers normalized across agents.
+- Tau (pi) session resumes now append `--continue`, so existing history/think level are reloaded instead of starting empty.
 
 ### Testing
 - Fixtures isolate session stores; added coverage for thinking directives, stateful levels, heartbeat backpressure, and agent parsing.
