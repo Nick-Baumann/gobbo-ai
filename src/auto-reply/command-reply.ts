@@ -12,6 +12,13 @@ import { enqueueCommand } from "../process/command-queue.js";
 import type { runCommandWithTimeout } from "../process/exec.js";
 import { runPiRpc } from "../process/tau-rpc.js";
 import { applyTemplate, type TemplateContext } from "./templating.js";
+import {
+  TOOL_RESULT_DEBOUNCE_MS,
+  createToolDebouncer,
+  formatToolAggregate,
+  formatToolPrefix,
+  shortenMeta,
+} from "./tool-meta.js";
 import type { ReplyPayload } from "./types.js";
 
 type CommandReplyConfig = NonNullable<WarelayConfig["inbound"]>["reply"] & {
@@ -115,59 +122,9 @@ function normalizeToolResults(
     .map((tr) => ({
       text: (tr.text ?? "").trim(),
       toolName: tr.toolName?.trim() || undefined,
-      meta: tr.meta ? shortenMetaPath(tr.meta) : undefined,
+      meta: tr.meta ? shortenMeta(tr.meta) : undefined,
     }))
     .filter((tr) => tr.text.length > 0);
-}
-
-function formatToolPrefix(toolName?: string, meta?: string) {
-  const label = toolName?.trim() || "tool";
-  const extra = meta?.trim();
-  return extra ? `[🛠️ ${label} ${extra}]` : `[🛠️ ${label}]`;
-}
-
-function shortenPath(p: string): string {
-  const home = process.env.HOME;
-  if (home && p.startsWith(home + "/")) return p.replace(home, "~");
-  if (home && p === home) return "~";
-  return p;
-}
-
-function shortenMetaPath(meta: string): string {
-  if (!meta) return meta;
-  const colonIdx = meta.indexOf(":");
-  if (colonIdx === -1) return shortenPath(meta);
-  const base = meta.slice(0, colonIdx);
-  const rest = meta.slice(colonIdx);
-  return `${shortenPath(base)}${rest}`;
-}
-
-function formatToolAggregate(toolName?: string, metas?: string[]) {
-  const filtered = (metas ?? []).filter(Boolean).map(shortenMetaPath);
-  if (!filtered.length) return formatToolPrefix(toolName);
-
-  // Group paths under common directory to reduce noise
-  const grouped: Record<string, string[]> = {};
-  for (const m of filtered) {
-    const parts = m.split("/");
-    if (parts.length > 1) {
-      const dir = parts.slice(0, -1).join("/");
-      const base = parts.at(-1) ?? m;
-      if (!grouped[dir]) grouped[dir] = [];
-      grouped[dir].push(base);
-    } else {
-      if (!grouped["."]) grouped["."] = [];
-      grouped["."].push(m);
-    }
-  }
-
-  const segments = Object.entries(grouped).map(([dir, files]) => {
-    const brace = files.length > 1 ? `{${files.join(", ")}}` : files[0];
-    if (dir === ".") return brace;
-    return `${dir}/${brace}`;
-  });
-
-  return `${formatToolPrefix(toolName)} ${segments.join("; ")}`;
 }
 
 export function summarizeClaudeMetadata(payload: unknown): string | undefined {
