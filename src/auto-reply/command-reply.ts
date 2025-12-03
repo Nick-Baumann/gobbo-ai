@@ -54,7 +54,7 @@ export type CommandReplyResult = {
 };
 
 // Debounce window for coalescing successive tool_result messages (ms)
-const TOOL_RESULT_DEBOUNCE_MS = 250;
+const TOOL_RESULT_DEBOUNCE_MS = 1000;
 
 type ToolMessageLike = {
   name?: string;
