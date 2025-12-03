@@ -810,7 +810,11 @@ describe("config and templating", () => {
     };
 
     const ack = await index.getReplyFromConfig(
-      { Body: "[Dec 1 00:00] [🦞 same-phone] /think:high", From: "+1", To: "+2" },
+      {
+        Body: "[Dec 1 00:00] [🦞 same-phone] /think:high",
+        From: "+1",
+        To: "+2",
+      },
       undefined,
       cfg,
       runSpy,
@@ -863,7 +867,7 @@ describe("config and templating", () => {
     );
 
     expect(runSpy).not.toHaveBeenCalled();
-    expect(ack?.text).toContain("Unrecognized thinking level \"big\"");
+    expect(ack?.text).toContain('Unrecognized thinking level "big"');
 
     // Send another message; state should not carry any level.
     const second = await index.getReplyFromConfig(

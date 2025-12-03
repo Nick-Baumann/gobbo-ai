@@ -76,7 +76,11 @@ function parsePiJson(raw: string): AgentParseResult {
         }
       : undefined;
 
-  return { texts, toolResults: toolResults.length ? toolResults : undefined, meta };
+  return {
+    texts,
+    toolResults: toolResults.length ? toolResults : undefined,
+    meta,
+  };
 }
 
 export const piSpec: AgentSpec = {

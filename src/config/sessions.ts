@@ -9,12 +9,12 @@ import { CONFIG_DIR, normalizeE164 } from "../utils.js";
 export type SessionScope = "per-sender" | "global";
 
 export type SessionEntry = {
-	sessionId: string;
-	updatedAt: number;
-	systemSent?: boolean;
-	abortedLastRun?: boolean;
-	thinkingLevel?: string;
-	verboseLevel?: string;
+  sessionId: string;
+  updatedAt: number;
+  systemSent?: boolean;
+  abortedLastRun?: boolean;
+  thinkingLevel?: string;
+  verboseLevel?: string;
 };
 
 export const SESSION_STORE_DEFAULT = path.join(CONFIG_DIR, "sessions.json");
