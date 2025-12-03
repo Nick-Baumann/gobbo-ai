@@ -202,11 +202,9 @@ export async function monitorWebInbox(options: {
       const timestamp = msg.messageTimestamp
         ? Number(msg.messageTimestamp) * 1000
         : undefined;
-      const unwrapped = unwrapMessage(msg.message as proto.IMessage | undefined);
-      const mentionedJids =
-        unwrapped?.extendedTextMessage?.contextInfo?.mentionedJid ??
-        unwrapped?.extendedTextMessage?.contextInfo?.quotedMessage
-          ?.extendedTextMessage?.contextInfo?.mentionedJid;
+      const mentionedJids = extractMentionedJids(
+        msg.message as proto.IMessage | undefined,
+      );
       const senderName = msg.pushName ?? undefined;
       inboundLogger.info(
         {
@@ -353,6 +351,31 @@ function unwrapMessage(message: proto.IMessage | undefined): proto.IMessage | un
     return unwrapMessage(message.viewOnceMessageV2.message as proto.IMessage);
   }
   return message;
+}
+
+function extractMentionedJids(
+  rawMessage: proto.IMessage | undefined,
+): string[] | undefined {
+  const message = unwrapMessage(rawMessage);
+  if (!message) return undefined;
+
+  const candidates: (string[] | undefined)[] = [
+    message.extendedTextMessage?.contextInfo?.mentionedJid,
+    message.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage
+      ?.contextInfo?.mentionedJid,
+    message.imageMessage?.contextInfo?.mentionedJid,
+    message.videoMessage?.contextInfo?.mentionedJid,
+    message.documentMessage?.contextInfo?.mentionedJid,
+    message.audioMessage?.contextInfo?.mentionedJid,
+    message.stickerMessage?.contextInfo?.mentionedJid,
+    message.buttonsResponseMessage?.contextInfo?.mentionedJid,
+    message.listResponseMessage?.contextInfo?.mentionedJid,
+  ];
+
+  const flattened = candidates.flat().filter((j): j is string => !!j);
+  if (flattened.length === 0) return undefined;
+  // De-dupe
+  return Array.from(new Set(flattened));
 }
 
 export function extractText(

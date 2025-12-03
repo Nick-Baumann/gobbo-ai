@@ -117,4 +117,52 @@ describe("web inbound media saves with extension", () => {
 
     await listener.close();
   });
+
+  it("extracts mentions from media captions", async () => {
+    const onMessage = vi.fn();
+    const listener = await monitorWebInbox({ verbose: false, onMessage });
+    const { createWaSocket } = await import("./session.js");
+    const realSock = await (
+      createWaSocket as unknown as () => Promise<{
+        ev: import("node:events").EventEmitter;
+      }>
+    )();
+
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: {
+            id: "img2",
+            fromMe: false,
+            remoteJid: "123@g.us",
+            participant: "999@s.whatsapp.net",
+          },
+          message: {
+            messageContextInfo: {},
+            imageMessage: {
+              caption: "@bot",
+              contextInfo: { mentionedJid: ["999@s.whatsapp.net"] },
+              mimetype: "image/jpeg",
+            },
+          },
+          messageTimestamp: 1_700_000_002,
+        },
+      ],
+    };
+
+    realSock.ev.emit("messages.upsert", upsert);
+
+    for (let i = 0; i < 10; i++) {
+      if (onMessage.mock.calls.length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    const msg = onMessage.mock.calls[0][0];
+    expect(msg.chatType).toBe("group");
+    expect(msg.mentionedJids).toEqual(["999@s.whatsapp.net"]);
+
+    await listener.close();
+  });
 });
