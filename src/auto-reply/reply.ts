@@ -16,6 +16,7 @@ import { runCommandWithTimeout } from "../process/exec.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import type { TwilioRequester } from "../twilio/types.js";
 import { sendTypingIndicator } from "../twilio/typing.js";
+import { triggerWarelayRestart } from "../infra/restart.js";
 import { chunkText } from "./chunk.js";
 import { runCommandReply } from "./command-reply.js";
 import {
@@ -25,6 +26,7 @@ import {
 } from "./templating.js";
 import { isAudio, transcribeInboundAudio } from "./transcription.js";
 import type { GetReplyOptions, ReplyPayload } from "./types.js";
+import { triggerWarelayRestart } from "../infra/restart.js";
 
 export type { GetReplyOptions, ReplyPayload } from "./types.js";
 
@@ -347,6 +349,11 @@ export async function getReplyFromConfig(
   const to = (ctx.To ?? "").replace(/^whatsapp:/, "");
   const isSamePhone = from && to && from === to;
   const abortKey = sessionKey ?? (from || undefined) ?? (to || undefined);
+  const rawBodyNormalized = (
+    sessionCtx.BodyStripped ?? sessionCtx.Body ?? ""
+  )
+    .trim()
+    .toLowerCase();
 
   if (!sessionEntry && abortKey) {
     abortedLastRun = ABORT_MEMORY.get(abortKey) ?? false;
@@ -364,6 +371,18 @@ export async function getReplyFromConfig(
       cleanupTyping();
       return undefined;
     }
+  }
+
+  if (
+    rawBodyNormalized === "/restart" ||
+    rawBodyNormalized === "restart" ||
+    rawBodyNormalized.startsWith("/restart ")
+  ) {
+    triggerWarelayRestart();
+    cleanupTyping();
+    return {
+      text: "Restarting warelay via launchctl; give me a few seconds to come back online.",
+    };
   }
 
   const abortRequested =
