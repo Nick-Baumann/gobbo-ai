@@ -267,6 +267,13 @@ export async function runCommandReply(
         ? (reply.session.sessionArgNew ?? defaultNew)
         : (reply.session.sessionArgResume ?? defaultResume)
     ).map((p) => applyTemplate(p, templatingCtx));
+
+    // Tau (pi agent) needs --continue to reload prior messages when resuming.
+    // Without it, pi starts from a blank state even though we pass the session file path.
+    if (agentKind === "pi" && !isNewSession && !sessionArgList.includes("--continue")) {
+      sessionArgList.push("--continue");
+    }
+
     if (sessionArgList.length) {
       const insertBeforeBody = reply.session.sessionArgBeforeBody ?? true;
       const insertAt =
