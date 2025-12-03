@@ -610,32 +610,56 @@ export async function runCommandReply(
     type ReplyItem = { text: string; media?: string[] };
     const replyItems: ReplyItem[] = [];
 
-    const includeToolResultsInline =
+  const includeToolResultsInline =
       verboseLevel === "on" && !onPartialReply && parsedToolResults.length > 0;
 
-    if (includeToolResultsInline) {
+  if (includeToolResultsInline) {
       const aggregated = parsedToolResults.reduce<
-        { toolName?: string; metas: string[] }[]
+        { toolName?: string; metas: string[]; previews: string[] }[]
       >((acc, tr) => {
         const last = acc.at(-1);
         if (last && last.toolName === tr.toolName) {
           if (tr.meta) last.metas.push(tr.meta);
+          if (tr.text) last.previews.push(tr.text);
         } else {
-          acc.push({ toolName: tr.toolName, metas: tr.meta ? [tr.meta] : [] });
+          acc.push({
+            toolName: tr.toolName,
+            metas: tr.meta ? [tr.meta] : [],
+            previews: tr.text ? [tr.text] : [],
+          });
         }
         return acc;
       }, []);
 
+      const emojiForTool = (tool?: string) => {
+        const t = (tool ?? "").toLowerCase();
+        if (t === "bash" || t === "shell") return "💻";
+        if (t === "read") return "📄";
+        if (t === "write") return "✍️";
+        if (t === "edit") return "📝";
+        if (t === "attach") return "📎";
+        return "🛠️";
+      };
+
+      const formatPreview = (texts: string[]) => {
+        const joined = texts.join(" ").trim();
+        if (!joined) return "";
+        const clipped = joined.length > 120 ? `${joined.slice(0, 117)}…` : joined;
+        return ` — “${clipped}”`;
+      };
+
       for (const tr of aggregated) {
-        const prefixed = formatToolAggregate(tr.toolName, tr.metas);
+        const prefix = formatToolAggregate(tr.toolName, tr.metas);
+        const preview = formatPreview(tr.previews);
+        const decorated = `${emojiForTool(tr.toolName)} ${prefix}${preview}`;
         const { text: cleanedText, mediaUrls: mediaFound } =
-          splitMediaFromOutput(prefixed);
+          splitMediaFromOutput(decorated);
         replyItems.push({
           text: cleanedText,
           media: mediaFound?.length ? mediaFound : undefined,
         });
       }
-    }
+  }
 
     for (const t of parsedTexts) {
       const { text: cleanedText, mediaUrls: mediaFound } =
