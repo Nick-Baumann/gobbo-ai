@@ -356,6 +356,29 @@ export async function runCommandReply(
         pendingTimer = null;
       }
     };
+    let lastStreamedAssistant: string | undefined;
+    const streamAssistant = (msg?: {
+      role?: string;
+      content?: unknown[];
+    }) => {
+      if (!onPartialReply || msg?.role !== "assistant") return;
+      const textBlocks = Array.isArray(msg.content)
+        ? (msg.content as Array<{ type?: string; text?: string }>)
+            .filter((c) => c?.type === "text" && typeof c.text === "string")
+            .map((c) => c.text.trim())
+            .filter(Boolean)
+        : [];
+      if (textBlocks.length === 0) return;
+      const combined = textBlocks.join("\n").trim();
+      if (!combined || combined === lastStreamedAssistant) return;
+      lastStreamedAssistant = combined;
+      const { text: cleanedText, mediaUrls: mediaFound } =
+        splitMediaFromOutput(combined);
+      void onPartialReply({
+        text: cleanedText,
+        mediaUrls: mediaFound?.length ? mediaFound : undefined,
+      } as ReplyPayload);
+    };
 
     const run = async () => {
       // Prefer long-lived tau RPC for pi agent to avoid cold starts.
@@ -380,7 +403,7 @@ export async function runCommandReply(
           prompt: body,
           timeoutMs,
           onEvent:
-            verboseLevel === "on" && onPartialReply
+            onPartialReply
               ? (line: string) => {
                   try {
                     const ev = JSON.parse(line) as {
@@ -413,6 +436,13 @@ export async function runCommandReply(
                         flushPendingTool,
                         TOOL_RESULT_DEBOUNCE_MS,
                       );
+                    }
+                    if (
+                      ev.type === "message_end" ||
+                      ev.type === "message_update" ||
+                      ev.type === "message"
+                    ) {
+                      streamAssistant(ev.message);
                     }
                   } catch {
                     // ignore malformed lines
