@@ -44,7 +44,7 @@ export async function getReplyFromConfig(
   opts?: GetReplyOptions,
   configOverride?: WarelayConfig,
   commandRunner: typeof runCommandWithTimeout = runCommandWithTimeout,
-): Promise<ReplyPayload | undefined> {
+): Promise<ReplyPayload | ReplyPayload[] | undefined> {
   // Choose reply from config: static text or external command stdout.
   const cfg = configOverride ?? loadConfig();
   const reply = cfg.inbound?.reply;
