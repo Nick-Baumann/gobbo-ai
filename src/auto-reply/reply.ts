@@ -117,6 +117,20 @@ function isAbortTrigger(text?: string): boolean {
   return ABORT_TRIGGERS.has(normalized);
 }
 
+function stripStructuralPrefixes(text: string): string {
+  // Ignore wrapper labels, timestamps, and sender prefixes so directive-only
+  // detection still works in group batches that include history/context.
+  const marker = "[Current message - respond to this]";
+  const afterMarker = text.includes(marker)
+    ? text.slice(text.indexOf(marker) + marker.length)
+    : text;
+  return afterMarker
+    .replace(/\[[^\]]+\]\s*/g, "")
+    .replace(/^[ \t]*[A-Za-z0-9+()\-_. ]+:\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function getReplyFromConfig(
   ctx: MsgContext,
   opts?: GetReplyOptions,
@@ -279,8 +293,7 @@ export async function getReplyFromConfig(
   const directiveOnly = (() => {
     if (!hasThinkDirective) return false;
     if (!thinkCleaned) return true;
-    // Ignore bracketed prefixes (timestamps, same-phone markers, etc.)
-    const stripped = thinkCleaned.replace(/\[[^\]]+\]\s*/g, "").trim();
+    const stripped = stripStructuralPrefixes(thinkCleaned);
     return stripped.length === 0;
   })();
 
@@ -313,7 +326,7 @@ export async function getReplyFromConfig(
   const verboseDirectiveOnly = (() => {
     if (!hasVerboseDirective) return false;
     if (!verboseCleaned) return true;
-    const stripped = verboseCleaned.replace(/\[[^\]]+\]\s*/g, "").trim();
+    const stripped = stripStructuralPrefixes(verboseCleaned);
     return stripped.length === 0;
   })();
 
