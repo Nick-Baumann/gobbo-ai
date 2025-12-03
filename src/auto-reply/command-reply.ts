@@ -414,6 +414,7 @@ export async function runCommandReply(
     let pendingToolName: string | undefined;
     let pendingMetas: string[] = [];
     let pendingTimer: NodeJS.Timeout | null = null;
+    const toolMetaById = new Map<string, string | undefined>();
     const flushPendingTool = () => {
       if (!onPartialReply) return;
       if (!pendingToolName && pendingMetas.length === 0) return;
@@ -488,15 +489,57 @@ export async function runCommandReply(
                         content?: unknown[];
                         details?: Record<string, unknown>;
                         arguments?: Record<string, unknown>;
+                        toolCallId?: string;
+                        tool_call_id?: string;
+                        toolName?: string;
+                        name?: string;
                       };
+                      toolCallId?: string;
+                      toolName?: string;
+                      args?: Record<string, unknown>;
                     };
+                    // Capture metadata as soon as the tool starts (from args).
+                    if (ev.type === "tool_execution_start") {
+                      const toolName = ev.toolName;
+                      const meta = inferToolMeta({
+                        toolName,
+                        name: ev.toolName,
+                        arguments: ev.args,
+                      });
+                      if (ev.toolCallId) {
+                        toolMetaById.set(ev.toolCallId, meta);
+                      }
+                      if (meta) {
+                        if (pendingToolName && toolName && toolName !== pendingToolName) {
+                          flushPendingTool();
+                        }
+                        if (!pendingToolName) pendingToolName = toolName;
+                        pendingMetas.push(meta);
+                        if (
+                          TOOL_RESULT_FLUSH_COUNT > 0 &&
+                          pendingMetas.length >= TOOL_RESULT_FLUSH_COUNT
+                        ) {
+                          flushPendingTool();
+                        } else {
+                          if (pendingTimer) clearTimeout(pendingTimer);
+                          pendingTimer = setTimeout(
+                            flushPendingTool,
+                            TOOL_RESULT_DEBOUNCE_MS,
+                          );
+                        }
+                      }
+                    }
                     if (
                       (ev.type === "message" || ev.type === "message_end") &&
                       ev.message?.role === "tool_result" &&
                       Array.isArray(ev.message.content)
                     ) {
                       const toolName = inferToolName(ev.message);
-                      const meta = inferToolMeta(ev.message);
+                      const toolCallId =
+                        ev.message.toolCallId ?? ev.message.tool_call_id;
+                      const meta =
+                        inferToolMeta(ev.message) ??
+                        (toolCallId ? toolMetaById.get(toolCallId) : undefined);
                       if (
                         pendingToolName &&
                         toolName &&
