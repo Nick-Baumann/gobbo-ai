@@ -26,7 +26,8 @@ Goal: Enable warelay’s web provider to participate in WhatsApp group chats, re
   - If `requireMention` and no mention detected, store in buffer only; no reply.
   - Allow opt-out via `requireMention: false`.
 - **Allow list**:
-  - Apply `inbound.allowFrom` to the *participant* (senderE164), not the group ID. Same-phone bypass preserved.
+  - Group chats ignore `inbound.allowFrom` so anyone in the group can trigger a reply; we still record the sender E.164 for context.
+  - Direct chats keep enforcing `inbound.allowFrom` (same-phone bypass preserved).
 - **Heartbeats**:
   - Skip reply heartbeats when the last inbound was a group chat; connection heartbeat still runs.
 - **Sessions**:

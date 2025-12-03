@@ -116,9 +116,10 @@ export async function monitorWebInbox(options: {
       const allowFrom = cfg.inbound?.allowFrom;
       const isSamePhone = from === selfE164;
 
-      if (!isSamePhone && Array.isArray(allowFrom) && allowFrom.length > 0) {
-        const candidate =
-          group && senderE164 ? normalizeE164(senderE164) : from;
+      const allowlistEnabled =
+        !group && Array.isArray(allowFrom) && allowFrom.length > 0;
+      if (!isSamePhone && allowlistEnabled) {
+        const candidate = from;
         const allowedList = allowFrom.map(normalizeE164);
         if (!allowFrom.includes("*") && !allowedList.includes(candidate)) {
           logVerbose(

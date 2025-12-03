@@ -321,7 +321,7 @@ describe("web monitor inbox", () => {
     await listener.close();
   });
 
-  it("applies allowFrom to group participants", async () => {
+  it("lets group messages through even when sender not in allowFrom", async () => {
     mockLoadConfig.mockReturnValue({
       inbound: {
         allowFrom: ["+1234"],
@@ -353,16 +353,10 @@ describe("web monitor inbox", () => {
     sock.ev.emit("messages.upsert", upsert);
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(onMessage).not.toHaveBeenCalled();
-
-    mockLoadConfig.mockReturnValue({
-      inbound: {
-        allowFrom: ["*"],
-        messagePrefix: undefined,
-        responsePrefix: undefined,
-        timestampPrefix: false,
-      },
-    });
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    const payload = onMessage.mock.calls[0][0];
+    expect(payload.chatType).toBe("group");
+    expect(payload.senderE164).toBe("+999");
 
     await listener.close();
   });
