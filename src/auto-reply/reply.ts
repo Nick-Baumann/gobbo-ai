@@ -33,6 +33,45 @@ const TWILIO_TEXT_LIMIT = 1600;
 const ABORT_TRIGGERS = new Set(["stop", "esc", "abort", "wait", "exit"]);
 const ABORT_MEMORY = new Map<string, boolean>();
 
+type ThinkLevel = "off" | "minimal" | "low" | "medium" | "high";
+
+function normalizeThinkLevel(raw?: string | null): ThinkLevel | undefined {
+  if (!raw) return undefined;
+  const key = raw.toLowerCase();
+  if (["off"].includes(key)) return "off";
+  if (["min", "minimal"].includes(key)) return "minimal";
+  if (["low"].includes(key)) return "low";
+  if (["med", "medium", "thinkhard", "think-harder", "thinkharder"].includes(key))
+    return "medium";
+  if (["high", "ultra", "ultrathink", "think-hard", "thinkhardest"].includes(key))
+    return "high";
+  if (["think"].includes(key)) return "minimal";
+  return undefined;
+}
+
+function extractThinkDirective(body?: string): {
+  cleaned: string;
+  thinkLevel?: ThinkLevel;
+} {
+  if (!body) return { cleaned: "" };
+  const re = /\/think:([a-zA-Z-]+)/i;
+  const match = body.match(re);
+  const thinkLevel = normalizeThinkLevel(match?.[1]);
+  const cleaned = match ? body.replace(match[0], "").trim() : body;
+  return { cleaned, thinkLevel };
+}
+
+function appendThinkingCue(body: string, level?: ThinkLevel): string {
+  if (!level || level === "off") return body;
+  const cue =
+    level === "high"
+      ? "ultrathink"
+      : level === "medium"
+        ? "think harder"
+        : "think";
+  return [body.trim(), cue].filter(Boolean).join(" ");
+}
+
 function isAbortTrigger(text?: string): boolean {
   if (!text) return false;
   const normalized = text.trim().toLowerCase();
@@ -165,6 +204,12 @@ export async function getReplyFromConfig(
     SessionId: sessionId,
     IsNewSession: isNewSession ? "true" : "false",
   };
+
+  const { cleaned: thinkCleaned, thinkLevel } = extractThinkDirective(
+    sessionCtx.BodyStripped ?? sessionCtx.Body ?? "",
+  );
+  sessionCtx.Body = thinkCleaned;
+  sessionCtx.BodyStripped = thinkCleaned;
 
   // Optional allowlist by origin number (E.164 without whatsapp: prefix)
   const allowFrom = cfg.inbound?.allowFrom;
@@ -313,10 +358,12 @@ export async function getReplyFromConfig(
   const isHeartbeat = opts?.isHeartbeat === true;
 
   if (reply && reply.mode === "command") {
-    const commandArgs =
-      isHeartbeat && reply.heartbeatCommand?.length
-        ? reply.heartbeatCommand
-        : reply.command;
+    const heartbeatCommand = isHeartbeat
+      ? (reply as { heartbeatCommand?: string[] }).heartbeatCommand
+      : undefined;
+    const commandArgs = heartbeatCommand?.length
+      ? heartbeatCommand
+      : reply.command;
 
     if (!commandArgs?.length) {
       cleanupTyping();
@@ -340,6 +387,7 @@ export async function getReplyFromConfig(
         timeoutMs,
         timeoutSeconds,
         commandRunner,
+        thinkLevel,
       });
       const payloadArray = runResult.payloads ?? [];
       const meta = runResult.meta;
