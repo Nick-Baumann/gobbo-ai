@@ -131,6 +131,33 @@ function stripStructuralPrefixes(text: string): string {
     .trim();
 }
 
+function stripMentions(
+  text: string,
+  ctx: MsgContext,
+  cfg: WarelayConfig | undefined,
+): string {
+  let result = text;
+  const patterns = cfg?.inbound?.groupChat?.mentionPatterns ?? [];
+  for (const p of patterns) {
+    try {
+      const re = new RegExp(p, "gi");
+      result = result.replace(re, " ");
+    } catch {
+      // ignore invalid regex
+    }
+  }
+  const selfE164 = (ctx.To ?? "").replace(/^whatsapp:/, "");
+  if (selfE164) {
+    const esc = selfE164.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result
+      .replace(new RegExp(esc, "gi"), " ")
+      .replace(new RegExp(`@${esc}`, "gi"), " ");
+  }
+  // Generic mention patterns like @123456789 or plain digits
+  result = result.replace(/@[0-9+]{5,}/g, " ");
+  return result.replace(/\s+/g, " ").trim();
+}
+
 export async function getReplyFromConfig(
   ctx: MsgContext,
   opts?: GetReplyOptions,
@@ -280,6 +307,10 @@ export async function getReplyFromConfig(
   sessionCtx.Body = verboseCleaned;
   sessionCtx.BodyStripped = verboseCleaned;
 
+  const isGroup =
+    typeof ctx.From === "string" &&
+    (ctx.From.includes("@g.us") || ctx.From.startsWith("group:"));
+
   let resolvedThinkLevel =
     inlineThink ??
     (sessionEntry?.thinkingLevel as ThinkLevel | undefined) ??
@@ -290,15 +321,26 @@ export async function getReplyFromConfig(
     (sessionEntry?.verboseLevel as VerboseLevel | undefined) ??
     (reply?.verboseDefault as VerboseLevel | undefined);
 
+  const combinedDirectiveOnly =
+    hasThinkDirective &&
+    hasVerboseDirective &&
+    (() => {
+      const stripped = stripStructuralPrefixes(verboseCleaned ?? "");
+      const noMentions = isGroup ? stripMentions(stripped, ctx, cfg) : stripped;
+      return noMentions.length === 0;
+    })();
+
   const directiveOnly = (() => {
     if (!hasThinkDirective) return false;
     if (!thinkCleaned) return true;
-    const stripped = stripStructuralPrefixes(thinkCleaned);
-    return stripped.length === 0;
+    // Check after stripping both think and verbose so combined directives count.
+    const stripped = stripStructuralPrefixes(verboseCleaned);
+    const noMentions = isGroup ? stripMentions(stripped, ctx, cfg) : stripped;
+    return noMentions.length === 0;
   })();
 
   // Directive-only message => persist session thinking level and return ack
-  if (directiveOnly) {
+  if (directiveOnly || combinedDirectiveOnly) {
     if (!inlineThink) {
       cleanupTyping();
       return {
@@ -315,10 +357,37 @@ export async function getReplyFromConfig(
       sessionStore[sessionKey] = sessionEntry;
       await saveSessionStore(storePath, sessionStore);
     }
-    const ack =
-      inlineThink === "off"
-        ? "Thinking disabled."
-        : `Thinking level set to ${inlineThink}.`;
+    // If verbose directive is also present, persist it too.
+    if (hasVerboseDirective && inlineVerbose && sessionEntry && sessionStore && sessionKey) {
+      if (inlineVerbose === "off") {
+        delete sessionEntry.verboseLevel;
+      } else {
+        sessionEntry.verboseLevel = inlineVerbose;
+      }
+      sessionEntry.updatedAt = Date.now();
+      sessionStore[sessionKey] = sessionEntry;
+      await saveSessionStore(storePath, sessionStore);
+    }
+    const parts: string[] = [];
+    if (inlineThink === "off") {
+      parts.push("Thinking disabled.");
+    } else {
+      parts.push(`Thinking level set to ${inlineThink}.`);
+    }
+    if (hasVerboseDirective) {
+      if (!inlineVerbose) {
+        parts.push(
+          `Unrecognized verbose level "${rawVerboseLevel ?? ""}". Valid levels: off, on.`,
+        );
+      } else {
+        parts.push(
+          inlineVerbose === "off"
+            ? "Verbose logging disabled."
+            : "Verbose logging enabled.",
+        );
+      }
+    }
+    const ack = parts.join(" ");
     cleanupTyping();
     return { text: ack };
   }
@@ -327,7 +396,8 @@ export async function getReplyFromConfig(
     if (!hasVerboseDirective) return false;
     if (!verboseCleaned) return true;
     const stripped = stripStructuralPrefixes(verboseCleaned);
-    return stripped.length === 0;
+    const noMentions = isGroup ? stripMentions(stripped, ctx, cfg) : stripped;
+    return noMentions.length === 0;
   })();
 
   if (verboseDirectiveOnly) {
@@ -360,9 +430,6 @@ export async function getReplyFromConfig(
   const from = (ctx.From ?? "").replace(/^whatsapp:/, "");
   const to = (ctx.To ?? "").replace(/^whatsapp:/, "");
   const isSamePhone = from && to && from === to;
-  const isGroup =
-    typeof ctx.From === "string" &&
-    (ctx.From.includes("@g.us") || ctx.From.startsWith("group:"));
   const abortKey = sessionKey ?? (from || undefined) ?? (to || undefined);
   const rawBodyNormalized = (
     sessionCtx.BodyStripped ?? sessionCtx.Body ?? ""
