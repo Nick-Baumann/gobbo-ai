@@ -414,7 +414,8 @@ private struct CritterStatusLabel: View {
         Image(nsImage: CritterIconRenderer.makeIcon(
             blink: blinkAmount,
             legWiggle: legWiggle,
-            earWiggle: earWiggle
+            earWiggle: earWiggle,
+            isPaused: isPaused
         ))
             .renderingMode(.template)
             .frame(width: 18, height: 16)
@@ -514,7 +515,7 @@ private struct CritterStatusLabel: View {
 enum CritterIconRenderer {
     private static let size = NSSize(width: 18, height: 16)
 
-    static func makeIcon(blink: CGFloat, legWiggle: CGFloat = 0, earWiggle: CGFloat = 0) -> NSImage {
+    static func makeIcon(blink: CGFloat, legWiggle: CGFloat = 0, earWiggle: CGFloat = 0, isPaused: Bool = false) -> NSImage {
         let image = NSImage(size: size)
         image.lockFocus()
         defer { image.unlockFocus() }
@@ -548,7 +549,8 @@ enum CritterIconRenderer {
         let eyeY = bodyY + bodyH * 0.56
         let eyeOffset = bodyW * 0.24
 
-        ctx.setFillColor(NSColor.labelColor.cgColor)
+        let baseAlpha: CGFloat = isPaused ? 0.38 : 1.0
+        ctx.setFillColor(NSColor.labelColor.withAlphaComponent(baseAlpha).cgColor)
 
         // Body
         ctx.addPath(CGPath(roundedRect: CGRect(x: bodyX, y: bodyY, width: bodyW, height: bodyH), cornerWidth: bodyCorner, cornerHeight: bodyCorner, transform: nil))
@@ -1172,66 +1174,60 @@ struct OnboardingView: View {
     var body: some View {
         let step = steps[stepIndex]
         VStack(spacing: 18) {
-            heroHeader(step: step)
-            contentCard(step: step)
+            heroCard(step: step)
+            contentPanel(step: step)
             progressDots
             footerButtons
         }
-        .padding(22)
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(NSColor.windowBackgroundColor))
         .task { await refreshPerms() }
     }
 
     @ViewBuilder
-    private func heroHeader(step: OnboardingStep) -> some View {
-        HStack(spacing: 16) {
-            ZStack {
-                LinearGradient(colors: [.accentColor.opacity(0.75), .purple.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .shadow(color: .accentColor.opacity(0.35), radius: 12, y: 6)
-                Image(nsImage: CritterIconRenderer.makeIcon(blink: 0))
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundStyle(.white)
-                    .frame(width: 54, height: 48)
-            }
-
+    private func heroCard(step: OnboardingStep) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: step.systemImage)
+                .font(.title3.bold())
+                .foregroundStyle(.white)
+                .padding(10)
+                .background(.white.opacity(0.12))
+                .clipShape(Circle())
             VStack(alignment: .leading, spacing: 6) {
-                Label(step.title, systemImage: step.systemImage)
+                Text(step.title)
                     .font(.title3.bold())
+                    .foregroundColor(.white)
                 Text(step.detail)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.white.opacity(0.92))
             }
             Spacer()
         }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(
+            LinearGradient(colors: [Color.blue.opacity(0.9), Color.purple.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        )
+        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
     }
 
     @ViewBuilder
-    private func contentCard(step: OnboardingStep) -> some View {
+    private func contentPanel(step: OnboardingStep) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if step.showsPermissions {
-                permissionsCard
-            }
-            if step.showsCLI {
-                CLIInstallCard(copied: $copied)
-            }
-            if step.showsLoginToggle {
-                loginCard
-            }
-            if !step.showsPermissions && !step.showsCLI {
+            if step.showsPermissions { permissionsCard }
+            if step.showsCLI { CLIInstallCard(copied: $copied) }
+            if step.showsLoginToggle { loginCard }
+            if !step.showsPermissions && !step.showsCLI && !step.showsLoginToggle {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Keep Clawdis running in your menu bar. Pause from the menu if you need silence, or open Settings to adjust permissions later.")
-                    Button("Open Settings") {
-                        NSApp.activate(ignoringOtherApps: true)
-                        SettingsTabRouter.request(.general)
-                        NSApplication.shared.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-                    }
+                        .font(.body)
                 }
             }
         }
-        .padding(16)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(NSColor.controlBackgroundColor)))
     }
 
