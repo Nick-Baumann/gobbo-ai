@@ -1173,13 +1173,13 @@ struct OnboardingView: View {
 
     var body: some View {
         let step = steps[stepIndex]
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             heroCard(step: step)
             contentPanel(step: step)
             progressDots
             footerButtons
         }
-        .padding(18)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(NSColor.windowBackgroundColor))
         .task { await refreshPerms() }
@@ -1187,13 +1187,15 @@ struct OnboardingView: View {
 
     @ViewBuilder
     private func heroCard(step: OnboardingStep) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: step.systemImage)
-                .font(.title3.bold())
-                .foregroundStyle(.white)
-                .padding(10)
-                .background(.white.opacity(0.12))
-                .clipShape(Circle())
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 38, height: 38)
+                Image(systemName: step.systemImage)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white)
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text(step.title)
                     .font(.title3.bold())
@@ -1205,12 +1207,12 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.vertical, 16)
         .background(
             LinearGradient(colors: [Color.blue.opacity(0.9), Color.purple.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         )
-        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
     }
 
     @ViewBuilder
@@ -1226,9 +1228,13 @@ struct OnboardingView: View {
                 }
             }
         }
-        .padding(18)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(NSColor.controlBackgroundColor)))
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(NSColor.controlBackgroundColor))
+                .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+        )
     }
 
     private var loginCard: some View {
@@ -1268,28 +1274,29 @@ struct OnboardingView: View {
 
     private var progressDots: some View {
         HStack(spacing: 8) {
+            Spacer()
             ForEach(Array(steps.indices), id: \.self) { idx in
                 Circle()
-                    .fill(idx == stepIndex ? Color.accentColor : Color.gray.opacity(0.4))
+                    .fill(idx == stepIndex ? Color.accentColor : Color.gray.opacity(0.35))
                     .frame(width: 8, height: 8)
-                    .scaleEffect(idx == stepIndex ? 1.25 : 1.0)
+                    .scaleEffect(idx == stepIndex ? 1.2 : 1.0)
                     .animation(.spring(response: 0.35, dampingFraction: 0.7), value: stepIndex)
             }
             Spacer()
         }
-        .padding(.horizontal, 4)
     }
 
     private var footerButtons: some View {
         HStack {
             Button("Skip") { finish() }
-                .buttonStyle(.plain)
+                .buttonStyle(.bordered)
             Spacer()
             if stepIndex > 0 {
                 Button("Back") { stepIndex = max(0, stepIndex - 1) }
             }
             Button(stepIndex == steps.count - 1 ? "Finish" : "Next") { advance() }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.return, modifiers: [])
         }
         .padding(.top, 4)
     }
