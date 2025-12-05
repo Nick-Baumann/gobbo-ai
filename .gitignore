@@ -8,3 +8,4 @@ coverage
 apps/macos/.build/
 apps/macos/Assets.xcassets/LobsterTemplate.imageset/lobster-template.pdf
 bin/clawdis-mac
+apps/macos/.build-local/
