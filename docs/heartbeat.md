@@ -1,9 +1,9 @@
 # Heartbeat polling plan (2025-11-26)
 
-Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven) that only notifies users when something matters, using the `HEARTBEAT_OK` sentinel. The heartbeat body we send is `HEARTBEAT /think:high` so the model can easily spot it.
+Goal: add a simple heartbeat poll for command-based auto-replies (Pi/Tau) that only notifies users when something matters, using the `HEARTBEAT_OK` sentinel. The heartbeat body we send is `HEARTBEAT /think:high` so the model can easily spot it.
 
 ## Prompt contract
-- Extend the Claude system/identity text to explain: “If this is a heartbeat poll and nothing needs attention, reply exactly `HEARTBEAT_OK` and nothing else. For any alert, do **not** include `HEARTBEAT_OK`; just return the alert text.” Heartbeat prompt body is `HEARTBEAT /think:high`.
+- Extend the Pi/Tau system/identity text to explain: “If this is a heartbeat poll and nothing needs attention, reply exactly `HEARTBEAT_OK` and nothing else. For any alert, do **not** include `HEARTBEAT_OK`; just return the alert text.” Heartbeat prompt body is `HEARTBEAT /think:high`.
 - Keep existing WhatsApp length guidance; forbid burying the sentinel inside alerts.
 
 ## Config & defaults
@@ -13,8 +13,8 @@ Goal: add a simple heartbeat poll for command-based auto-replies (Claude-driven)
 
 ## Poller behavior
 - When relay runs with command-mode auto-reply, start a timer with the resolved heartbeat interval.
-- Each tick invokes the configured command with a short heartbeat body (e.g., “(heartbeat) summarize any important changes since last turn”) while reusing the active session args so Claude context stays warm.
-- Heartbeats never create a new session implicitly: if there’s no stored session for the target (fallback path), the heartbeat is skipped instead of starting a fresh Claude session.
+- Each tick invokes the configured command with a short heartbeat body (e.g., “(heartbeat) summarize any important changes since last turn”) while reusing the active session args so Pi context stays warm.
+- Heartbeats never create a new session implicitly: if there’s no stored session for the target (fallback path), the heartbeat is skipped instead of starting a fresh Pi session.
 - Abort timer on SIGINT/abort of the relay.
 
 ## Sentinel handling

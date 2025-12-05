@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 — 2025-12-05
+
+### Breaking
+- Dropped all non-Pi agents (Claude, Codex, Gemini, Opencode); `inbound.reply.agent.kind` now only accepts `"pi"` and related CLI helpers have been removed.
+
+### Changes
+- Default agent handling now favors Pi RPC while falling back to the plain command runner for non-Pi invocations, keeping heartbeat/session plumbing intact.
+- Documentation updated to reflect Pi-only support and to mark legacy Claude paths as historical.
+
 ## 1.4.1 — 2025-12-04
 
 ### Changes

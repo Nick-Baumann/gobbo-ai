@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - Source code: `src/` (CLI wiring in `src/cli`, commands in `src/commands`, Twilio in `src/twilio`, Web provider in `src/provider-web.ts`, infra in `src/infra`, media pipeline in `src/media`).
 - Tests: colocated `*.test.ts` plus e2e in `src/cli/relay.e2e.test.ts`.
-- Docs: `docs/` (images, queue, Claude config). Built output lives in `dist/`.
+- Docs: `docs/` (images, queue, Pi config). Built output lives in `dist/`.
 
 ## Build, Test, and Development Commands
 - Install deps: `pnpm install`

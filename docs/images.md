@@ -56,7 +56,7 @@ This document defines how `warelay` should handle sending and replying with imag
 - Web inbox:
   - If `mediaUrl` present, fetch/resolve same as send (local path or URL), send via Baileys with caption.
 
-## Inbound Media to Commands (Claude etc.)
+## Inbound Media to Commands (Pi/Tau)
 - For completeness: when inbound Twilio/Web messages include media, download to temp file, expose templating variables:
   - `{{MediaUrl}}` original URL (Twilio) or pseudo-URL (web).
   - `{{MediaPath}}` local temp path written before running the command.

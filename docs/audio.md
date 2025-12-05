@@ -5,7 +5,7 @@
   1) Download inbound audio (Web or Twilio) to a temp path if only a URL is present.
   2) Run the configured CLI (templated with `{{MediaPath}}`), expecting transcript on stdout.
   3) Replace `Body` with the transcript, set `{{Transcript}}`, and prepend the original media path plus a `Transcript:` section in the command prompt so models see both.
-  4) Continue through the normal auto-reply pipeline (templating, sessions, Claude/command).
+  4) Continue through the normal auto-reply pipeline (templating, sessions, Pi command).
 - **Verbose logging**: In `--verbose`, we log when transcription runs and when the transcript replaces the body.
 
 ## Config example (OpenAI Whisper CLI)
@@ -29,7 +29,8 @@ Requires `OPENAI_API_KEY` in env and `openai` CLI installed:
     },
     reply: {
       mode: "command",
-      command: ["claude", "{{Body}}"]
+      command: ["pi", "{{Body}}"],
+      agent: { kind: "pi" }
     }
   }
 }

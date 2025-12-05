@@ -19,7 +19,7 @@
 ```
 ┌─────────────┐      ┌──────────┐      ┌─────────────┐
 │  WhatsApp   │ ───▶ │ CLAWDIS  │ ───▶ │  AI Agent   │
-│  (You)      │ ◀─── │  🦞⏱️💙   │ ◀─── │ (Tau/Claude)│
+│  (You)      │ ◀─── │  🦞⏱️💙   │ ◀─── │   (Pi/Tau)  │
 └─────────────┘      └──────────┘      └─────────────┘
 ```
 
@@ -32,13 +32,15 @@ Because every space lobster needs a time-and-space machine. The Doctor has a TAR
 ## Features
 
 - 📱 **WhatsApp Integration** — Personal WhatsApp Web or Twilio
-- 🤖 **AI Agent Gateway** — Works with Tau/Pi, Claude CLI, Codex, Gemini
+- 🤖 **AI Agent Gateway** — Pi/Tau only (Pi CLI in RPC mode)
 - 💬 **Session Management** — Per-sender conversation context
 - 🔔 **Heartbeats** — Periodic check-ins for proactive AI
 - 👥 **Group Chat Support** — Mention-based triggering
 - 📎 **Media Support** — Images, audio, documents, voice notes
 - 🎤 **Voice Transcription** — Whisper integration
 - 🔧 **Tool Streaming** — Real-time display (💻📄✍️📝)
+
+Only the Pi/Tau CLI is supported now; legacy Claude/Codex/Gemini paths have been removed.
 
 ## Quick Start
 

@@ -557,7 +557,7 @@ export async function getReplyFromConfig(
   const mediaNote = ctx.MediaPath?.length
     ? `[media attached: ${ctx.MediaPath}${ctx.MediaType ? ` (${ctx.MediaType})` : ""}${ctx.MediaUrl ? ` | ${ctx.MediaUrl}` : ""}]`
     : undefined;
-  // For command prompts we prepend the media note so Claude et al. see it; text replies stay clean.
+  // For command prompts we prepend the media note so Pi sees it; text replies stay clean.
   const mediaReplyHint =
     mediaNote && reply?.mode === "command"
       ? "To send an image back, add a line like: MEDIA:https://example.com/image.jpg (no spaces). Keep caption in the text body."

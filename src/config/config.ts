@@ -118,7 +118,7 @@ const ReplySchema = z
   .object({
     mode: z.union([z.literal("text"), z.literal("command")]),
     text: z.string().optional(),
-      command: z.array(z.string()).optional(),
+    command: z.array(z.string()).optional(),
     heartbeatCommand: z.array(z.string()).optional(),
     thinkingDefault: z
       .union([
@@ -147,8 +147,8 @@ const ReplySchema = z
         heartbeatIdleMinutes: z.number().int().positive().optional(),
         store: z.string().optional(),
         sessionArgNew: z.array(z.string()).optional(),
-      sessionArgResume: z.array(z.string()).optional(),
-      sessionArgBeforeBody: z.boolean().optional(),
+        sessionArgResume: z.array(z.string()).optional(),
+        sessionArgBeforeBody: z.boolean().optional(),
         sendSystemOnce: z.boolean().optional(),
         sessionIntro: z.string().optional(),
         typingIntervalSeconds: z.number().int().positive().optional(),
@@ -157,13 +157,7 @@ const ReplySchema = z
     heartbeatMinutes: z.number().int().nonnegative().optional(),
     agent: z
       .object({
-        kind: z.union([
-          z.literal("claude"),
-          z.literal("opencode"),
-          z.literal("pi"),
-          z.literal("codex"),
-          z.literal("gemini"),
-        ]),
+        kind: z.literal("pi"),
         format: z.union([z.literal("text"), z.literal("json")]).optional(),
         identityPrefix: z.string().optional(),
       })

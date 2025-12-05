@@ -18,13 +18,15 @@ CLAWDIS (née Warelay) bridges WhatsApp to AI coding agents like [Tau/Pi](https:
 ## Features
 
 - 📱 **WhatsApp Integration** — Uses Baileys for WhatsApp Web protocol
-- 🤖 **AI Agent Gateway** — Spawns coding agents (Tau, Claude, etc.) per message
+- 🤖 **AI Agent Gateway** — Pi/Tau only (Pi CLI in RPC mode)
 - 💬 **Session Management** — Maintains conversation context across messages
 - 🔔 **Heartbeats** — Periodic check-ins so your AI doesn't feel lonely
 - 👥 **Group Chat Support** — Mention-based triggering in group chats
 - 📎 **Media Support** — Send and receive images, audio, documents
 - 🎤 **Voice Messages** — Transcription via Whisper
 - 🔧 **Tool Streaming** — Real-time display of AI tool usage (💻📄✍️📝)
+
+Note: support for Claude, Codex, Gemini, and Opencode has been removed; Pi/Tau is now the only coding agent path.
 
 ## The Name
 

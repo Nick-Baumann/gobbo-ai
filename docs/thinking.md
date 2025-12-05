@@ -21,8 +21,7 @@
 - Confirmation reply is sent (`Thinking level set to high.` / `Thinking disabled.`). If the level is invalid (e.g. `/thinking big`), the command is rejected with a hint and the session state is left unchanged.
 
 ## Application by agent
-- **Pi/Tau**: injects `--thinking <level>` (skipped for `off`).
-- **Claude & other text agents**: appends the cue word to the prompt text as above.
+- **Pi/Tau**: injects `--thinking <level>` (skipped for `off`). Other agent paths have been removed.
 
 ## Verbose directives (/verbose or /v)
 - Levels: `on|full` or `off` (default).

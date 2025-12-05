@@ -87,7 +87,7 @@ describe("cli program", () => {
     const program = buildProgram();
     await program.parseAsync(["relay:tmux:attach"], { from: "user" });
     expect(spawnRelayTmux).toHaveBeenCalledWith(
-      "pnpm warelay relay --verbose",
+      "pnpm clawdis relay --verbose",
       true,
       false,
     );
@@ -122,7 +122,7 @@ describe("cli program", () => {
     await program.parseAsync(["relay:heartbeat:tmux"], { from: "user" });
     const shouldAttach = Boolean(process.stdout.isTTY);
     expect(spawnRelayTmux).toHaveBeenCalledWith(
-      "pnpm warelay relay --verbose --heartbeat-now",
+      "pnpm clawdis relay --verbose --heartbeat-now",
       shouldAttach,
     );
   });

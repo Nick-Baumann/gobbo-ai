@@ -8,7 +8,7 @@
 ## Commands
 - `warelay relay:tmux` — restarts the `warelay-relay` session running `pnpm warelay relay --verbose`, then attaches (skips attach when stdout isn’t a TTY).
 - `warelay relay:tmux:attach` — attach to the existing session without restarting it.
-- `warelay relay:heartbeat:tmux` — same as `relay:tmux` but adds `--heartbeat-now` so Claude is pinged immediately on startup.
+- `warelay relay:heartbeat:tmux` — same as `relay:tmux` but adds `--heartbeat-now` so Pi is pinged immediately on startup.
 
 All helpers use the fixed session name `warelay-relay`.
 

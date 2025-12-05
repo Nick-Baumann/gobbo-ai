@@ -145,22 +145,25 @@ export const piSpec: AgentSpec = {
   },
   buildArgs: (ctx) => {
     const argv = [...ctx.argv];
+    let bodyPos = ctx.bodyIndex;
     // Non-interactive print + JSON
     if (!argv.includes("-p") && !argv.includes("--print")) {
-      argv.splice(argv.length - 1, 0, "-p");
+      argv.splice(bodyPos, 0, "-p");
+      bodyPos += 1;
     }
     if (
       ctx.format === "json" &&
       !argv.includes("--mode") &&
       !argv.some((a) => a === "--mode")
     ) {
-      argv.splice(argv.length - 1, 0, "--mode", "json");
+      argv.splice(bodyPos, 0, "--mode", "json");
+      bodyPos += 2;
     }
     // Session defaults
     // Identity prefix optional; Pi usually doesn't need it, but allow injection
-    if (!(ctx.sendSystemOnce && ctx.systemSent) && argv[ctx.bodyIndex]) {
-      const existingBody = argv[ctx.bodyIndex];
-      argv[ctx.bodyIndex] = [ctx.identityPrefix, existingBody]
+    if (!(ctx.sendSystemOnce && ctx.systemSent) && argv[bodyPos]) {
+      const existingBody = argv[bodyPos];
+      argv[bodyPos] = [ctx.identityPrefix, existingBody]
         .filter(Boolean)
         .join("\n\n");
     }

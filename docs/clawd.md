@@ -1,6 +1,8 @@
 # Building Your Own AI Personal Assistant with warelay
 
-> **TL;DR:** warelay lets you turn Claude into a proactive personal assistant that lives in your pocket via WhatsApp. It can check in on you, remember context across conversations, run commands on your Mac, and even wake you up with music. This doc shows you how.
+> **TL;DR:** CLAWDIS (Pi/Tau only) lets you run a proactive assistant over WhatsApp. It can check in on you, remember context across conversations, run commands on your Mac, and even wake you up with music. This doc was originally written for Claude Code; where you see `claude ...`, use `pi --mode rpc ...` instead. A Pi-specific rewrite is coming soon.
+
+⚠️ **Note (2025-12-05):** CLAWDIS now ships with only the Pi/Tau agent. The walkthrough below references Claude Code; swap those commands for `pi`/`tau` if you follow along. A Pi-specific guide is coming soon.
 
 ---
 

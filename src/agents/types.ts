@@ -1,4 +1,4 @@
-export type AgentKind = "claude" | "opencode" | "pi" | "codex" | "gemini";
+export type AgentKind = "pi";
 
 export type AgentMeta = {
   model?: string;

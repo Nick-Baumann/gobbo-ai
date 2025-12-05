@@ -247,7 +247,7 @@ Examples:
     .option("--to <number>", "Override target E.164; defaults to allowFrom[0]")
     .option(
       "--session-id <id>",
-      "Force a session id for this heartbeat (resumes a specific Claude session)",
+      "Force a session id for this heartbeat (resumes a specific Pi session)",
     )
     .option(
       "--all",

@@ -26,7 +26,7 @@ describe("spawnRelayTmux", () => {
 
   it("kills old session, starts new one, and attaches", async () => {
     const session = await spawnRelayTmux("echo hi", true, true);
-    expect(session).toBe("warelay-relay");
+    expect(session).toBe("clawdis-relay");
     const spawnMock = spawn as unknown as vi.Mock;
     expect(spawnMock.mock.calls.length).toBe(3);
     const calls = spawnMock.mock.calls as Array<[string, string[], unknown]>;

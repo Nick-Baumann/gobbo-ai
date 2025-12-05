@@ -59,7 +59,7 @@ export async function runCommandWithTimeout(
       : optionsOrTimeout;
   const { timeoutMs, cwd, input } = options;
 
-  // Spawn with inherited stdin (TTY) so tools like `claude` don't hang.
+  // Spawn with inherited stdin (TTY) so tools like `pi` stay interactive when needed.
   return await new Promise((resolve, reject) => {
     const child = spawn(argv[0], argv.slice(1), {
       stdio: [input ? "pipe" : "inherit", "pipe", "pipe"],
