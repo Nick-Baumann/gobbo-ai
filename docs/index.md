@@ -4,6 +4,8 @@
 
 **CLAWDIS** is a WhatsApp-to-AI gateway that lets your AI assistant live in your pocket. Built for [Clawd](https://clawd.me), a space lobster who needed a TARDIS.
 
+**Source & Issues:** [github.com/steipete/clawdis](https://github.com/steipete/clawdis)
+
 ## What is this?
 
 CLAWDIS (née Warelay) bridges WhatsApp to AI coding agents like [Tau/Pi](https://github.com/badlogic/pi-mono). Send a message, get an AI response. It's like having a genius lobster on call 24/7.
