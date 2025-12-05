@@ -358,7 +358,7 @@ struct ClawdisApp: App {
 
         Settings {
             SettingsRootView(state: state)
-                .frame(minWidth: 520, minHeight: 420)
+                .frame(minWidth: 520, minHeight: 460)
         }
     }
 
@@ -456,60 +456,71 @@ struct CritterGlyph: View {
             let w = geo.size.width
             let h = geo.size.height
 
-            let bodyWidth = w * 0.78
-            let bodyHeight = h * 0.58
-            let bodyRect = CGRect(x: (w - bodyWidth) / 2, y: h * 0.18, width: bodyWidth, height: bodyHeight)
+            let bodyWidth = w * 0.8
+            let bodyHeight = h * 0.56
+            let bodyCorner = w * 0.08
+            let bodyY = h * 0.18
 
-            let armWidth = w * 0.2
-            let armHeight = bodyHeight * 0.6
-            let armCorner = armWidth * 0.24
+            let earWidth = w * 0.22
+            let earHeight = bodyHeight * 0.7
+            let earCorner = earWidth * 0.22
 
-            let legWidth = w * 0.11
-            let legHeight = h * 0.26
+            let legWidth = w * 0.12
+            let legHeight = h * 0.28
             let legSpacing = w * 0.08
-            let legStartX = bodyRect.minX + w * 0.05
-            let legY = bodyRect.maxY - legHeight * 0.2
+            let legStartX = (w - (4 * legWidth + 3 * legSpacing)) / 2
+            let legY = bodyY + bodyHeight - legHeight * 0.18
 
-            let eyeOpen = max(0.02, 1 - blinkAmount)
+            let eyeOpen = max(0.08, 1 - blinkAmount)
             let eyeWidth = bodyWidth * 0.18
-            let eyeHeight = bodyHeight * 0.22 * eyeOpen
-            let eyeY = bodyRect.midY - bodyHeight * 0.08
-            let eyeOffset = bodyWidth * 0.2
+            let eyeHeight = bodyHeight * 0.24 * eyeOpen
+            let eyeY = bodyY + bodyHeight * 0.45
+            let eyeOffset = bodyWidth * 0.22
 
-            Path { path in
-                path.addRoundedRect(in: bodyRect, cornerSize: CGSize(width: w * 0.08, height: w * 0.08))
+            ZStack {
+                RoundedRectangle(cornerRadius: bodyCorner, style: .continuous)
+                    .frame(width: bodyWidth, height: bodyHeight)
+                    .offset(y: bodyY)
 
-                path.addRoundedRect(
-                    in: CGRect(x: bodyRect.minX - armWidth * 0.65, y: bodyRect.midY - armHeight / 2, width: armWidth, height: armHeight),
-                    cornerSize: CGSize(width: armCorner, height: armCorner)
-                )
+                RoundedRectangle(cornerRadius: earCorner, style: .continuous)
+                    .frame(width: earWidth, height: earHeight)
+                    .offset(x: -bodyWidth * 0.5 + earWidth * 0.35, y: bodyY + bodyHeight * 0.02)
 
-                path.addRoundedRect(
-                    in: CGRect(x: bodyRect.maxX - armWidth * 0.35, y: bodyRect.midY - armHeight / 2, width: armWidth, height: armHeight),
-                    cornerSize: CGSize(width: armCorner, height: armCorner)
-                )
+                RoundedRectangle(cornerRadius: earCorner, style: .continuous)
+                    .frame(width: earWidth, height: earHeight)
+                    .offset(x: bodyWidth * 0.5 - earWidth * 0.35, y: bodyY + bodyHeight * 0.02)
 
-                for i in 0 ..< 4 {
-                    let x = legStartX + CGFloat(i) * (legWidth + legSpacing)
-                    path.addRoundedRect(
-                        in: CGRect(x: x, y: legY, width: legWidth, height: legHeight),
-                        cornerSize: CGSize(width: legWidth * 0.35, height: legWidth * 0.35)
-                    )
+                Path { path in
+                    for i in 0 ..< 4 {
+                        let x = legStartX + CGFloat(i) * (legWidth + legSpacing)
+                        path.addRoundedRect(
+                            in: CGRect(x: x, y: legY, width: legWidth, height: legHeight),
+                            cornerSize: CGSize(width: legWidth * 0.36, height: legWidth * 0.36)
+                        )
+                    }
                 }
+                .fill()
 
-                let leftEyeX = bodyRect.midX - eyeOffset
-                path.move(to: CGPoint(x: leftEyeX - eyeWidth / 2, y: eyeY - eyeHeight))
-                path.addLine(to: CGPoint(x: leftEyeX + eyeWidth / 2, y: eyeY))
-                path.addLine(to: CGPoint(x: leftEyeX - eyeWidth / 2, y: eyeY + eyeHeight))
-                path.closeSubpath()
-
-                let rightEyeX = bodyRect.midX + eyeOffset
-                path.move(to: CGPoint(x: rightEyeX + eyeWidth / 2, y: eyeY - eyeHeight))
-                path.addLine(to: CGPoint(x: rightEyeX - eyeWidth / 2, y: eyeY))
-                path.addLine(to: CGPoint(x: rightEyeX + eyeWidth / 2, y: eyeY + eyeHeight))
-                path.closeSubpath()
+                ZStack {
+                    Path { path in
+                        let centerX = w / 2 - eyeOffset
+                        path.move(to: CGPoint(x: centerX - eyeWidth / 2, y: eyeY - eyeHeight))
+                        path.addLine(to: CGPoint(x: centerX + eyeWidth / 2, y: eyeY))
+                        path.addLine(to: CGPoint(x: centerX - eyeWidth / 2, y: eyeY + eyeHeight))
+                        path.closeSubpath()
+                    }
+                    Path { path in
+                        let centerX = w / 2 + eyeOffset
+                        path.move(to: CGPoint(x: centerX + eyeWidth / 2, y: eyeY - eyeHeight))
+                        path.addLine(to: CGPoint(x: centerX - eyeWidth / 2, y: eyeY))
+                        path.addLine(to: CGPoint(x: centerX + eyeWidth / 2, y: eyeY + eyeHeight))
+                        path.closeSubpath()
+                    }
+                }
+                .compositingGroup()
+                .blendMode(.destinationOut)
             }
-            .fill(style: FillStyle(eoFill: true, antialiased: true))
+            .compositingGroup()
         }
     }
 }
@@ -552,31 +563,24 @@ struct SettingsRootView: View {
     @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                ForEach(SettingsTab.allCases, id: \.self) { tab in
-                    Text(tab.title).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding([.top, .horizontal])
+        TabView(selection: $selectedTab) {
+            GeneralSettings(state: state)
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
 
-            Divider()
+            PermissionsSettings(status: permStatus, refresh: refreshPerms, showOnboarding: { OnboardingController.shared.show() })
+                .tabItem { Label("Permissions", systemImage: "lock.shield") }
+                .tag(SettingsTab.permissions)
 
-            Group {
-                switch selectedTab {
-                case .general:
-                    GeneralSettings(state: state)
-                case .permissions:
-                    PermissionsSettings(status: permStatus, refresh: refreshPerms, showOnboarding: { OnboardingController.shared.show() })
-                case .debug:
-                    DebugSettings()
-                case .about:
-                    AboutSettings()
-                }
-            }
-            .padding(16)
+            DebugSettings()
+                .tabItem { Label("Debug", systemImage: "ant") }
+                .tag(SettingsTab.debug)
+
+            AboutSettings()
+                .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsTab.about)
         }
+        .padding(12)
         .task { await refreshPerms() }
     }
 
@@ -603,6 +607,8 @@ enum SettingsTab: CaseIterable {
 
 struct GeneralSettings: View {
     @ObservedObject var state: AppState
+    @State private var isInstallingCLI = false
+    @State private var cliStatus: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -624,7 +630,69 @@ struct GeneralSettings: View {
                 .labelsHidden()
                 .frame(width: 140)
             }
+            Divider().padding(.vertical, 6)
+            cliInstaller
             Spacer()
+            HStack {
+                Spacer()
+                Button("Quit Clawdis") { NSApp.terminate(nil) }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var cliInstaller: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Button {
+                    Task { await installCLI() }
+                } label: {
+                    if isInstallingCLI {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Install CLI helper")
+                    }
+                }
+                .disabled(isInstallingCLI)
+
+                if let status = cliStatus {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Text("Symlink \"clawdis-mac\" into /usr/local/bin and /opt/homebrew/bin for scripts.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func installCLI() async {
+        guard !isInstallingCLI else { return }
+        isInstallingCLI = true
+        defer { isInstallingCLI = false }
+
+        let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/ClawdisCLI")
+        guard FileManager.default.isExecutableFile(atPath: helper.path) else {
+            await MainActor.run { cliStatus = "Helper missing in bundle; rebuild via scripts/package-mac-app.sh" }
+            return
+        }
+
+        let targets = ["/usr/local/bin/clawdis-mac", "/opt/homebrew/bin/clawdis-mac"]
+        var messages: [String] = []
+        for target in targets {
+            do {
+                try FileManager.default.createDirectory(atPath: (target as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+                try? FileManager.default.removeItem(atPath: target)
+                try FileManager.default.createSymbolicLink(atPath: target, withDestinationPath: helper.path)
+                messages.append("Linked \(target)")
+            } catch {
+                messages.append("Failed \(target): \(error.localizedDescription)")
+            }
+        }
+        await MainActor.run {
+            cliStatus = messages.joined(separator: "; ")
         }
     }
 }
