@@ -14,6 +14,8 @@ import UserNotifications
 
 private let serviceName = "com.steipete.clawdis.xpc"
 private let launchdLabel = "com.steipete.clawdis"
+private let onboardingVersionKey = "clawdis.onboardingVersion"
+private let currentOnboardingVersion = 1
 private let pauseDefaultsKey = "clawdis.pauseEnabled"
 
 // MARK: - App model
@@ -557,6 +559,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
         state = AppStateStore.shared
         LaunchdManager.startClawdis()
         startListener()
+        scheduleFirstRunOnboardingIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -570,6 +573,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
         listener.delegate = self
         listener.resume()
         self.listener = listener
+    }
+
+    @MainActor
+    private func scheduleFirstRunOnboardingIfNeeded() {
+        let seenVersion = UserDefaults.standard.integer(forKey: onboardingVersionKey)
+        let shouldShow = seenVersion < currentOnboardingVersion || !AppStateStore.shared.onboardingSeen
+        guard shouldShow else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            OnboardingController.shared.show()
+        }
     }
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
@@ -1234,6 +1247,7 @@ struct OnboardingView: View {
 
     private func finish() {
         UserDefaults.standard.set(true, forKey: "clawdis.onboardingSeen")
+        UserDefaults.standard.set(currentOnboardingVersion, forKey: onboardingVersionKey)
         OnboardingController.shared.close()
     }
 
