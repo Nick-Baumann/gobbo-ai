@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import type { MessageInstance } from "twilio/lib/rest/api/v2010/account/message.js";
 import { loadConfig, type WarelayConfig } from "../config/config.js";
 import {
   DEFAULT_IDLE_MINUTES,
@@ -10,14 +9,10 @@ import {
   type SessionEntry,
   saveSessionStore,
 } from "../config/sessions.js";
-import { info, isVerbose, logVerbose } from "../globals.js";
+import { isVerbose, logVerbose } from "../globals.js";
 import { triggerWarelayRestart } from "../infra/restart.js";
-import { ensureMediaHosted } from "../media/host.js";
 import { runCommandWithTimeout } from "../process/exec.js";
-import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
-import type { TwilioRequester } from "../twilio/types.js";
-import { sendTypingIndicator } from "../twilio/typing.js";
-import { chunkText } from "./chunk.js";
+import { defaultRuntime } from "../runtime.js";
 import { runCommandReply } from "./command-reply.js";
 import {
   applyTemplate,
@@ -34,8 +29,6 @@ import { isAudio, transcribeInboundAudio } from "./transcription.js";
 import type { GetReplyOptions, ReplyPayload } from "./types.js";
 
 export type { GetReplyOptions, ReplyPayload } from "./types.js";
-
-const TWILIO_TEXT_LIMIT = 1600;
 
 const ABORT_TRIGGERS = new Set(["stop", "esc", "abort", "wait", "exit"]);
 const ABORT_MEMORY = new Map<string, boolean>();
@@ -193,7 +186,7 @@ export async function getReplyFromConfig(
     1,
   );
   const sessionScope = sessionCfg?.scope ?? "per-sender";
-  const storePath = resolveStorePath(sessionCfg?.store);
+  const storePath = sessionCfg ? resolveStorePath(sessionCfg.store) : undefined;
   let sessionStore: ReturnType<typeof loadSessionStore> | undefined;
   let sessionKey: string | undefined;
   let sessionEntry: SessionEntry | undefined;
@@ -692,163 +685,4 @@ export async function getReplyFromConfig(
 
   cleanupTyping();
   return undefined;
-}
-
-type TwilioLikeClient = TwilioRequester & {
-  messages: {
-    create: (opts: {
-      from?: string;
-      to?: string;
-      body: string;
-    }) => Promise<unknown>;
-  };
-};
-
-export async function autoReplyIfConfigured(
-  client: TwilioLikeClient,
-  message: MessageInstance,
-  configOverride?: WarelayConfig,
-  runtime: RuntimeEnv = defaultRuntime,
-): Promise<void> {
-  // Fire a config-driven reply (text or command) for the inbound message, if configured.
-  const ctx: MsgContext = {
-    Body: message.body ?? undefined,
-    From: message.from ?? undefined,
-    To: message.to ?? undefined,
-    MessageSid: message.sid,
-  };
-  const replyFrom = message.to;
-  const replyTo = message.from;
-  if (!replyFrom || !replyTo) {
-    if (isVerbose())
-      console.error(
-        "Skipping auto-reply: missing to/from on inbound message",
-        ctx,
-      );
-    return;
-  }
-  const cfg = configOverride ?? loadConfig();
-  // Attach media hints for transcription/templates if present on Twilio payloads.
-  const mediaUrl = (message as { mediaUrl?: string }).mediaUrl;
-  if (mediaUrl) ctx.MediaUrl = mediaUrl;
-
-  // Optional audio transcription before building reply.
-  const mediaField = (message as { media?: unknown }).media;
-  const mediaItems = Array.isArray(mediaField) ? mediaField : [];
-  if (cfg.inbound?.transcribeAudio && mediaItems.length) {
-    const media = mediaItems[0];
-    const contentType = (media as { contentType?: string }).contentType;
-    if (contentType?.startsWith("audio")) {
-      const transcribed = await transcribeInboundAudio(cfg, ctx, runtime);
-      if (transcribed?.text) {
-        ctx.Body = transcribed.text;
-        ctx.MediaType = contentType;
-        logVerbose("Replaced Body with audio transcript for reply flow");
-      }
-    }
-  }
-
-  const sendTwilio = async (body: string, media?: string) => {
-    let resolvedMedia = media;
-    if (resolvedMedia && !/^https?:\/\//i.test(resolvedMedia)) {
-      const hosted = await ensureMediaHosted(resolvedMedia);
-      resolvedMedia = hosted.url;
-    }
-    await client.messages.create({
-      from: replyFrom,
-      to: replyTo,
-      body,
-      ...(resolvedMedia ? { mediaUrl: [resolvedMedia] } : {}),
-    });
-  };
-
-  const sendPayload = async (replyPayload: ReplyPayload) => {
-    const mediaList = replyPayload.mediaUrls?.length
-      ? replyPayload.mediaUrls
-      : replyPayload.mediaUrl
-        ? [replyPayload.mediaUrl]
-        : [];
-
-    const text = replyPayload.text ?? "";
-    const chunks = chunkText(text, TWILIO_TEXT_LIMIT);
-    if (chunks.length === 0) chunks.push("");
-
-    for (let i = 0; i < chunks.length; i++) {
-      const body = chunks[i];
-      const attachMedia = i === 0 ? mediaList[0] : undefined;
-
-      if (body) {
-        logVerbose(
-          `Auto-replying via Twilio: from ${replyFrom} to ${replyTo}, body length ${body.length}`,
-        );
-      } else if (attachMedia) {
-        logVerbose(
-          `Auto-replying via Twilio: from ${replyFrom} to ${replyTo} (media only)`,
-        );
-      }
-
-      await sendTwilio(body, attachMedia);
-
-      if (i === 0 && mediaList.length > 1) {
-        for (const extra of mediaList.slice(1)) {
-          await sendTwilio("", extra);
-        }
-      }
-
-      if (isVerbose()) {
-        console.log(
-          info(
-            `↩️  Auto-replied to ${replyTo} (sid ${message.sid ?? "no-sid"}${attachMedia ? ", media" : ""})`,
-          ),
-        );
-      }
-    }
-  };
-
-  const partialSender = async (payload: ReplyPayload) => {
-    await sendPayload(payload);
-  };
-
-  const replyResult = await getReplyFromConfig(
-    ctx,
-    {
-      onReplyStart: () => sendTypingIndicator(client, runtime, message.sid),
-      onPartialReply: partialSender,
-    },
-    cfg,
-  );
-  const replies = replyResult
-    ? Array.isArray(replyResult)
-      ? replyResult
-      : [replyResult]
-    : [];
-  if (replies.length === 0) return;
-
-  try {
-    for (const replyPayload of replies) {
-      await sendPayload(replyPayload);
-    }
-  } catch (err) {
-    const anyErr = err as {
-      code?: string | number;
-      message?: unknown;
-      moreInfo?: unknown;
-      status?: string | number;
-      response?: { body?: unknown };
-    };
-    const { code, status } = anyErr;
-    const msg =
-      typeof anyErr?.message === "string"
-        ? anyErr.message
-        : (anyErr?.message ?? err);
-    runtime.error(
-      `❌ Twilio send failed${code ? ` (code ${code})` : ""}${status ? ` status ${status}` : ""}: ${msg}`,
-    );
-    if (anyErr?.moreInfo) runtime.error(`More info: ${anyErr.moreInfo}`);
-    const responseBody = anyErr?.response?.body;
-    if (responseBody) {
-      runtime.error("Response body:");
-      runtime.error(JSON.stringify(responseBody, null, 2));
-    }
-  }
 }

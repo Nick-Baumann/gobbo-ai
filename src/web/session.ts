@@ -212,9 +212,12 @@ export function logWebSelfId(
 }
 
 export async function pickProvider(pref: Provider | "auto"): Promise<Provider> {
-  // Auto-select web when logged in; otherwise fall back to twilio.
-  if (pref !== "auto") return pref;
+  const choice: Provider = pref === "auto" ? "web" : pref;
   const hasWeb = await webAuthExists();
-  if (hasWeb) return "web";
-  return "twilio";
+  if (!hasWeb) {
+    throw new Error(
+      "No WhatsApp Web session found. Run `clawdis login --verbose` to link.",
+    );
+  }
+  return choice;
 }

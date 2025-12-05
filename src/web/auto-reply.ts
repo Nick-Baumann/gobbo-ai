@@ -301,8 +301,7 @@ export async function runWebHeartbeatOnce(opts: {
     const stripped = stripHeartbeatToken(replyPayload.text);
     if (stripped.shouldSkip && !hasMedia) {
       // Don't let heartbeats keep sessions alive: restore previous updatedAt so idle expiry still works.
-      const sessionCfg = cfg.inbound?.reply?.session;
-      const storePath = resolveStorePath(sessionCfg?.store);
+      const storePath = resolveStorePath(cfg.inbound?.reply?.session?.store);
       const store = loadSessionStore(storePath);
       if (sessionSnapshot.entry && store[sessionSnapshot.key]) {
         store[sessionSnapshot.key].updatedAt = sessionSnapshot.entry.updatedAt;
@@ -350,8 +349,7 @@ export async function runWebHeartbeatOnce(opts: {
 }
 
 function getFallbackRecipient(cfg: ReturnType<typeof loadConfig>) {
-  const sessionCfg = cfg.inbound?.reply?.session;
-  const storePath = resolveStorePath(sessionCfg?.store);
+  const storePath = resolveStorePath(cfg.inbound?.reply?.session?.store);
   const store = loadSessionStore(storePath);
   const candidates = Object.entries(store).filter(([key]) => key !== "global");
   if (candidates.length === 0) {
@@ -372,7 +370,7 @@ function getSessionRecipients(cfg: ReturnType<typeof loadConfig>) {
   const sessionCfg = cfg.inbound?.reply?.session;
   const scope = sessionCfg?.scope ?? "per-sender";
   if (scope === "global") return [];
-  const storePath = resolveStorePath(sessionCfg?.store);
+  const storePath = resolveStorePath(cfg.inbound?.reply?.session?.store);
   const store = loadSessionStore(storePath);
   return Object.entries(store)
     .filter(([key]) => key !== "global" && key !== "unknown")

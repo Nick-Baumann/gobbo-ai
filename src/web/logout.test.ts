@@ -17,7 +17,7 @@ describe("web logout", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "warelay-logout-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawdis-logout-"));
     vi.spyOn(os, "homedir").mockReturnValue(tmpDir);
   });
 
@@ -32,10 +32,16 @@ describe("web logout", () => {
   });
 
   it("deletes cached credentials when present", async () => {
-    const credsDir = path.join(tmpDir, ".warelay", "credentials");
+    const credsDir = path.join(tmpDir, ".clawdis", "credentials");
     fs.mkdirSync(credsDir, { recursive: true });
     fs.writeFileSync(path.join(credsDir, "creds.json"), "{}");
-    const sessionsPath = path.join(tmpDir, ".warelay", "sessions.json");
+    const sessionsPath = path.join(
+      tmpDir,
+      ".clawdis",
+      "sessions",
+      "sessions.json",
+    );
+    fs.mkdirSync(path.dirname(sessionsPath), { recursive: true });
     fs.writeFileSync(sessionsPath, "{}");
     const { logoutWeb, WA_WEB_AUTH_DIR } = await import("./session.js");
 

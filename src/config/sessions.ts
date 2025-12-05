@@ -17,14 +17,17 @@ export type SessionEntry = {
   verboseLevel?: string;
 };
 
-export const SESSION_STORE_DEFAULT = path.join(CONFIG_DIR, "sessions.json");
+export const SESSION_STORE_DEFAULT = path.join(
+  CONFIG_DIR,
+  "sessions",
+  "sessions.json",
+);
 export const DEFAULT_RESET_TRIGGER = "/new";
 export const DEFAULT_IDLE_MINUTES = 60;
 
 export function resolveStorePath(store?: string) {
   if (!store) return SESSION_STORE_DEFAULT;
-  if (store.startsWith("~"))
-    return path.resolve(store.replace("~", os.homedir()));
+  if (store.startsWith("~")) return path.resolve(store.replace("~", os.homedir()));
   return path.resolve(store);
 }
 

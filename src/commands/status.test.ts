@@ -1,50 +1,51 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { CliDeps } from "../cli/deps.js";
-import type { RuntimeEnv } from "../runtime.js";
-import { statusCommand } from "./status.js";
-
-vi.mock("../twilio/messages.js", () => ({
-  formatMessageLine: (m: { sid: string }) => `LINE:${m.sid}`,
+const mocks = vi.hoisted(() => ({
+  loadSessionStore: vi.fn().mockReturnValue({
+    "+1000": { updatedAt: Date.now() - 60_000 },
+  }),
+  resolveStorePath: vi.fn().mockReturnValue("/tmp/sessions.json"),
+  webAuthExists: vi.fn().mockResolvedValue(true),
+  getWebAuthAgeMs: vi.fn().mockReturnValue(5000),
+  logWebSelfId: vi.fn(),
 }));
 
-const runtime: RuntimeEnv = {
+vi.mock("../config/sessions.js", () => ({
+  loadSessionStore: mocks.loadSessionStore,
+  resolveStorePath: mocks.resolveStorePath,
+}));
+vi.mock("../web/session.js", () => ({
+  webAuthExists: mocks.webAuthExists,
+  getWebAuthAgeMs: mocks.getWebAuthAgeMs,
+  logWebSelfId: mocks.logWebSelfId,
+}));
+vi.mock("../config/config.js", () => ({
+  loadConfig: () => ({ inbound: { reply: { session: {} } } }),
+}));
+
+import { statusCommand } from "./status.js";
+
+const runtime = {
   log: vi.fn(),
   error: vi.fn(),
-  exit: vi.fn(() => {
-    throw new Error("exit");
-  }),
+  exit: vi.fn(),
 };
 
-const deps: CliDeps = {
-  listRecentMessages: vi.fn(),
-} as unknown as CliDeps;
-
 describe("statusCommand", () => {
-  it("validates limit and lookback", async () => {
-    await expect(
-      statusCommand({ limit: "0", lookback: "10" }, deps, runtime),
-    ).rejects.toThrow("limit must be between 1 and 200");
-    await expect(
-      statusCommand({ limit: "10", lookback: "0" }, deps, runtime),
-    ).rejects.toThrow("lookback must be > 0 minutes");
-  });
-
   it("prints JSON when requested", async () => {
-    (deps.listRecentMessages as jest.Mock).mockResolvedValue([{ sid: "1" }]);
-    await statusCommand(
-      { limit: "5", lookback: "10", json: true },
-      deps,
-      runtime,
-    );
-    expect(runtime.log).toHaveBeenCalledWith(
-      JSON.stringify([{ sid: "1" }], null, 2),
-    );
+    await statusCommand({ json: true }, runtime as never);
+    const payload = JSON.parse((runtime.log as vi.Mock).mock.calls[0][0]);
+    expect(payload.web.linked).toBe(true);
+    expect(payload.sessions.count).toBe(1);
+    expect(payload.sessions.path).toBe("/tmp/sessions.json");
   });
 
   it("prints formatted lines otherwise", async () => {
-    (deps.listRecentMessages as jest.Mock).mockResolvedValue([{ sid: "123" }]);
-    await statusCommand({ limit: "1", lookback: "5" }, deps, runtime);
-    expect(runtime.log).toHaveBeenCalledWith("LINE:123");
+    (runtime.log as vi.Mock).mockClear();
+    await statusCommand({}, runtime as never);
+    const logs = (runtime.log as vi.Mock).mock.calls.map((c) => String(c[0]));
+    expect(logs.some((l) => l.includes("Web session"))).toBe(true);
+    expect(logs.some((l) => l.includes("Active sessions"))).toBe(true);
+    expect(mocks.logWebSelfId).toHaveBeenCalled();
   });
 });

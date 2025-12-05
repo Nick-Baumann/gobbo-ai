@@ -386,11 +386,11 @@ export async function runCommandReply(
   let rpcInput: string | undefined;
   let rpcArgv = finalArgv;
   if (agentKind === "pi") {
-    rpcInput = JSON.stringify({ type: "prompt", message: promptArg }) + "\n";
+    rpcInput = `${JSON.stringify({ type: "prompt", message: promptArg })}\n`;
     const bodyIdx =
       promptIndex >= 0 ? promptIndex : Math.max(finalArgv.length - 1, 0);
     rpcArgv = finalArgv.filter((_, idx) => idx !== bodyIdx);
-    const modeIdx = rpcArgv.findIndex((v) => v === "--mode");
+    const modeIdx = rpcArgv.indexOf("--mode");
     if (modeIdx >= 0 && rpcArgv[modeIdx + 1]) {
       rpcArgv[modeIdx + 1] = "rpc";
     } else {

@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { chunkText } from "../auto-reply/chunk.js";
 import { runCommandReply } from "../auto-reply/command-reply.js";
 import {
   applyTemplate,
@@ -22,11 +21,8 @@ import {
   type SessionEntry,
   saveSessionStore,
 } from "../config/sessions.js";
-import { ensureTwilioEnv } from "../env.js";
 import { runCommandWithTimeout } from "../process/exec.js";
-import { pickProvider } from "../provider-web.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
-import type { Provider } from "../utils.js";
 import { sendViaIpc } from "../web/ipc.js";
 
 type AgentCommandOpts = {
@@ -38,7 +34,6 @@ type AgentCommandOpts = {
   json?: boolean;
   timeout?: string;
   deliver?: boolean;
-  provider?: Provider | "auto";
 };
 
 type SessionResolution = {
@@ -344,14 +339,6 @@ export async function agentCommand(
   }
 
   const deliver = opts.deliver === true;
-  let provider: Provider | "auto" | undefined = opts.provider ?? "auto";
-  if (deliver) {
-    provider =
-      provider === "twilio"
-        ? "twilio"
-        : await pickProvider((provider ?? "auto") as Provider | "auto");
-    if (provider === "twilio") ensureTwilioEnv();
-  }
 
   for (const payload of payloads) {
     const lines: string[] = [];
@@ -366,55 +353,29 @@ export async function agentCommand(
     if (deliver && opts.to) {
       const text = payload.text ?? "";
       const media = mediaList;
-      if (provider === "web") {
-        // Prefer IPC to reuse the running relay; fall back to direct web send.
-        let sentViaIpc = false;
-        const ipcResult = await sendViaIpc(opts.to, text, media[0]);
-        if (ipcResult) {
-          sentViaIpc = ipcResult.success;
-          if (ipcResult.success && media.length > 1) {
-            for (const extra of media.slice(1)) {
-              await sendViaIpc(opts.to, "", extra);
-            }
-          }
-        }
-        if (!sentViaIpc) {
-          if (text || media.length === 0) {
-            await deps.sendMessageWeb(opts.to, text, {
-              verbose: false,
-              mediaUrl: media[0],
-            });
-          }
+      // Prefer IPC to reuse the running relay; fall back to direct web send.
+      let sentViaIpc = false;
+      const ipcResult = await sendViaIpc(opts.to, text, media[0]);
+      if (ipcResult) {
+        sentViaIpc = ipcResult.success;
+        if (ipcResult.success && media.length > 1) {
           for (const extra of media.slice(1)) {
-            await deps.sendMessageWeb(opts.to, "", {
-              verbose: false,
-              mediaUrl: extra,
-            });
+            await sendViaIpc(opts.to, "", extra);
           }
         }
-      } else {
-        const chunks = chunkText(text, 1600);
-        const resolvedMedia = await Promise.all(
-          media.map((m) =>
-            deps.resolveTwilioMediaUrl(m, { serveMedia: false, runtime }),
-          ),
-        );
-        const firstMedia = resolvedMedia[0];
-        if (chunks.length === 0) chunks.push("");
-        for (let i = 0; i < chunks.length; i++) {
-          const bodyChunk = chunks[i];
-          const attach = i === 0 ? firstMedia : undefined;
-          await deps.sendMessage(
-            opts.to,
-            bodyChunk,
-            { mediaUrl: attach },
-            runtime,
-          );
+      }
+      if (!sentViaIpc) {
+        if (text || media.length === 0) {
+          await deps.sendMessageWeb(opts.to, text, {
+            verbose: false,
+            mediaUrl: media[0],
+          });
         }
-        if (resolvedMedia.length > 1) {
-          for (const extra of resolvedMedia.slice(1)) {
-            await deps.sendMessage(opts.to, "", { mediaUrl: extra }, runtime);
-          }
+        for (const extra of media.slice(1)) {
+          await deps.sendMessageWeb(opts.to, "", {
+            verbose: false,
+            mediaUrl: extra,
+          });
         }
       }
     }

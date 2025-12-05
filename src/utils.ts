@@ -7,11 +7,11 @@ export async function ensureDir(dir: string) {
   await fs.promises.mkdir(dir, { recursive: true });
 }
 
-export type Provider = "twilio" | "web";
+export type Provider = "web";
 
 export function assertProvider(input: string): asserts input is Provider {
-  if (input !== "twilio" && input !== "web") {
-    throw new Error("Provider must be 'twilio' or 'web'");
+  if (input !== "web") {
+    throw new Error("Provider must be 'web'");
   }
 }
 
@@ -71,10 +71,5 @@ export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Prefer new branding directory; fall back to legacy for compatibility.
-export const CONFIG_DIR = (() => {
-  const clawdis = path.join(os.homedir(), ".clawdis");
-  const legacy = path.join(os.homedir(), ".warelay");
-  if (fs.existsSync(clawdis)) return clawdis;
-  return legacy;
-})();
+// Fixed configuration root; legacy ~/.warelay is no longer used.
+export const CONFIG_DIR = path.join(os.homedir(), ".clawdis");

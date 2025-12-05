@@ -2,16 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendCommand = vi.fn();
 const statusCommand = vi.fn();
-const webhookCommand = vi.fn().mockResolvedValue(undefined);
-const ensureTwilioEnv = vi.fn();
 const loginWeb = vi.fn();
 const monitorWebProvider = vi.fn();
-const pickProvider = vi.fn();
-const monitorTwilio = vi.fn();
-const logTwilioFrom = vi.fn();
 const logWebSelfId = vi.fn();
 const waitForever = vi.fn();
-const spawnRelayTmux = vi.fn().mockResolvedValue("warelay-relay");
+const spawnRelayTmux = vi.fn().mockResolvedValue("clawdis-relay");
 
 const runtime = {
   log: vi.fn(),
@@ -23,19 +18,14 @@ const runtime = {
 
 vi.mock("../commands/send.js", () => ({ sendCommand }));
 vi.mock("../commands/status.js", () => ({ statusCommand }));
-vi.mock("../commands/webhook.js", () => ({ webhookCommand }));
-vi.mock("../env.js", () => ({ ensureTwilioEnv }));
 vi.mock("../runtime.js", () => ({ defaultRuntime: runtime }));
 vi.mock("../provider-web.js", () => ({
   loginWeb,
   monitorWebProvider,
-  pickProvider,
 }));
 vi.mock("./deps.js", () => ({
   createDefaultDeps: () => ({ waitForever }),
-  logTwilioFrom,
   logWebSelfId,
-  monitorTwilio,
 }));
 vi.mock("./relay_tmux.js", () => ({ spawnRelayTmux }));
 
@@ -54,55 +44,15 @@ describe("cli program", () => {
     expect(sendCommand).toHaveBeenCalled();
   });
 
-  it("rejects invalid relay provider", async () => {
-    const program = buildProgram();
-    await expect(
-      program.parseAsync(["relay", "--provider", "bogus"], { from: "user" }),
-    ).rejects.toThrow("exit");
-    expect(runtime.error).toHaveBeenCalledWith(
-      "--provider must be auto, web, or twilio",
-    );
-  });
-
-  it("falls back to twilio when web relay fails", async () => {
-    pickProvider.mockResolvedValue("web");
-    monitorWebProvider.mockRejectedValue(new Error("no web"));
-    const program = buildProgram();
-    await expect(
-      program.parseAsync(
-        ["relay", "--provider", "auto", "--interval", "2", "--lookback", "1"],
-        { from: "user" },
-      ),
-    ).rejects.toThrow("exit");
-    expect(logWebSelfId).toHaveBeenCalled();
-    expect(ensureTwilioEnv).not.toHaveBeenCalled();
-    expect(monitorTwilio).not.toHaveBeenCalled();
-  });
-
-  it("runs relay tmux attach command", async () => {
-    const originalIsTTY = process.stdout.isTTY;
-    (process.stdout as typeof process.stdout & { isTTY?: boolean }).isTTY =
-      true;
-
-    const program = buildProgram();
-    await program.parseAsync(["relay:tmux:attach"], { from: "user" });
-    expect(spawnRelayTmux).toHaveBeenCalledWith(
-      "pnpm clawdis relay --verbose",
-      true,
-      false,
-    );
-
-    (process.stdout as typeof process.stdout & { isTTY?: boolean }).isTTY =
-      originalIsTTY;
-  });
-
-  it("runs relay heartbeat command", async () => {
-    pickProvider.mockResolvedValue("web");
+  it("starts relay with heartbeat tuning", async () => {
     monitorWebProvider.mockResolvedValue(undefined);
-    const originalExit = runtime.exit;
-    runtime.exit = vi.fn();
     const program = buildProgram();
-    await program.parseAsync(["relay:heartbeat"], { from: "user" });
+    await program.parseAsync(
+      ["relay", "--web-heartbeat", "90", "--heartbeat-now"],
+      {
+        from: "user",
+      },
+    );
     expect(logWebSelfId).toHaveBeenCalled();
     expect(monitorWebProvider).toHaveBeenCalledWith(
       false,
@@ -111,8 +61,17 @@ describe("cli program", () => {
       undefined,
       runtime,
       undefined,
-      { replyHeartbeatNow: true },
+      { heartbeatSeconds: 90, replyHeartbeatNow: true },
     );
+  });
+
+  it("runs relay heartbeat command", async () => {
+    monitorWebProvider.mockResolvedValue(undefined);
+    const originalExit = runtime.exit;
+    runtime.exit = vi.fn();
+    const program = buildProgram();
+    await program.parseAsync(["relay:heartbeat"], { from: "user" });
+    expect(logWebSelfId).toHaveBeenCalled();
     expect(runtime.exit).not.toHaveBeenCalled();
     runtime.exit = originalExit;
   });
@@ -125,5 +84,11 @@ describe("cli program", () => {
       "pnpm clawdis relay --verbose --heartbeat-now",
       shouldAttach,
     );
+  });
+
+  it("runs status command", async () => {
+    const program = buildProgram();
+    await program.parseAsync(["status"], { from: "user" });
+    expect(statusCommand).toHaveBeenCalled();
   });
 });

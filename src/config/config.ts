@@ -94,25 +94,6 @@ export const CONFIG_PATH_CLAWDIS = path.join(
   ".clawdis",
   "clawdis.json",
 );
-// Legacy path (fallback for backward compatibility)
-export const CONFIG_PATH_LEGACY = path.join(
-  os.homedir(),
-  ".warelay",
-  "warelay.json",
-);
-// Deprecated: kept for backward compatibility
-export const CONFIG_PATH = CONFIG_PATH_LEGACY;
-
-/**
- * Resolve which config path to use.
- * Prefers new clawdis.json, falls back to warelay.json.
- */
-function resolveConfigPath(): string {
-  if (fs.existsSync(CONFIG_PATH_CLAWDIS)) {
-    return CONFIG_PATH_CLAWDIS;
-  }
-  return CONFIG_PATH_LEGACY;
-}
 
 const ReplySchema = z
   .object({
@@ -231,8 +212,7 @@ const WarelaySchema = z.object({
 
 export function loadConfig(): WarelayConfig {
   // Read config file (JSON5) if present.
-  // Prefers ~/.clawdis/clawdis.json, falls back to ~/.warelay/warelay.json
-  const configPath = resolveConfigPath();
+  const configPath = CONFIG_PATH_CLAWDIS;
   try {
     if (!fs.existsSync(configPath)) return {};
     const raw = fs.readFileSync(configPath, "utf-8");
