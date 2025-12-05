@@ -357,8 +357,8 @@ struct ClawdisApp: App {
             .menuBarExtraStyle(.menu)
 
         Settings {
-            SettingsView(state: state)
-                .frame(width: 420, height: 320)
+            SettingsRootView(state: state)
+                .frame(minWidth: 520, minHeight: 420)
         }
     }
 
@@ -460,10 +460,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
 
 // MARK: - Settings UI
 
-struct SettingsView: View {
+struct SettingsRootView: View {
     @ObservedObject var state: AppState
     @State private var permStatus: [Capability: Bool] = [:]
     @State private var loadingPerms = false
+    @State private var selectedTab: SettingsTab = .general
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Picker("", selection: $selectedTab) {
+                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding([.top, .horizontal])
+
+            Divider()
+
+            Group {
+                switch selectedTab {
+                case .general:
+                    GeneralSettings(state: state)
+                case .permissions:
+                    PermissionsSettings(status: permStatus, refresh: refreshPerms, showOnboarding: { OnboardingController.shared.show() })
+                case .debug:
+                    DebugSettings()
+                case .about:
+                    AboutSettings()
+                }
+            }
+            .padding(16)
+        }
+        .task { await refreshPerms() }
+    }
+
+    @MainActor
+    private func refreshPerms() async {
+        guard !loadingPerms else { return }
+        loadingPerms = true
+        permStatus = await PermissionManager.status()
+        loadingPerms = false
+    }
+}
+
+enum SettingsTab: CaseIterable {
+    case general, permissions, debug, about
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .permissions: return "Permissions"
+        case .debug: return "Debug"
+        case .about: return "About"
+        }
+    }
+}
+
+struct GeneralSettings: View {
+    @ObservedObject var state: AppState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -471,12 +525,8 @@ struct SettingsView: View {
                 Label("Complete onboarding to finish setup", systemImage: "sparkles")
                     .foregroundColor(.accentColor)
             }
-            Toggle(isOn: $state.isPaused) {
-                Text("Pause Clawdis (disables notifications & privileged actions)")
-            }
-            Toggle(isOn: $state.launchAtLogin) {
-                Text("Launch at login")
-            }
+            Toggle(isOn: $state.isPaused) { Text("Pause Clawdis (disables notifications & privileged actions)") }
+            Toggle(isOn: $state.launchAtLogin) { Text("Launch at login") }
             HStack {
                 Text("Default sound")
                 Spacer()
@@ -489,30 +539,72 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 140)
             }
-            Divider()
-            Text("Permissions")
-                .font(.headline)
-            PermissionStatusList(status: permStatus, refresh: refreshPerms)
-            Button("Show Onboarding") {
-                OnboardingController.shared.show()
-            }
             Spacer()
-            HStack {
-                Spacer()
-                Text("Clawdis Companion")
-                    .foregroundColor(.secondary)
-            }
         }
-        .padding()
-        .task { await refreshPerms() }
+    }
+}
+
+struct PermissionsSettings: View {
+    let status: [Capability: Bool]
+    let refresh: () async -> Void
+    let showOnboarding: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Allow these so Clawdis can notify and capture when needed.")
+            PermissionStatusList(status: status, refresh: refresh)
+            Button("Show onboarding") { showOnboarding() }
+            Spacer()
+        }
+    }
+}
+
+struct DebugSettings: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            LabeledContent("PID") { Text("\(ProcessInfo.processInfo.processIdentifier)") }
+            LabeledContent("Log file") {
+                Button("Open /tmp/clawdis.log") { NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp/clawdis.log")) }
+            }
+            LabeledContent("Binary path") { Text(Bundle.main.bundlePath).font(.footnote) }
+            HStack {
+                Button("Restart app") { relaunch() }
+                Button("Reveal app in Finder") { revealApp() }
+            }
+            .buttonStyle(.bordered)
+            Spacer()
+        }
     }
 
-    @MainActor
-    private func refreshPerms() async {
-        guard !loadingPerms else { return }
-        loadingPerms = true
-        permStatus = await PermissionManager.status()
-        loadingPerms = false
+    private func relaunch() {
+        let url = Bundle.main.bundleURL
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = [url.path]
+        try? task.run()
+        task.waitUntilExit()
+        NSApp.terminate(nil)
+    }
+
+    private func revealApp() {
+        let url = Bundle.main.bundleURL
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+}
+
+struct AboutSettings: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Clawdis Companion")
+                .font(.title2.bold())
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+            Text("Version \(version)")
+            Text("Menu bar helper for notifications, screenshots, and privileged actions.")
+                .foregroundColor(.secondary)
+            Divider()
+            Link("View repository", destination: URL(string: "https://github.com/steipete/warelay")!)
+            Spacer()
+        }
     }
 }
 
