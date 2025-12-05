@@ -12,7 +12,9 @@
 - Status command reports web session health + session recipients; config paths are locked to `~/.clawdis` with session metadata stored under `~/.clawdis/sessions/`.
 - Simplified send/agent/relay/heartbeat to web-only delivery; removed Twilio mocks/tests and dead code.
 - Tau RPC timeout is now inactivity-based (5m without events) and error messages show seconds only.
+- Pi/Tau sessions now write to `~/.clawdis/sessions/` by default (legacy `~/.tau/agent/sessions/clawdis` files are copied over when present).
 - Directive triggers (`/think`, `/verbose`, `/stop` et al.) now reply immediately using normalized bodies (timestamps/group prefixes stripped) without waiting for the agent.
+- Directive/system acks carry a `⚙️` prefix and verbose parsing rejects typoed `/ver*` strings so unrelated text doesn’t flip verbosity.
 - Batched history blocks no longer trip directive parsing; `/think` in prior messages won't emit stray acknowledgements.
 - RPC fallbacks no longer echo the user's prompt (e.g., pasting a link) when the agent returns no assistant text.
 - Heartbeat prompts with `/think` no longer send directive acks; heartbeat replies stay silent on settings.

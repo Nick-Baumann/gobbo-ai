@@ -35,6 +35,7 @@ export type { GetReplyOptions, ReplyPayload } from "./types.js";
 
 const ABORT_TRIGGERS = new Set(["stop", "esc", "abort", "wait", "exit"]);
 const ABORT_MEMORY = new Map<string, boolean>();
+const SYSTEM_MARK = "⚙️";
 
 export function extractThinkDirective(body?: string): {
   cleaned: string;
@@ -67,8 +68,8 @@ export function extractVerboseDirective(body?: string): {
   hasDirective: boolean;
 } {
   if (!body) return { cleaned: "", hasDirective: false };
-  // Require start or whitespace before "/verbose" to avoid matching URLs like /verioussmith.
-  const match = body.match(/(?:^|\s)\/(?:verbose|v)\s*:?\s*([a-zA-Z-]+)\b/i);
+  // Require start or whitespace before "/verbose" and reject "/ver*" typos.
+  const match = body.match(/(?:^|\s)\/v(?:erbose)?\b\s*:?\s*([a-zA-Z-]+)\b/i);
   const verboseLevel = normalizeVerboseLevel(match?.[1]);
   const cleaned = match
     ? body.replace(match[0], "").replace(/\s+/g, " ").trim()
@@ -364,7 +365,7 @@ export async function getReplyFromConfig(
     if (!inlineThink) {
       cleanupTyping();
       return {
-        text: `Unrecognized thinking level "${rawThinkLevel ?? ""}". Valid levels: off, minimal, low, medium, high.`,
+        text: `${SYSTEM_MARK} Unrecognized thinking level "${rawThinkLevel ?? ""}". Valid levels: off, minimal, low, medium, high.`,
       };
     }
     if (sessionEntry && sessionStore && sessionKey) {
@@ -413,7 +414,7 @@ export async function getReplyFromConfig(
         );
       }
     }
-    const ack = parts.join(" ");
+    const ack = `${SYSTEM_MARK} ${parts.join(" ")}`;
     cleanupTyping();
     return { text: ack };
   }
@@ -430,7 +431,7 @@ export async function getReplyFromConfig(
     if (!inlineVerbose) {
       cleanupTyping();
       return {
-        text: `Unrecognized verbose level "${rawVerboseLevel ?? ""}". Valid levels: off, on.`,
+        text: `${SYSTEM_MARK} Unrecognized verbose level "${rawVerboseLevel ?? ""}". Valid levels: off, on.`,
       };
     }
     if (sessionEntry && sessionStore && sessionKey) {
@@ -445,8 +446,8 @@ export async function getReplyFromConfig(
     }
     const ack =
       inlineVerbose === "off"
-        ? "Verbose logging disabled."
-        : "Verbose logging enabled.";
+        ? `${SYSTEM_MARK} Verbose logging disabled.`
+        : `${SYSTEM_MARK} Verbose logging enabled.`;
     cleanupTyping();
     return { text: ack };
   }

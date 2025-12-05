@@ -1,13 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as tauRpc from "../process/tau-rpc.js";
 import { getReplyFromConfig, extractVerboseDirective, extractThinkDirective } from "./reply.js";
 
 describe("directive parsing", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("ignores verbose directive inside URL", () => {
     const body = "https://x.com/verioussmith/status/1997066835133669687";
     const res = extractVerboseDirective(body);
     expect(res.hasDirective).toBe(false);
     expect(res.cleaned).toBe(body);
+  });
+
+  it("ignores typoed /verioussmith", () => {
+    const body = "/verioussmith";
+    const res = extractVerboseDirective(body);
+    expect(res.hasDirective).toBe(false);
+    expect(res.cleaned).toBe(body.trim());
   });
 
   it("ignores think directive inside URL", () => {
@@ -60,5 +71,34 @@ describe("directive parsing", () => {
     const text = Array.isArray(res) ? res[0]?.text : res?.text;
     expect(text).toBe("done");
     expect(rpcMock).toHaveBeenCalledOnce();
+  });
+
+  it("acks verbose directive immediately with system marker", async () => {
+    const rpcMock = vi.spyOn(tauRpc, "runPiRpc").mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      code: 0,
+      signal: null,
+      killed: false,
+    });
+
+    const res = await getReplyFromConfig(
+      { Body: "/verbose on", From: "+1222", To: "+1222" },
+      {},
+      {
+        inbound: {
+          reply: {
+            mode: "command",
+            command: ["pi", "{{Body}}"],
+            agent: { kind: "pi" },
+            session: {},
+          },
+        },
+      },
+    );
+
+    const text = Array.isArray(res) ? res[0]?.text : res?.text;
+    expect(text).toMatch(/^⚙️ Verbose logging enabled\./);
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 });
