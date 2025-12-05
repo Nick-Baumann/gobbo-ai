@@ -677,18 +677,19 @@ export async function runCommandReply(
         }
       },
     });
-    const rawStdout = stdout.trim();
-    const rpcAssistantText = extractRpcAssistantText(stdout);
-    let mediaFromCommand: string[] | undefined;
-    const trimmed = stripRpcNoise(rawStdout);
-    if (stderr?.trim()) {
-      logVerbose(`Command auto-reply stderr: ${stderr.trim()}`);
-    }
+  const rawStdout = stdout.trim();
+  const rpcAssistantText = extractRpcAssistantText(stdout);
+  let mediaFromCommand: string[] | undefined;
+  const trimmed = stripRpcNoise(rawStdout);
+  if (stderr?.trim()) {
+    logVerbose(`Command auto-reply stderr: ${stderr.trim()}`);
+  }
+  const promptTooLong = rawStdout.includes("prompt is too long");
 
-    const logFailure = () => {
-      const truncate = (s?: string) =>
-        s ? (s.length > 4000 ? `${s.slice(0, 4000)}…` : s) : undefined;
-      logger.warn(
+  const logFailure = () => {
+    const truncate = (s?: string) =>
+      s ? (s.length > 4000 ? `${s.slice(0, 4000)}…` : s) : undefined;
+    logger.warn(
         {
           code,
           signal,
@@ -701,6 +702,21 @@ export async function runCommandReply(
         "command auto-reply failed",
       );
     };
+
+    if (promptTooLong) {
+      const text =
+        "⚠️ Session history is too long. Starting a fresh session — please resend your last message.";
+      const meta: CommandReplyMeta = {
+        durationMs: Date.now() - started,
+        queuedMs,
+        queuedAhead,
+        exitCode: code,
+        signal,
+        killed,
+        agentMeta: { extra: { promptTooLong: true } },
+      };
+      return { payloads: [{ text }], meta };
+    }
 
     const parsed = trimmed ? agent.parseOutput(trimmed) : undefined;
 
