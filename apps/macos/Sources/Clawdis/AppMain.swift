@@ -682,8 +682,8 @@ struct SettingsRootView: View {
                 .tabItem { Label("About", systemImage: "info.circle") }
                 .tag(SettingsTab.about)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .onReceive(NotificationCenter.default.publisher(for: .clawdisSelectSettingsTab)) { note in
             if let tab = note.object as? SettingsTab {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
@@ -720,8 +720,8 @@ struct SettingsRootView: View {
 
 enum SettingsTab: CaseIterable {
     case general, permissions, debug, about
-    static let windowWidth: CGFloat = 460
-    static let windowHeight: CGFloat = 500
+    static let windowWidth: CGFloat = 410
+    static let windowHeight: CGFloat = 480
     var title: String {
         switch self {
         case .general: return "General"
@@ -758,19 +758,18 @@ struct GeneralSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if !state.onboardingSeen {
-                Label("Complete onboarding to finish setup", systemImage: "sparkles")
+                Text("Complete onboarding to finish setup")
+                    .font(.callout.weight(.semibold))
                     .foregroundColor(.accentColor)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 2)
             }
 
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(isOn: activeBinding) { Text(activeBinding.wrappedValue ? "Clawdis Active" : "Clawdis Paused") }
                     .help("Disable to stop Clawdis background helpers and notifications")
                 Toggle(isOn: $state.launchAtLogin) { Text("Launch at login") }
-                #if DEBUG
                 Toggle(isOn: $state.debugPaneEnabled) { Text("Enable debug tools") }
                     .help("Show the Debug tab with development utilities")
-                #endif
 
                 LabeledContent("Default sound") {
                     Picker("Sound", selection: $state.defaultSound) {
