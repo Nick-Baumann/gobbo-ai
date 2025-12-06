@@ -8,7 +8,6 @@ import Speech
 import UserNotifications
 
 enum PermissionManager {
-    @MainActor
     static func ensure(_ caps: [Capability], interactive: Bool) async -> [Capability: Bool] {
         var results: [Capability: Bool] = [:]
         for cap in caps {
@@ -43,11 +42,13 @@ enum PermissionManager {
                 }
 
             case .accessibility:
-                let trusted = AXIsProcessTrusted()
+                let trusted = await MainActor.run { AXIsProcessTrusted() }
                 results[cap] = trusted
                 if interactive, !trusted {
-                    let opts: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
-                    _ = AXIsProcessTrustedWithOptions(opts)
+                    await MainActor.run {
+                        let opts: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
+                        _ = AXIsProcessTrustedWithOptions(opts)
+                    }
                 }
 
             case .screenRecording:
@@ -81,7 +82,6 @@ enum PermissionManager {
         return results
     }
 
-    @MainActor
     static func status(_ caps: [Capability] = Capability.allCases) async -> [Capability: Bool] {
         var results: [Capability: Bool] = [:]
         for cap in caps {
@@ -93,7 +93,7 @@ enum PermissionManager {
                     || settings.authorizationStatus == .provisional
 
             case .accessibility:
-                results[cap] = AXIsProcessTrusted()
+                results[cap] = await MainActor.run { AXIsProcessTrusted() }
 
             case .screenRecording:
                 if #available(macOS 10.15, *) {
@@ -184,12 +184,12 @@ final class PermissionMonitor: ObservableObject {
         }
 
         self.isChecking = true
-        self.lastCheck = now
 
         let latest = await PermissionManager.status()
         if latest != self.status {
             self.status = latest
         }
+        self.lastCheck = Date()
 
         self.isChecking = false
     }

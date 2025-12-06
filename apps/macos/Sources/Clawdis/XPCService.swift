@@ -11,16 +11,16 @@ final class ClawdisXPCService: NSObject, ClawdisXPCProtocol {
 
     func handle(_ data: Data, withReply reply: @escaping @Sendable (Data?, Error?) -> Void) {
         let logger = logger
-        Task.detached(priority: nil) { @Sendable in
+        Task.detached { @Sendable in
             do {
                 let request = try JSONDecoder().decode(Request.self, from: data)
                 let response = try await Self.process(request: request, notifier: NotificationManager(), logger: logger)
                 let encoded = try JSONEncoder().encode(response)
-                reply(encoded, nil)
+                await MainActor.run { reply(encoded, nil) }
             } catch {
                 logger.error("Failed to handle XPC request: \(error.localizedDescription, privacy: .public)")
                 let resp = Response(ok: false, message: "decode/handle error: \(error.localizedDescription)")
-                reply(try? JSONEncoder().encode(resp), error)
+                await MainActor.run { reply(try? JSONEncoder().encode(resp), error) }
             }
         }
     }
