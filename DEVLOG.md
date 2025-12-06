@@ -194,3 +194,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-12-03: discovered another sicilian line
 - 2025-12-04: candidate failed gate, archived
 - 2025-12-04: trained for 6 epochs instead of 8
+- 2025-12-06: split a long function
