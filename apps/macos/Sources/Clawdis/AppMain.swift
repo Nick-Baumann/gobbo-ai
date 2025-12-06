@@ -592,9 +592,9 @@ enum ShellRunner {
 struct ClawdisApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var state: AppState
+    @StateObject private var relayManager = RelayProcessManager.shared
     @State private var statusItem: NSStatusItem?
     @State private var isMenuPresented = false
-    private let relayManager = RelayProcessManager.shared
 
     init() {
         _state = StateObject(wrappedValue: AppStateStore.shared)
@@ -605,7 +605,8 @@ struct ClawdisApp: App {
             CritterStatusLabel(
                 isPaused: self.state.isPaused,
                 isWorking: self.state.isWorking,
-                earBoostActive: self.state.earBoostActive)
+                earBoostActive: self.state.earBoostActive,
+                relayStatus: self.relayManager.status)
         }
             .menuBarExtraStyle(.menu)
             .menuBarExtraAccess(isPresented: self.$isMenuPresented) { item in
@@ -708,6 +709,7 @@ private struct CritterStatusLabel: View {
     var isPaused: Bool
     var isWorking: Bool
     var earBoostActive: Bool
+    var relayStatus: RelayProcessManager.Status
 
     @State private var blinkAmount: CGFloat = 0
     @State private var nextBlink = Date().addingTimeInterval(Double.random(in: 3.5...8.5))
@@ -721,45 +723,54 @@ private struct CritterStatusLabel: View {
     private let ticker = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        Group {
-            if self.isPaused {
-                Image(nsImage: CritterIconRenderer.makeIcon(blink: 0))
-                    .frame(width: 18, height: 16)
-            } else {
-                Image(nsImage: CritterIconRenderer.makeIcon(
-                    blink: self.blinkAmount,
-                    legWiggle: max(self.legWiggle, self.isWorking ? 0.6 : 0),
-                    earWiggle: self.earWiggle,
-                    earScale: self.earBoostActive ? 1.9 : 1.0))
-                    .frame(width: 18, height: 16)
-                    .rotationEffect(.degrees(self.wiggleAngle), anchor: .center)
-                    .offset(x: self.wiggleOffset)
-                    .onReceive(self.ticker) { now in
-                        if now >= self.nextBlink {
-                            self.blink()
-                            self.nextBlink = now.addingTimeInterval(Double.random(in: 3.5...8.5))
-                        }
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                if self.isPaused {
+                    Image(nsImage: CritterIconRenderer.makeIcon(blink: 0))
+                        .frame(width: 18, height: 16)
+                } else {
+                    Image(nsImage: CritterIconRenderer.makeIcon(
+                        blink: self.blinkAmount,
+                        legWiggle: max(self.legWiggle, self.isWorking ? 0.6 : 0),
+                        earWiggle: self.earWiggle,
+                        earScale: self.earBoostActive ? 1.9 : 1.0))
+                        .frame(width: 18, height: 16)
+                        .rotationEffect(.degrees(self.wiggleAngle), anchor: .center)
+                        .offset(x: self.wiggleOffset)
+                        .onReceive(self.ticker) { now in
+                            if now >= self.nextBlink {
+                                self.blink()
+                                self.nextBlink = now.addingTimeInterval(Double.random(in: 3.5...8.5))
+                            }
 
-                        if now >= self.nextWiggle {
-                            self.wiggle()
-                            self.nextWiggle = now.addingTimeInterval(Double.random(in: 6.5...14))
-                        }
+                            if now >= self.nextWiggle {
+                                self.wiggle()
+                                self.nextWiggle = now.addingTimeInterval(Double.random(in: 6.5...14))
+                            }
 
-                        if now >= self.nextLegWiggle {
-                            self.wiggleLegs()
-                            self.nextLegWiggle = now.addingTimeInterval(Double.random(in: 5.0...11.0))
-                        }
+                            if now >= self.nextLegWiggle {
+                                self.wiggleLegs()
+                                self.nextLegWiggle = now.addingTimeInterval(Double.random(in: 5.0...11.0))
+                            }
 
-                        if now >= self.nextEarWiggle {
-                            self.wiggleEars()
-                            self.nextEarWiggle = now.addingTimeInterval(Double.random(in: 7.0...14.0))
-                        }
+                            if now >= self.nextEarWiggle {
+                                self.wiggleEars()
+                                self.nextEarWiggle = now.addingTimeInterval(Double.random(in: 7.0...14.0))
+                            }
 
-                        if self.isWorking {
-                            self.scurry()
+                            if self.isWorking {
+                                self.scurry()
+                            }
                         }
-                    }
-                    .onChange(of: self.isPaused) { _, _ in self.resetMotion() }
+                        .onChange(of: self.isPaused) { _, _ in self.resetMotion() }
+                }
+            }
+
+            if self.relayNeedsAttention {
+                Circle()
+                    .fill(self.relayBadgeColor)
+                    .frame(width: 8, height: 8)
+                    .offset(x: 4, y: 4)
             }
         }
     }
@@ -825,6 +836,23 @@ private struct CritterStatusLabel: View {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
             withAnimation(.interpolatingSpring(stiffness: 260, damping: 19)) { self.earWiggle = 0 }
+        }
+    }
+
+    private var relayNeedsAttention: Bool {
+        switch self.relayStatus {
+        case .failed, .stopped:
+            return !self.isPaused
+        case .starting, .restarting, .running:
+            return false
+        }
+    }
+
+    private var relayBadgeColor: Color {
+        switch self.relayStatus {
+        case .failed: return .red
+        case .stopped: return .orange
+        default: return .clear
         }
     }
 }
