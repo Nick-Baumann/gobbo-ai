@@ -6,7 +6,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_ROOT="$ROOT_DIR/dist/Clawdis.app"
-BUILD_PATH="$ROOT_DIR/apps/macos/.build-local"
+BUILD_PATH="$ROOT_DIR/apps/macos/.build"
 PRODUCT="Clawdis"
 
 cd "$ROOT_DIR/apps/macos"
