@@ -335,8 +335,8 @@ enum PermissionManager {
             case .notifications:
                 let center = UNUserNotificationCenter.current()
                 let settings = await center.notificationSettings()
-                results[cap] = settings.authorizationStatus == .authorized || settings
-                    .authorizationStatus == .provisional
+                results[cap] = settings.authorizationStatus == .authorized
+                    || settings.authorizationStatus == .provisional
 
             case .accessibility:
                 results[cap] = AXIsProcessTrusted()
@@ -1765,6 +1765,10 @@ struct SettingsRootView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
 
+            ToolsSettings()
+                .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                .tag(SettingsTab.tools)
+
             SessionsSettings()
                 .tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }
                 .tag(SettingsTab.sessions)
@@ -1852,12 +1856,13 @@ struct SettingsRootView: View {
 }
 
 enum SettingsTab: CaseIterable {
-    case general, sessions, config, voiceWake, permissions, debug, about
+    case general, tools, sessions, config, voiceWake, permissions, debug, about
     static let windowWidth: CGFloat = 520
     static let windowHeight: CGFloat = 624
     var title: String {
         switch self {
         case .general: "General"
+        case .tools: "Tools"
         case .sessions: "Sessions"
         case .config: "Config"
         case .voiceWake: "Voice Wake"
@@ -2821,11 +2826,10 @@ struct DebugSettings: View {
     private func chooseCatalogFile() {
         let panel = NSOpenPanel()
         panel.title = "Select models.generated.ts"
-        if let tsType = UTType(filenameExtension: "ts") {
-            panel.allowedContentTypes = [tsType]
-        } else {
-            panel.allowedFileTypes = ["ts"] // fallback
-        }
+        let tsType = UTType(filenameExtension: "ts")
+            ?? UTType(tag: "ts", tagClass: .filenameExtension, conformingTo: .sourceCode)
+            ?? .item
+        panel.allowedContentTypes = [tsType]
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: self.modelCatalogPath).deletingLastPathComponent()
         if panel.runModal() == .OK, let url = panel.url {
@@ -2996,23 +3000,7 @@ struct PermissionStatusList: View {
     @MainActor
     private func handle(_ cap: Capability) async {
         Task {
-            switch cap {
-            case .notifications:
-                let center = UNUserNotificationCenter.current()
-                _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-
-            case .accessibility:
-                self.openSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-
-            case .screenRecording:
-                self.openSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenRecording")
-
-            case .microphone:
-                self.openSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
-
-            case .speechRecognition:
-                self.openSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition")
-            }
+            _ = await PermissionManager.ensure([cap], interactive: true)
             await self.refresh()
         }
     }
