@@ -23,6 +23,7 @@ private let pauseDefaultsKey = "clawdis.pauseEnabled"
 private let swabbleEnabledKey = "clawdis.swabbleEnabled"
 private let swabbleTriggersKey = "clawdis.swabbleTriggers"
 private let defaultVoiceWakeTriggers = ["clawd", "claude"]
+private let voiceWakeMicKey = "clawdis.voiceWakeMicID"
 
 // MARK: - App model
 
@@ -56,6 +57,9 @@ final class AppState: ObservableObject {
             }
         }
     }
+    @Published var voiceWakeMicID: String {
+        didSet { UserDefaults.standard.set(voiceWakeMicID, forKey: voiceWakeMicKey) }
+    }
 
     init() {
         self.isPaused = UserDefaults.standard.bool(forKey: pauseDefaultsKey)
@@ -65,6 +69,7 @@ final class AppState: ObservableObject {
         self.debugPaneEnabled = UserDefaults.standard.bool(forKey: "clawdis.debugPaneEnabled")
         self.swabbleEnabled = UserDefaults.standard.bool(forKey: swabbleEnabledKey)
         self.swabbleTriggerWords = UserDefaults.standard.stringArray(forKey: swabbleTriggersKey) ?? defaultVoiceWakeTriggers
+        self.voiceWakeMicID = UserDefaults.standard.string(forKey: voiceWakeMicKey) ?? ""
     }
 }
 
@@ -1567,6 +1572,14 @@ struct VoiceWakeSettings: View {
     @State private var testState: VoiceWakeTestState = .idle
     @State private var tester = VoiceWakeTester()
     @State private var isTesting = false
+    @State private var availableMics: [AudioInputDevice] = []
+    @State private var loadingMics = false
+
+    struct AudioInputDevice: Identifiable, Hashable {
+        let uid: String
+        let name: String
+        var id: String { uid }
+    }
 
     private struct IndexedWord: Identifiable {
         let id: Int
@@ -1580,6 +1593,8 @@ struct VoiceWakeSettings: View {
                 subtitle: "Listen for a wake phrase (e.g. \"Claude\") before running voice commands.",
                 binding: $state.swabbleEnabled
             )
+
+            micPicker
 
             testCard
 
@@ -1631,6 +1646,7 @@ struct VoiceWakeSettings: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
+        .task { await loadMicsIfNeeded() }
     }
 
     private var indexedWords: [IndexedWord] {
@@ -1768,6 +1784,37 @@ struct VoiceWakeSettings: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return cleaned.isEmpty ? defaultVoiceWakeTriggers : cleaned
+    }
+
+    private var micPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LabeledContent("Microphone") {
+                Picker("Microphone", selection: $state.voiceWakeMicID) {
+                    Text("System default").tag("")
+                    ForEach(availableMics) { mic in
+                        Text(mic.name).tag(mic.uid)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 260)
+            }
+            if loadingMics {
+                ProgressView().controlSize(.small)
+            }
+        }
+    }
+
+    @MainActor
+    private func loadMicsIfNeeded() async {
+        guard availableMics.isEmpty, !loadingMics else { return }
+        loadingMics = true
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.external, .microphone],
+            mediaType: .audio,
+            position: .unspecified
+        )
+        availableMics = discovery.devices.map { AudioInputDevice(uid: $0.uniqueID, name: $0.localizedName) }
+        loadingMics = false
     }
 }
 
