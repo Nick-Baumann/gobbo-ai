@@ -1,0 +1,20 @@
+included:
+  - apps/macos/Sources
+
+excluded:
+  - apps/macos/Tests
+
+disabled_rules:
+  - trailing_whitespace
+  - todo
+  - line_length
+  - identifier_name
+  - type_body_length
+  - file_length
+
+opt_in_rules:
+  - explicit_self
+  - implicit_return
+  - vertical_whitespace_between_cases
+
+reporter: "xcode"

@@ -56,11 +56,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install SwiftLint / SwiftFormat
+        run: |
+          brew install swiftlint swiftformat
+
       - name: Show toolchain
         run: |
           sw_vers
           xcodebuild -version
           swift --version
+
+      - name: SwiftLint
+        run: swiftlint --config .swiftlint.yml
+
+      - name: SwiftFormat (lint mode)
+        run: swiftformat --lint apps/macos/Sources --config .swiftformat
 
       - name: Swift build (release)
         run: swift build --package-path apps/macos --configuration release

@@ -1,0 +1,12 @@
+--swiftversion 5.10
+--indent 4
+--decimalgrouping none
+--hexgrouping none
+--wraparguments after-first
+--wrapcollections before-first
+--trimwhitespace always
+--stripunusedargs closure-only
+--stripunusedimports
+--self init-only
+--disable redundantSelf
+--enable wrapMultilineStatementBraces
