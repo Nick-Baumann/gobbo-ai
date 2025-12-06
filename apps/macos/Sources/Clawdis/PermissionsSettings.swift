@@ -43,10 +43,8 @@ struct PermissionStatusList: View {
 
     @MainActor
     private func handle(_ cap: Capability) async {
-        Task {
-            _ = await PermissionManager.ensure([cap], interactive: true)
-            await self.refresh()
-        }
+        _ = await PermissionManager.ensure([cap], interactive: true)
+        await self.refresh()
     }
 }
 
