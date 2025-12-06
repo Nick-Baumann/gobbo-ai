@@ -731,8 +731,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
 
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
         state = AppStateStore.shared
+        AppActivationPolicy.apply(showDockIcon: state?.showDockIcon ?? false)
         LaunchdManager.startClawdis()
         startListener()
         scheduleFirstRunOnboardingIfNeeded()
@@ -1623,6 +1623,10 @@ struct GeneralSettings: View {
                 SettingsToggleRow(title: "Launch at login",
                                   subtitle: "Automatically start Clawdis after you sign in.",
                                   binding: $state.launchAtLogin)
+
+                SettingsToggleRow(title: "Show Dock icon",
+                                  subtitle: "Keep Clawdis visible in the Dock instead of menu-bar-only mode.",
+                                  binding: $state.showDockIcon)
 
                 SettingsToggleRow(title: "Enable debug tools",
                                   subtitle: "Show the Debug tab with development utilities.",
