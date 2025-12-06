@@ -4,6 +4,11 @@ import Subprocess
 #if canImport(Darwin)
 import Darwin
 #endif
+#if canImport(System)
+import System
+#else
+import SystemPackage
+#endif
 
 @MainActor
 final class RelayProcessManager: ObservableObject {
@@ -85,14 +90,15 @@ final class RelayProcessManager: ObservableObject {
 
     private func spawnRelay() async {
         let command = self.resolveCommand()
-        self.appendLog("[relay] starting: \(command.joined(separator: " "))\n")
+        let cwd = self.defaultProjectRoot().path
+        self.appendLog("[relay] starting: \(command.joined(separator: " ")) (cwd: \(cwd))\n")
 
         do {
             let result = try await run(
                 .name(command.first ?? "clawdis"),
                 arguments: Arguments(Array(command.dropFirst())),
                 environment: self.makeEnvironment(),
-                workingDirectory: nil
+                workingDirectory: FilePath(cwd)
             ) { execution, stdin, stdout, stderr in
                 self.didStart(execution)
                 async let out: Void = self.stream(output: stdout, label: "stdout")
@@ -202,8 +208,8 @@ final class RelayProcessManager: ObservableObject {
             return [clawdisPath, "relay"]
         }
         if let pnpm = self.findExecutable(named: "pnpm") {
-            // Run pnpm from the project root so package.json is present.
-            return [pnpm, "clawdis", "relay", "--dir", self.defaultProjectRoot().path]
+            // Run pnpm from the project root (workingDirectory handles cwd).
+            return [pnpm, "clawdis", "relay"]
         }
         if let node = self.findExecutable(named: "node") {
             let warelay = self.defaultProjectRoot().appendingPathComponent("bin/warelay.js").path
