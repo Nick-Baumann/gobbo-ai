@@ -1,5 +1,5 @@
-import Foundation
 import AppKit
+import Foundation
 
 enum LaunchdManager {
     private static func runLaunchctl(_ args: [String]) {

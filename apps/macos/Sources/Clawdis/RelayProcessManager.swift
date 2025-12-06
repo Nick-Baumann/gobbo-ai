@@ -46,7 +46,7 @@ final class RelayProcessManager: ObservableObject {
     private var recentCrashes: [Date] = []
 
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "relay")
-    private let logLimit = 20_000 // characters to keep in-memory
+    private let logLimit = 20000 // characters to keep in-memory
     private let maxCrashes = 3
     private let crashWindow: TimeInterval = 120 // seconds
 
@@ -98,8 +98,8 @@ final class RelayProcessManager: ObservableObject {
                 .name(command.first ?? "clawdis"),
                 arguments: Arguments(Array(command.dropFirst())),
                 environment: self.makeEnvironment(),
-                workingDirectory: FilePath(cwd)
-            ) { execution, stdin, stdout, stderr in
+                workingDirectory: FilePath(cwd))
+            { execution, stdin, stdout, stderr in
                 self.didStart(execution)
                 async let out: Void = self.stream(output: stdout, label: "stdout")
                 async let err: Void = self.stream(output: stderr, label: "stderr")
@@ -122,12 +122,10 @@ final class RelayProcessManager: ObservableObject {
     }
 
     private func handleTermination(status: TerminationStatus) async {
-        let code: Int32 = {
-            switch status {
-            case let .exited(exitCode): return exitCode
-            case let .unhandledException(sig): return -Int32(sig)
-            }
-        }()
+        let code: Int32 = switch status {
+        case let .exited(exitCode): exitCode
+        case let .unhandledException(sig): -Int32(sig)
+        }
 
         self.execution = nil
         if self.stopping || !self.desiredActive {
@@ -161,7 +159,7 @@ final class RelayProcessManager: ObservableObject {
         }
         self.appendLog("[relay] failed: \(message)\n")
         self.logger.error("relay failed: \(message, privacy: .public)")
-        if self.desiredActive && !self.shouldGiveUpAfterCrashes() {
+        if self.desiredActive, !self.shouldGiveUpAfterCrashes() {
             self.status = .restarting
             self.recentCrashes.append(Date())
             self.startIfNeeded()
@@ -200,7 +198,8 @@ final class RelayProcessManager: ObservableObject {
         // Keep it simple: rely on system-installed clawdis/warelay.
         // Default to `clawdis relay`; users can provide an override via env if needed.
         if let override = ProcessInfo.processInfo.environment["CLAWDIS_RELAY_CMD"],
-           !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+           !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
             return override.split(separator: " ").map(String.init)
         }
 
@@ -257,7 +256,8 @@ final class RelayProcessManager: ObservableObject {
 
     private func defaultProjectRoot() -> URL {
         if let stored = UserDefaults.standard.string(forKey: Defaults.projectRootPath),
-           let url = self.expandPath(stored) {
+           let url = self.expandPath(stored)
+        {
             return url
         }
         let fallback = FileManager.default.homeDirectoryForCurrentUser
@@ -275,7 +275,7 @@ final class RelayProcessManager: ObservableObject {
     func projectRootPath() -> String {
         UserDefaults.standard.string(forKey: Defaults.projectRootPath)
             ?? FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Projects/clawdis").path
+            .appendingPathComponent("Projects/clawdis").path
     }
 
     private func expandPath(_ path: String) -> URL? {

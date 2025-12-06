@@ -16,11 +16,11 @@ private enum InstallMethod: Equatable {
              let .npm(_, binary),
              let .go(_, binary),
              let .pnpm(_, _, binary):
-            return binary
+            binary
         case .gitClone:
-            return nil
+            nil
         case .mcporter:
-            return "mcporter"
+            "mcporter"
         }
     }
 }
@@ -57,80 +57,70 @@ struct ToolsSettings: View {
             url: URL(string: "https://github.com/steipete/mcporter")!,
             description: "MCP runtime/CLI to discover servers, run tools, and sync configs across AI clients.",
             method: .npm(package: "mcporter", binary: "mcporter"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "peekaboo",
             name: "Peekaboo",
             url: URL(string: "https://github.com/steipete/Peekaboo")!,
             description: "Lightning-fast macOS screenshots with AI vision helpers for step-by-step automation.",
             method: .brew(formula: "steipete/tap/peekaboo", binary: "peekaboo"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "camsnap",
             name: "camsnap",
             url: URL(string: "https://github.com/steipete/camsnap")!,
             description: "One command to grab frames, clips, or motion alerts from RTSP/ONVIF cameras.",
             method: .brew(formula: "steipete/tap/camsnap", binary: "camsnap"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "oracle",
             name: "oracle",
             url: URL(string: "https://github.com/steipete/oracle")!,
             description: "Runs OpenAI-ready agent workflows from the CLI with session replay and browser control.",
             method: .npm(package: "@steipete/oracle", binary: "oracle"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "eightctl",
             name: "eightctl",
             url: URL(string: "https://github.com/steipete/eightctl")!,
             description: "Control Eight Sleep Pods (temp, alarms, schedules, metrics) from scripts or cron.",
             method: .go(module: "github.com/steipete/eightctl/cmd/eightctl@latest", binary: "eightctl"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "imsg",
             name: "imsg",
             url: URL(string: "https://github.com/steipete/imsg")!,
             description: "CLI for macOS Messages: read/tail chats and send iMessage/SMS with attachments.",
             method: .go(module: "github.com/steipete/imsg/cmd/imsg@latest", binary: "imsg"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "spotify-player",
             name: "spotify-player",
             url: URL(string: "https://github.com/aome510/spotify-player")!,
             description: "Terminal Spotify client to queue, search, and control playback without leaving chat.",
             method: .brew(formula: "spotify_player", binary: "spotify_player"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "openhue-cli",
             name: "OpenHue CLI",
             url: URL(string: "https://github.com/openhue/openhue-cli")!,
             description: "Control Philips Hue lights from scripts—scenes, dimming, and automations.",
             method: .brew(formula: "openhue/cli/openhue-cli", binary: "openhue"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "openai-whisper",
             name: "OpenAI Whisper",
             url: URL(string: "https://github.com/openai/whisper")!,
             description: "On-device speech-to-text for quick note taking or voicemail transcription.",
             method: .brew(formula: "openai-whisper", binary: "whisper"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "gemini-cli",
             name: "Gemini CLI",
             url: URL(string: "https://github.com/google-gemini/gemini-cli")!,
             description: "Google Gemini models from the terminal for fast Q&A and web-grounded summaries.",
             method: .brew(formula: "gemini-cli", binary: "gemini"),
-            kind: .tool
-        ),
+            kind: .tool),
         ToolEntry(
             id: "bird",
             name: "bird",
@@ -139,10 +129,8 @@ struct ToolsSettings: View {
             method: .pnpm(
                 repoPath: "\(NSHomeDirectory())/Projects/bird",
                 script: "binary",
-                binary: "bird"
-            ),
-            kind: .tool
-        ),
+                binary: "bird"),
+            kind: .tool),
         ToolEntry(
             id: "agent-tools",
             name: "agent-tools",
@@ -150,10 +138,8 @@ struct ToolsSettings: View {
             description: "Collection of utilities and scripts tuned for autonomous agents and MCP clients.",
             method: .gitClone(
                 url: "https://github.com/badlogic/agent-tools.git",
-                destination: "\(NSHomeDirectory())/agent-tools"
-            ),
-            kind: .tool
-        ),
+                destination: "\(NSHomeDirectory())/agent-tools"),
+            kind: .tool),
         ToolEntry(
             id: "gmail-mcp",
             name: "Gmail MCP",
@@ -162,10 +148,8 @@ struct ToolsSettings: View {
             method: .mcporter(
                 name: "gmail",
                 command: "npx -y @gongrzhe/server-gmail-autoauth-mcp",
-                summary: "Adds Gmail MCP via mcporter (stdio transport, auto-auth)."
-            ),
-            kind: .mcp
-        ),
+                summary: "Adds Gmail MCP via mcporter (stdio transport, auto-auth)."),
+            kind: .mcp),
         ToolEntry(
             id: "google-calendar-mcp",
             name: "Google Calendar MCP",
@@ -174,10 +158,8 @@ struct ToolsSettings: View {
             method: .mcporter(
                 name: "google-calendar",
                 command: "npx -y @cocal/google-calendar-mcp",
-                summary: "Adds Google Calendar MCP via mcporter (stdio transport)."
-            ),
-            kind: .mcp
-        ),
+                summary: "Adds Google Calendar MCP via mcporter (stdio transport)."),
+            kind: .mcp),
     ]
 
     var body: some View {
@@ -188,8 +170,8 @@ struct ToolsSettings: View {
 
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    section(for: .tool, title: "CLI Tools")
-                    section(for: .mcp, title: "MCP Servers")
+                    self.section(for: .tool, title: "CLI Tools")
+                    self.section(for: .mcp, title: "MCP Servers")
                 }
             }
         }
@@ -198,7 +180,7 @@ struct ToolsSettings: View {
     }
 
     private func section(for kind: ToolEntry.Kind, title: String) -> some View {
-        let filtered = tools.filter { $0.kind == kind }
+        let filtered = self.tools.filter { $0.kind == kind }
         return VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.callout.weight(.semibold))
@@ -212,8 +194,7 @@ struct ToolsSettings: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
-                        )
+                                .stroke(Color.secondary.opacity(0.15), lineWidth: 1))
                 }
             }
         }
@@ -231,15 +212,15 @@ private struct ToolRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Link(tool.name, destination: tool.url)
+                    Link(self.tool.name, destination: self.tool.url)
                         .font(.headline)
-                    Text(tool.description)
+                    Text(self.tool.description)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                actionButton
+                self.actionButton
             }
 
             if let statusMessage, !statusMessage.isEmpty {
@@ -248,12 +229,12 @@ private struct ToolRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onAppear { refresh() }
+        .onAppear { self.refresh() }
     }
 
     private var actionButton: some View {
         VStack {
-            switch state {
+            switch self.state {
             case .installed:
                 Label("Installed", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
@@ -261,12 +242,12 @@ private struct ToolRow: View {
             case .installing:
                 ProgressView().controlSize(.small)
             case .failed:
-                Button("Retry") { install() }
+                Button("Retry") { self.install() }
                     .buttonStyle(.borderedProminent)
             case .checking:
                 ProgressView().controlSize(.small)
             case .notInstalled:
-                Button("Install") { install() }
+                Button("Install") { self.install() }
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -274,21 +255,21 @@ private struct ToolRow: View {
 
     private func refresh() {
         Task {
-            state = .checking
-            let installed = await ToolInstaller.isInstalled(tool.method)
+            self.state = .checking
+            let installed = await ToolInstaller.isInstalled(self.tool.method)
             await MainActor.run {
-                state = installed ? .installed : .notInstalled
+                self.state = installed ? .installed : .notInstalled
             }
         }
     }
 
     private func install() {
         Task {
-            state = .installing
-            let result = await ToolInstaller.install(tool.method)
+            self.state = .installing
+            let result = await ToolInstaller.install(self.tool.method)
             await MainActor.run {
-                statusMessage = result.message
-                state = result.installed ? .installed : .failed(result.message)
+                self.statusMessage = result.message
+                self.state = result.installed ? .installed : .failed(result.message)
             }
         }
     }
@@ -305,30 +286,30 @@ private enum ToolInstaller {
     static func isInstalled(_ method: InstallMethod) async -> Bool {
         switch method {
         case let .brew(formula, _):
-            return await shellSucceeds("brew list --versions \(formula)")
+            return await self.shellSucceeds("brew list --versions \(formula)")
         case let .npm(_, binary),
              let .go(_, binary),
              let .pnpm(_, _, binary):
-            return await commandExists(binary)
+            return await self.commandExists(binary)
         case let .gitClone(_, destination):
             return FileManager.default.fileExists(atPath: destination)
         case let .mcporter(name, _, _):
-            guard await commandExists("mcporter") else { return false }
-            return await shellSucceeds("mcporter config get \(name) --json")
+            guard await self.commandExists("mcporter") else { return false }
+            return await self.shellSucceeds("mcporter config get \(name) --json")
         }
     }
 
     static func install(_ method: InstallMethod) async -> InstallResult {
         switch method {
         case let .brew(formula, _):
-            return await runInstall("brew install \(formula)")
+            return await self.runInstall("brew install \(formula)")
         case let .npm(package, _):
-            return await runInstall("npm install -g \(package)")
+            return await self.runInstall("npm install -g \(package)")
         case let .go(module, _):
-            return await runInstall("GO111MODULE=on go install \(module)")
+            return await self.runInstall("GO111MODULE=on go install \(module)")
         case let .pnpm(repoPath, script, _):
             let cmd = "cd \(escape(repoPath)) && pnpm install && pnpm run \(script)"
-            return await runInstall(cmd)
+            return await self.runInstall(cmd)
         case let .gitClone(url, destination):
             let cmd = """
             if [ -d \(escape(destination)) ]; then
@@ -337,19 +318,19 @@ private enum ToolInstaller {
               git clone \(url) \(escape(destination))
             fi
             """
-            return await runInstall(cmd)
+            return await self.runInstall(cmd)
         case let .mcporter(name, command, summary):
             let cmd = """
             mcporter config add \(name) --command "\(command)" --transport stdio --scope home --description "\(summary)"
             """
-            return await runInstall(cmd)
+            return await self.runInstall(cmd)
         }
     }
 
     // MARK: - Helpers
 
     private static func commandExists(_ binary: String) async -> Bool {
-        await shellSucceeds("command -v \(binary)")
+        await self.shellSucceeds("command -v \(binary)")
     }
 
     private static func shellSucceeds(_ command: String) async -> Bool {

@@ -115,11 +115,9 @@ extension [String] {
     fileprivate func dedupedPreserveOrder() -> [String] {
         var seen = Set<String>()
         var result: [String] = []
-        for item in self {
-            if !seen.contains(item) {
-                seen.insert(item)
-                result.append(item)
-            }
+        for item in self where !seen.contains(item) {
+            seen.insert(item)
+            result.append(item)
         }
         return result
     }

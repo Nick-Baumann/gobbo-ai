@@ -37,6 +37,7 @@ struct ClawdisCLI {
         }
     }
 
+    // swiftlint:disable cyclomatic_complexity
     private static func parseCommandLine() throws -> Request {
         var args = Array(CommandLine.arguments.dropFirst())
         guard let command = args.first else { throw CLIError.help }
@@ -125,6 +126,8 @@ struct ClawdisCLI {
             throw CLIError.help
         }
     }
+
+    // swiftlint:enable cyclomatic_complexity
 
     private static func send(request: Request) async throws -> Response {
         let conn = NSXPCConnection(machServiceName: serviceName)

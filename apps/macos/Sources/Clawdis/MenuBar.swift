@@ -23,15 +23,15 @@ struct ClawdisApp: App {
                 earBoostActive: self.state.earBoostActive,
                 relayStatus: self.relayManager.status)
         }
-            .menuBarExtraStyle(.menu)
-            .menuBarExtraAccess(isPresented: self.$isMenuPresented) { item in
-                self.statusItem = item
-                self.applyStatusItemAppearance(paused: self.state.isPaused)
-            }
-            .onChange(of: self.state.isPaused) { _, paused in
-                self.applyStatusItemAppearance(paused: paused)
-                self.relayManager.setActive(!paused)
-            }
+        .menuBarExtraStyle(.menu)
+        .menuBarExtraAccess(isPresented: self.$isMenuPresented) { item in
+            self.statusItem = item
+            self.applyStatusItemAppearance(paused: self.state.isPaused)
+        }
+        .onChange(of: self.state.isPaused) { _, paused in
+            self.applyStatusItemAppearance(paused: paused)
+            self.relayManager.setActive(!paused)
+        }
 
         Settings {
             SettingsRootView(state: self.state)
@@ -90,10 +90,10 @@ private struct MenuContent: View {
 
     private func statusColor(_ status: RelayProcessManager.Status) -> Color {
         switch status {
-        case .running: return .green
-        case .starting, .restarting: return .orange
-        case .failed: return .red
-        case .stopped: return .secondary
+        case .running: .green
+        case .starting, .restarting: .orange
+        case .failed: .red
+        case .stopped: .secondary
         }
     }
 
@@ -257,17 +257,17 @@ private struct CritterStatusLabel: View {
     private var relayNeedsAttention: Bool {
         switch self.relayStatus {
         case .failed, .stopped:
-            return !self.isPaused
+            !self.isPaused
         case .starting, .restarting, .running:
-            return false
+            false
         }
     }
 
     private var relayBadgeColor: Color {
         switch self.relayStatus {
-        case .failed: return .red
-        case .stopped: return .orange
-        default: return .clear
+        case .failed: .red
+        case .stopped: .orange
+        default: .clear
         }
     }
 }
@@ -279,8 +279,8 @@ enum CritterIconRenderer {
         blink: CGFloat,
         legWiggle: CGFloat = 0,
         earWiggle: CGFloat = 0,
-        earScale: CGFloat = 1
-    ) -> NSImage {
+        earScale: CGFloat = 1) -> NSImage
+    {
         let image = NSImage(size: size)
         image.lockFocus()
         defer { image.unlockFocus() }

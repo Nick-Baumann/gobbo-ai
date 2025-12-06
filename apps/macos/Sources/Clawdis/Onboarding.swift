@@ -120,7 +120,8 @@ struct OnboardingView: View {
             self.onboardingCard {
                 self.featureRow(
                     title: "Owns the TCC prompts",
-                    subtitle: "Requests Notifications, Accessibility, and Screen Recording so your agents stay unblocked.",
+                    subtitle: "Requests Notifications, Accessibility, and Screen Recording "
+                        + "so your agents stay unblocked.",
                     systemImage: "lock.shield")
                 self.featureRow(
                     title: "Native notifications",
@@ -128,7 +129,8 @@ struct OnboardingView: View {
                     systemImage: "bell.and.waveform")
                 self.featureRow(
                     title: "Privileged helpers",
-                    subtitle: "Runs screenshots or shell actions from the `clawdis-mac` CLI with the right permissions.",
+                    subtitle: "Runs screenshots or shell actions from the `clawdis-mac` CLI "
+                        + "with the right permissions.",
                     systemImage: "terminal")
             }
         }
@@ -232,7 +234,8 @@ struct OnboardingView: View {
                     Spacer()
                 }
                 Text(
-                    "You can pause from the menu bar anytime. Settings keeps a \"Show onboarding\" button if you need to revisit.")
+                    "You can pause from the menu bar anytime. Settings keeps a \"Show onboarding\" "
+                        + "button if you need to revisit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -247,7 +250,8 @@ struct OnboardingView: View {
             self.onboardingCard {
                 self.featureRow(
                     title: "Run the dashboard",
-                    subtitle: "Use the CLI helper from your scripts, and reopen onboarding from Settings if you add a new user.",
+                    subtitle: "Use the CLI helper from your scripts, and reopen onboarding from "
+                        + "Settings if you add a new user.",
                     systemImage: "checkmark.seal")
                 self.featureRow(
                     title: "Test a notification",
@@ -273,10 +277,10 @@ struct OnboardingView: View {
                 .disabled(true)
 
                 if self.currentPage > 0 {
-                    Button(action: { self.handleBack() }) {
+                    Button(action: self.handleBack, label: {
                         Label("Back", systemImage: "chevron.left")
                             .labelStyle(.iconOnly)
-                    }
+                    })
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
                     .opacity(0.8)

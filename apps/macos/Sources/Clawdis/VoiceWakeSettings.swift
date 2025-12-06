@@ -103,7 +103,10 @@ final class VoiceWakeTester {
                 domain: "VoiceWakeTester",
                 code: 3,
                 userInfo: [
-                    NSLocalizedDescriptionKey: "Missing mic/speech privacy strings. Rebuild the mac app (scripts/restart-mac.sh) to include usage descriptions.",
+                    NSLocalizedDescriptionKey: """
+                    Missing mic/speech privacy strings. Rebuild the mac app (scripts/restart-mac.sh) \
+                    to include usage descriptions.
+                    """,
                 ])
         }
 
@@ -256,7 +259,8 @@ struct VoiceWakeSettings: View {
         VStack(alignment: .leading, spacing: 14) {
             SettingsToggleRow(
                 title: "Enable Voice Wake",
-                subtitle: "Listen for a wake phrase (e.g. \"Claude\") before running voice commands. Voice recognition runs fully on-device.",
+                subtitle: "Listen for a wake phrase (e.g. \"Claude\") before running voice commands. "
+                    + "Voice recognition runs fully on-device.",
                 binding: self.$state.swabbleEnabled)
                 .disabled(!voiceWakeSupported)
 
@@ -314,7 +318,8 @@ struct VoiceWakeSettings: View {
                         .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
 
                 Text(
-                    "Clawdis reacts when any trigger appears in a transcription. Keep them short to avoid false positives.")
+                    "Clawdis reacts when any trigger appears in a transcription. "
+                        + "Keep them short to avoid false positives.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

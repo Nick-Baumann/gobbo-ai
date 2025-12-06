@@ -62,7 +62,7 @@ final class AppState: ObservableObject {
     @Published var isWorking: Bool = false
     @Published var earBoostActive: Bool = false
 
-    private var earBoostTask: Task<Void, Never>? = nil
+    private var earBoostTask: Task<Void, Never>?
 
     init() {
         self.isPaused = UserDefaults.standard.bool(forKey: pauseDefaultsKey)

@@ -23,7 +23,8 @@ enum PermissionManager {
 
                 case .notDetermined:
                     if interactive {
-                        let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+                        let granted = await (try? center.requestAuthorization(options: [.alert, .sound, .badge])) ??
+                            false
                         let updated = await center.notificationSettings()
                         results[cap] = granted && (updated.authorizationStatus == .authorized || updated
                             .authorizationStatus == .provisional)

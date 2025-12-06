@@ -69,7 +69,7 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     private func loadPage() {
         let messagesJSON = self.initialMessagesJSON.replacingOccurrences(of: "</script>", with: "<\\/script>")
@@ -112,7 +112,13 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
             "{}"
         }
 
-        let html = """
+        let html = self.makeHTML(importMapJSON: importMapJSON, messagesJSON: messagesJSON)
+        self.webView.loadHTMLString(html, baseURL: webChatURL)
+    }
+
+    // swiftlint:disable line_length
+    private func makeHTML(importMapJSON: String, messagesJSON: String) -> String {
+        """
         <!doctype html>
         <html>
         <head>
@@ -156,7 +162,7 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
                 class NativeTransport {
                   async *run(messages, userMessage, cfg, signal) {
                     const result = await window.__clawdisSend({ type: 'chat', payload: { text: userMessage.content?.[0]?.text ?? '', sessionKey: '\(
-                        sessionKey)' } });
+                        self.sessionKey)' } });
                     const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
                     const assistant = {
                       role: 'assistant',
@@ -225,8 +231,9 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
         </body>
         </html>
         """
-        self.webView.loadHTMLString(html, baseURL: webChatURL)
     }
+
+    // swiftlint:enable line_length
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         webView.evaluateJavaScript("document.body.innerText") { result, error in

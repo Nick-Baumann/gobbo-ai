@@ -1,6 +1,6 @@
+import ClawdisIPC
 import Foundation
 import OSLog
-import ClawdisIPC
 
 @objc protocol ClawdisXPCProtocol {
     func handle(_ data: Data, withReply reply: @escaping @Sendable (Data?, Error?) -> Void)
