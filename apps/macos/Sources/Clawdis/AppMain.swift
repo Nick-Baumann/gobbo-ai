@@ -2130,7 +2130,7 @@ struct VoiceWakeSettings: View {
         VStack(alignment: .leading, spacing: 14) {
             SettingsToggleRow(
                 title: "Enable Voice Wake",
-                subtitle: "Listen for a wake phrase (e.g. \"Claude\") before running voice commands.",
+                subtitle: "Listen for a wake phrase (e.g. \"Claude\") before running voice commands. Voice recognition runs fully on-device.",
                 binding: self.$state.swabbleEnabled)
                 .disabled(!voiceWakeSupported)
 
