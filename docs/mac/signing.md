@@ -6,6 +6,7 @@ This app is usually built from `scripts/package-mac-app.sh`, which now:
 - writes the Info.plist with that bundle id (override via `BUNDLE_ID=...`)
 - calls `scripts/codesign-mac-app.sh` to sign the main binary, bundled CLI, and app bundle so macOS treats each rebuild as the same signed bundle and keeps TCC permissions (notifications, accessibility, screen recording, mic, speech). Defaults to ad‑hoc; set `SIGN_IDENTITY="Developer ID Application: …"` to use a real cert.
 - injects build metadata into Info.plist: `ClawdisBuildTimestamp` (UTC) and `ClawdisGitCommit` (short hash) so the About pane can show build, git, and debug/release channel.
+- reads `SIGN_IDENTITY` from the environment. Add `export SIGN_IDENTITY="Apple Development: Your Name (TEAMID)"` (or your Developer ID Application cert) to your shell rc to always sign with your cert; otherwise signing falls back to ad‑hoc.
 
 ## Usage
 
@@ -13,6 +14,9 @@ This app is usually built from `scripts/package-mac-app.sh`, which now:
 # from repo root
 scripts/package-mac-app.sh               # ad-hoc signing
 SIGN_IDENTITY="Developer ID Application: Your Name" scripts/package-mac-app.sh   # real cert
+
+# set it once in your shell profile for convenience
+echo 'export SIGN_IDENTITY="Apple Development: Your Name (TEAMID)"' >> ~/.zshrc
 ```
 
 If you need a different bundle id (e.g. release build):

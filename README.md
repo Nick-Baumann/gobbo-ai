@@ -44,6 +44,7 @@ Because every space lobster needs a time-and-space machine. The Doctor has a TAR
 Only the Pi/Tau CLI is supported now; legacy Claude/Codex/Gemini paths have been removed.
 
 ## Quick Start
+Mac signing tip: set `SIGN_IDENTITY="Apple Development: Your Name (TEAMID)"` in your shell profile so `scripts/restart-mac.sh` signs with your cert (defaults to ad-hoc). Debug bundle ID remains `com.steipete.clawdis.debug`.
 
 ```bash
 # Install
