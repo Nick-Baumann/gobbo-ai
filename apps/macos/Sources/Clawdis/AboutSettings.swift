@@ -29,7 +29,7 @@ struct AboutSettings: View {
                 Text("Version \(self.versionString)")
                     .foregroundStyle(.secondary)
                 if let buildTimestamp {
-                    Text("Built \(buildTimestamp)")
+                    Text("Built \(buildTimestamp)\(self.buildSuffix)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -39,6 +39,18 @@ struct AboutSettings: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 18)
             }
+
+            VStack(alignment: .leading, spacing: 6) {
+                AboutMetaRow(label: "Bundle ID", value: self.bundleID)
+                AboutMetaRow(label: "Git commit", value: self.gitCommit)
+                #if DEBUG
+                AboutMetaRow(label: "Build", value: "Debug")
+                #else
+                AboutMetaRow(label: "Build", value: "Release")
+                #endif
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
 
             VStack(alignment: .center, spacing: 6) {
                 AboutLinkRow(
@@ -84,6 +96,26 @@ struct AboutSettings: View {
         formatter.locale = .current
         return formatter.string(from: date)
     }
+
+    private var gitCommit: String {
+        Bundle.main.object(forInfoDictionaryKey: "ClawdisGitCommit") as? String ?? "unknown"
+    }
+
+    private var bundleID: String {
+        Bundle.main.bundleIdentifier ?? "unknown"
+    }
+
+    private var buildSuffix: String {
+        let git = self.gitCommit
+        guard !git.isEmpty, git != "unknown" else { return "" }
+
+        var suffix = " (\(git)"
+        #if DEBUG
+        suffix += " DEBUG"
+        #endif
+        suffix += ")"
+        return suffix
+    }
 }
 
 @MainActor
@@ -107,5 +139,21 @@ private struct AboutLinkRow: View {
         }
         .buttonStyle(.plain)
         .onHover { self.hovering = $0 }
+    }
+}
+
+private struct AboutMetaRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(self.label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(self.value)
+                .font(.caption.monospaced())
+                .foregroundStyle(.primary)
+        }
     }
 }
