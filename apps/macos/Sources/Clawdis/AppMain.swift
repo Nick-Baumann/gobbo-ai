@@ -1337,7 +1337,7 @@ actor MicLevelMonitor {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 512, format: format) { [weak self] buffer, _ in
             guard let self else { return }
             let level = Self.normalizedLevel(from: buffer)
             Task { await self.push(level: level) }
@@ -1355,7 +1355,7 @@ actor MicLevelMonitor {
     }
 
     private func push(level: Double) {
-        smoothedLevel = (smoothedLevel * 0.85) + (level * 0.15)
+        smoothedLevel = (smoothedLevel * 0.65) + (level * 0.35)
         guard let update else { return }
         let value = smoothedLevel
         Task { @MainActor in update(value) }
