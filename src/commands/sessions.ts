@@ -1,3 +1,5 @@
+import chalk from "chalk";
+
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL } from "../agents/defaults.js";
 import { loadConfig } from "../config/config.js";
@@ -24,6 +26,76 @@ type SessionRow = {
   totalTokens?: number;
   model?: string;
   contextTokens?: number;
+};
+
+const KIND_PAD = 6;
+const KEY_PAD = 26;
+const AGE_PAD = 9;
+const MODEL_PAD = 14;
+const TOKENS_PAD = 20;
+
+const isRich = () => Boolean(process.stdout.isTTY && chalk.level > 0);
+
+const formatKTokens = (value: number) => `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}k`;
+
+const truncateKey = (key: string) => {
+  if (key.length <= KEY_PAD) return key;
+  const head = Math.max(4, KEY_PAD - 10);
+  return `${key.slice(0, head)}...${key.slice(-6)}`;
+};
+
+const colorByPct = (label: string, pct: number | null, rich: boolean) => {
+  if (!rich || pct === null) return label;
+  if (pct >= 95) return chalk.red(label);
+  if (pct >= 80) return chalk.yellow(label);
+  if (pct >= 60) return chalk.green(label);
+  return chalk.gray(label);
+};
+
+const formatTokensCell = (
+  total: number,
+  contextTokens: number | null,
+  rich: boolean,
+) => {
+  if (!total) return "-".padEnd(TOKENS_PAD);
+  const totalLabel = formatKTokens(total);
+  const ctxLabel = contextTokens ? formatKTokens(contextTokens) : "?";
+  const pct = contextTokens ? Math.min(999, Math.round((total / contextTokens) * 100)) : null;
+  const label = `${totalLabel}/${ctxLabel} (${pct ?? "?"}%)`;
+  const padded = label.padEnd(TOKENS_PAD);
+  return colorByPct(padded, pct, rich);
+};
+
+const formatKindCell = (kind: SessionRow["kind"], rich: boolean) => {
+  const label = kind.padEnd(KIND_PAD);
+  if (!rich) return label;
+  if (kind === "group") return chalk.magenta(label);
+  if (kind === "global") return chalk.yellow(label);
+  if (kind === "direct") return chalk.cyan(label);
+  return chalk.gray(label);
+};
+
+const formatAgeCell = (updatedAt: number | null | undefined, rich: boolean) => {
+  const ageLabel = updatedAt ? formatAge(Date.now() - updatedAt) : "unknown";
+  const padded = ageLabel.padEnd(AGE_PAD);
+  return rich ? chalk.gray(padded) : padded;
+};
+
+const formatModelCell = (model: string | null | undefined, rich: boolean) => {
+  const label = (model ?? "unknown").padEnd(MODEL_PAD);
+  return rich ? chalk.white(label) : label;
+};
+
+const formatFlagsCell = (row: SessionRow, rich: boolean) => {
+  const flags = [
+    row.thinkingLevel ? `think:${row.thinkingLevel}` : null,
+    row.verboseLevel ? `verbose:${row.verboseLevel}` : null,
+    row.systemSent ? "system" : null,
+    row.abortedLastRun ? "aborted" : null,
+    row.sessionId ? `id:${row.sessionId}` : null,
+  ].filter(Boolean);
+  const label = flags.join(" ");
+  return label.length === 0 ? "" : rich ? chalk.gray(label) : label;
 };
 
 const formatAge = (ms: number | null | undefined) => {
@@ -134,6 +206,18 @@ export async function sessionsCommand(
     return;
   }
 
+  const rich = isRich();
+  const header = [
+    "Kind".padEnd(KIND_PAD),
+    "Key".padEnd(KEY_PAD),
+    "Age".padEnd(AGE_PAD),
+    "Model".padEnd(MODEL_PAD),
+    "Tokens (ctx %)".padEnd(TOKENS_PAD),
+    "Flags",
+  ].join(" ");
+
+  runtime.log(rich ? chalk.bold(header) : header);
+
   for (const row of rows) {
     const model = row.model ?? configModel;
     const contextTokens =
@@ -141,26 +225,19 @@ export async function sessionsCommand(
     const input = row.inputTokens ?? 0;
     const output = row.outputTokens ?? 0;
     const total = row.totalTokens ?? input + output;
-    const pct = contextTokens
-      ? `${Math.min(100, Math.round((total / contextTokens) * 100))}%`
-      : null;
 
-    const parts = [
-      `${row.key} [${row.kind}]`,
-      row.updatedAt ? formatAge(Date.now() - row.updatedAt) : "age unknown",
-    ];
-    if (row.sessionId) parts.push(`id ${row.sessionId}`);
-    if (row.thinkingLevel) parts.push(`think=${row.thinkingLevel}`);
-    if (row.verboseLevel) parts.push(`verbose=${row.verboseLevel}`);
-    if (row.systemSent) parts.push("systemSent");
-    if (row.abortedLastRun) parts.push("aborted");
-    if (total > 0) {
-      const tokenStr = `tokens in:${input} out:${output} total:${total}`;
-      parts.push(
-        contextTokens ? `${tokenStr} (${pct} of ${contextTokens})` : tokenStr,
-      );
-    }
-    if (model) parts.push(`model=${model}`);
-    runtime.log(`- ${parts.join(" | ")}`);
+    const keyLabel = truncateKey(row.key).padEnd(KEY_PAD);
+    const keyCell = rich ? chalk.cyan(keyLabel) : keyLabel;
+
+    const line = [
+      formatKindCell(row.kind, rich),
+      keyCell,
+      formatAgeCell(row.updatedAt, rich),
+      formatModelCell(model, rich),
+      formatTokensCell(total, contextTokens ?? null, rich),
+      formatFlagsCell(row, rich),
+    ].join(" ");
+
+    runtime.log(line.trimEnd());
   }
 }
