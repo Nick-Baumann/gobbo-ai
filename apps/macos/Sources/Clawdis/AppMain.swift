@@ -1393,6 +1393,7 @@ final class VoiceWakeTester {
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private let audioQueue = DispatchQueue(label: "com.steipete.clawdis.voicewake.audio", qos: .userInitiated)
 
     init(locale: Locale = .current) {
         self.recognizer = SFSpeechRecognizer(locale: locale)
@@ -1425,7 +1426,7 @@ final class VoiceWakeTester {
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             guard let self else { return }
-            self.recognitionRequest?.append(buffer)
+            self.enqueueBuffer(buffer)
         }
 
         audioEngine.prepare()
@@ -1439,7 +1440,9 @@ final class VoiceWakeTester {
             let text = result?.bestTranscription.formattedString ?? ""
             let matched = Self.matches(text: text, triggers: triggers)
             let errorMessage = error?.localizedDescription
-            self.handleResult(matched: matched, text: text, isFinal: result?.isFinal ?? false, errorMessage: errorMessage, onUpdate: onUpdate)
+            DispatchQueue.main.async {
+                self.handleResult(matched: matched, text: text, isFinal: result?.isFinal ?? false, errorMessage: errorMessage, onUpdate: onUpdate)
+            }
         }
     }
 
@@ -1450,6 +1453,13 @@ final class VoiceWakeTester {
         recognitionTask = nil
         recognitionRequest = nil
         audioEngine.inputNode.removeTap(onBus: 0)
+    }
+
+    private func enqueueBuffer(_ buffer: AVAudioPCMBuffer) {
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            self.recognitionRequest?.append(buffer)
+        }
     }
 
     private func handleResult(
