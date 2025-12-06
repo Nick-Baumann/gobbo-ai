@@ -40,10 +40,11 @@ struct Response { ok: Bool; message?: String; payload?: Data }
 
 ## App UX (Clawdis)
 - MenuBarExtra icon only (LSUIElement; no Dock).
-- Menu items: Status, Test Notification, Permissions…, **Pause Clawdis** toggle (temporarily deny privileged actions/notifications without quitting), Quit.
+- Menu items: Status, Permissions…, **Pause Clawdis** toggle (temporarily deny privileged actions/notifications without quitting), Quit.
 - Settings window (Trimmy-style tabs):
   - General: launch at login toggle, default sound, logging verbosity.
   - Permissions: live status + “Request” buttons for Notifications/Accessibility/Screen Recording; links to System Settings.
+  - Debug (when enabled): PID/log links, restart/reveal app shortcuts, manual test notification.
   - About: version, links, license.
 - Pause behavior: matches Trimmy’s “Auto Trim” toggle. When paused, XPC listener returns `ok=false, message="clawdis paused"` for actions that would touch TCC (notify/run/screenshot). State is persisted (UserDefaults) and surfaced in menu and status view.
 - Onboarding (VibeTunnel-inspired): Welcome → What it does → Install CLI (shows `ln -s .../clawdis-mac /usr/local/bin`) → Permissions checklist with live status → Test notification → Done. Re-show when `welcomeVersion` bumps or CLI/app version mismatch.
@@ -79,6 +80,12 @@ struct Response { ok: Bool; message?: String; payload?: Data }
 - Run app for dev: `swift run Clawdis` (or Xcode scheme).
 - Package app + helper: `swift build -c release && swift package --allow-writing-to-directory ../dist` (tbd exact script).
 - Tests: add Swift Testing suites under `apps/macos/Tests` (especially IPC round-trips and permission probing fakes).
+
+## Icon pipeline
+- Source asset lives at `apps/macos/Icon.icon` (glass .icon bundle).
+- Regenerate the bundled icns via `scripts/build_icon.sh` (uses ictool/icontool + sips), which outputs to
+  `apps/macos/Sources/Clawdis/Resources/Clawdis.icns` by default. Override `DEST_ICNS` to change the target.
+  The script also writes intermediate renders to `apps/macos/build/icon/`.
 
 ## Open questions / decisions
 - Where to place the dev symlink `bin/clawdis-mac` (repo root vs. `apps/macos/bin`)?
