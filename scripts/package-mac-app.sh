@@ -8,7 +8,9 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_ROOT="$ROOT_DIR/dist/Clawdis.app"
 BUILD_PATH="$ROOT_DIR/apps/macos/.build"
 PRODUCT="Clawdis"
-BUNDLE_ID="com.steipete.clawdis.debug"
+BUNDLE_ID="${BUNDLE_ID:-com.steipete.clawdis.debug}"
+BUILD_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT=$(cd "$ROOT_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 cd "$ROOT_DIR/apps/macos"
 
@@ -42,6 +44,10 @@ cat > "$APP_ROOT/Contents/Info.plist" <<PLIST
     <string>15.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>ClawdisBuildTimestamp</key>
+    <string>${BUILD_TS}</string>
+    <key>ClawdisGitCommit</key>
+    <string>${GIT_COMMIT}</string>
     <key>NSUserNotificationUsageDescription</key>
     <string>Clawdis needs notification permission to show alerts for agent actions.</string>
     <key>NSScreenCaptureDescription</key>
@@ -70,12 +76,8 @@ fi
 echo "⏹  Stopping any running Clawdis"
 killall -q Clawdis 2>/dev/null || true
 
-echo "🔏 Ad-hoc signing binaries for stable TCC permissions"
-codesign --force --options runtime --timestamp=none --sign - "$APP_ROOT/Contents/MacOS/Clawdis"
-if [ -f "$APP_ROOT/Contents/MacOS/ClawdisCLI" ]; then
-  codesign --force --options runtime --timestamp=none --sign - "$APP_ROOT/Contents/MacOS/ClawdisCLI"
-fi
-codesign --force --options runtime --timestamp=none --sign - "$APP_ROOT"
+echo "🔏 Signing bundle (ad-hoc by default; set SIGN_IDENTITY for real cert)"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}" "$ROOT_DIR/scripts/codesign-mac-app.sh" "$APP_ROOT"
 
 echo "✅ Bundle ready at $APP_ROOT"
 
