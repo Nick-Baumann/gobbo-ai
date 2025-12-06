@@ -2823,7 +2823,7 @@ struct DebugSettings: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.2)))
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text("Relay project root")
+                Text("Clawdis project root")
                     .font(.caption.weight(.semibold))
                 HStack(spacing: 8) {
                     TextField("Path to clawdis repo", text: self.$relayRootInput)
