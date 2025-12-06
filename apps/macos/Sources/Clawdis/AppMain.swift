@@ -1032,10 +1032,16 @@ struct SessionsSettings: View {
     @State private var errorMessage: String?
     @State private var loading = false
     @State private var hasLoaded = false
+    @State private var configModel: String = ""
+    @State private var configStorePath: String = SessionLoader.defaultStorePath
+    @State private var configContextTokens: String = ""
+    @State private var configStatus: String?
+    @State private var configSaving = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             self.header
+            self.configEditor
             self.storeMetadata
             Divider().padding(.vertical, 4)
             self.content
@@ -1046,6 +1052,7 @@ struct SessionsSettings: View {
         .task {
             guard !self.hasLoaded else { return }
             self.hasLoaded = true
+            self.loadConfig()
             await self.refresh()
         }
     }
@@ -1058,6 +1065,57 @@ struct SessionsSettings: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var configEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Clawdis CLI config")
+                .font(.callout.weight(.semibold))
+            Text("Writes to ~/.clawdis/clawdis.json (inbound.reply.agent/session).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            LabeledContent("Model") {
+                TextField("e.g. claude-3.5-sonnet", text: self.$configModel)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 260)
+            }
+
+            LabeledContent("Session store") {
+                TextField("Path", text: self.$configStorePath)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 320)
+            }
+
+            LabeledContent("Context tokens") {
+                TextField("Optional", text: self.$configContextTokens)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 160)
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    Task { await self.saveConfig() }
+                } label: {
+                    Label(self.configSaving ? "Saving…" : "Save config", systemImage: "square.and.arrow.down")
+                        .labelStyle(.titleAndIcon)
+                }
+                .disabled(self.configSaving)
+
+                Button {
+                    self.loadConfig()
+                } label: {
+                    Label("Revert", systemImage: "arrow.uturn.backward")
+                }
+                .disabled(self.configSaving)
+
+                if let configStatus {
+                    Text(configStatus)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -1197,6 +1255,80 @@ struct SessionsSettings: View {
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } else {
             NSWorkspace.shared.open(url.deletingLastPathComponent())
+        }
+    }
+
+    private func configURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".clawdis")
+            .appendingPathComponent("clawdis.json")
+    }
+
+    private func loadConfig() {
+        let url = self.configURL()
+        guard let data = try? Data(contentsOf: url) else {
+            self.configModel = ""
+            self.configStorePath = SessionLoader.defaultStorePath
+            self.configContextTokens = ""
+            self.configStatus = "Using defaults (no config file yet)"
+            return
+        }
+        guard
+            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let inbound = parsed["inbound"] as? [String: Any],
+            let reply = inbound["reply"] as? [String: Any]
+        else {
+            self.configStatus = "Invalid config file; using defaults"
+            return
+        }
+
+        let session = reply["session"] as? [String: Any]
+        let agent = reply["agent"] as? [String: Any]
+        self.configStorePath = (session?["store"] as? String) ?? SessionLoader.defaultStorePath
+        self.configModel = (agent?["model"] as? String) ?? ""
+        if let ctx = (agent?["contextTokens"] as? NSNumber)?.intValue {
+            self.configContextTokens = "\(ctx)"
+        } else {
+            self.configContextTokens = ""
+        }
+        self.configStatus = "Loaded from config"
+    }
+
+    private func saveConfig() async {
+        guard !self.configSaving else { return }
+        self.configSaving = true
+        defer { self.configSaving = false }
+
+        let ctxTokens: Int? = Int(self.configContextTokens.trimmingCharacters(in: .whitespacesAndNewlines))
+        var session: [String: Any] = [:]
+        var agent: [String: Any] = [:]
+
+        let trimmedStore = self.configStorePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedStore.isEmpty { session["store"] = trimmedStore }
+
+        let trimmedModel = self.configModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedModel.isEmpty { agent["model"] = trimmedModel }
+        if let ctxTokens { agent["contextTokens"] = ctxTokens }
+
+        let reply: [String: Any] = [
+            "session": session,
+            "agent": agent,
+        ]
+        let inbound: [String: Any] = ["reply": reply]
+        let root: [String: Any] = ["inbound": inbound]
+
+        do {
+            let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+            let url = self.configURL()
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            try data.write(to: url, options: [.atomic])
+            self.configStatus = "Saved to \(url.path)"
+            // refresh session view with new defaults
+            await self.refresh()
+        } catch {
+            self.configStatus = "Save failed: \(error.localizedDescription)"
         }
     }
 }
