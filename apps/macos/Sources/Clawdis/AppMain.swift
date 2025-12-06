@@ -14,6 +14,7 @@ import Speech
 import SwiftUI
 import UserNotifications
 import VideoToolbox
+import UniformTypeIdentifiers
 
 private let serviceName = "com.steipete.clawdis.xpc"
 private let launchdLabel = "com.steipete.clawdis"
@@ -28,6 +29,7 @@ private let voiceWakeMicKey = "clawdis.voiceWakeMicID"
 private let voiceWakeLocaleKey = "clawdis.voiceWakeLocaleID"
 private let voiceWakeAdditionalLocalesKey = "clawdis.voiceWakeAdditionalLocaleIDs"
 private let modelCatalogPathKey = "clawdis.modelCatalogPath"
+private let modelCatalogReloadKey = "clawdis.modelCatalogReload"
 private let voiceWakeSupported: Bool = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
 
 // MARK: - App model
@@ -242,13 +244,30 @@ enum PermissionManager {
             switch cap {
             case .notifications:
                 let center = UNUserNotificationCenter.current()
-                let status = await center.notificationSettings()
-                if status.authorizationStatus == .notDetermined, interactive {
-                    _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-                    let post = await center.notificationSettings()
-                    results[cap] = post.authorizationStatus == .authorized
-                } else {
-                    results[cap] = status.authorizationStatus == .authorized
+                let settings = await center.notificationSettings()
+
+                switch settings.authorizationStatus {
+                case .authorized, .provisional, .ephemeral:
+                    results[cap] = true
+
+                case .notDetermined:
+                    if interactive {
+                        let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+                        let updated = await center.notificationSettings()
+                        results[cap] = granted && (updated.authorizationStatus == .authorized || updated
+                            .authorizationStatus == .provisional)
+                    } else {
+                        results[cap] = false
+                    }
+
+                case .denied:
+                    results[cap] = false
+                    if interactive {
+                        NotificationPermissionHelper.openSettings()
+                    }
+
+                @unknown default:
+                    results[cap] = false
                 }
 
             case .accessibility:
@@ -319,6 +338,90 @@ enum PermissionManager {
             }
         }
         return results
+    }
+}
+
+enum NotificationPermissionHelper {
+    static func openSettings() {
+        let candidates = [
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension",
+            "x-apple.systempreferences:com.apple.preference.notifications",
+        ]
+
+        for candidate in candidates {
+            if let url = URL(string: candidate), NSWorkspace.shared.open(url) {
+                return
+            }
+        }
+    }
+}
+
+// MARK: - Permission monitoring
+
+@MainActor
+final class PermissionMonitor: ObservableObject {
+    static let shared = PermissionMonitor()
+
+    @Published private(set) var status: [Capability: Bool] = [:]
+
+    private var monitorTimer: Timer?
+    private var isChecking = false
+    private var registrations = 0
+    private var lastCheck: Date?
+    private let minimumCheckInterval: TimeInterval = 0.5
+
+    func register() {
+        self.registrations += 1
+        if self.registrations == 1 {
+            self.startMonitoring()
+        }
+    }
+
+    func unregister() {
+        guard self.registrations > 0 else { return }
+        self.registrations -= 1
+        if self.registrations == 0 {
+            self.stopMonitoring()
+        }
+    }
+
+    func refreshNow() async {
+        await self.checkStatus(force: true)
+    }
+
+    private func startMonitoring() {
+        Task { await self.checkStatus(force: true) }
+
+        self.monitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.checkStatus(force: false)
+            }
+        }
+    }
+
+    private func stopMonitoring() {
+        self.monitorTimer?.invalidate()
+        self.monitorTimer = nil
+        self.lastCheck = nil
+    }
+
+    private func checkStatus(force: Bool) async {
+        if self.isChecking { return }
+        let now = Date()
+        if !force, let lastCheck, now.timeIntervalSince(lastCheck) < self.minimumCheckInterval {
+            return
+        }
+
+        self.isChecking = true
+        self.lastCheck = now
+
+        let latest = await PermissionManager.status()
+        if latest != self.status {
+            self.status = latest
+        }
+
+        self.isChecking = false
     }
 }
 
@@ -506,14 +609,12 @@ private struct MenuContent: View {
         Toggle(isOn: self.$state.swabbleEnabled) { Text("Voice Wake") }
             .disabled(!voiceWakeSupported)
             .opacity(voiceWakeSupported ? 1 : 0.5)
+        Button("Open Chat") { WebChatManager.shared.show(sessionKey: self.primarySessionKey()) }
+        Divider()
         Button("Settings…") { self.open(tab: .general) }
             .keyboardShortcut(",", modifiers: [.command])
         Button("About Clawdis") { self.open(tab: .about) }
-        Button("Open Web Chat") { WebChatManager.shared.show(sessionKey: self.primarySessionKey()) }
         Divider()
-        Button("Test Notification") {
-            Task { _ = await NotificationManager().send(title: "Clawdis", body: "Test notification", sound: nil) }
-        }
         Button("Quit") { NSApplication.shared.terminate(nil) }
     }
 
@@ -1104,10 +1205,13 @@ enum ModelCatalogLoader {
         }
         var body = String(source[firstBrace...lastBrace])
         body = body.replacingOccurrences(
-            of: #"satisfies\s+[A-Za-z0-9_<>.,\-\s]+"#,
+            of: #"(?m)\bsatisfies\s+[^,}\n]+"#,
             with: "",
             options: .regularExpression)
-        body = body.replacingOccurrences(of: #"as\s+[A-Za-z0-9_<>.,\-\s]+"#, with: "", options: .regularExpression)
+        body = body.replacingOccurrences(
+            of: #"(?m)\bas\s+[^;,\n]+"#,
+            with: "",
+            options: .regularExpression)
         return "var MODELS = \(body);"
     }
 }
@@ -1306,15 +1410,14 @@ struct ConfigSettings: View {
     @State private var configModel: String = ""
     @State private var customModel: String = ""
     @State private var configStorePath: String = SessionLoader.defaultStorePath
-    @State private var configContextTokens: String = ""
-    @State private var configStatus: String?
     @State private var configSaving = false
     @State private var hasLoaded = false
     @State private var models: [ModelChoice] = []
     @State private var modelsLoading = false
     @State private var modelError: String?
-    @State private var modelCatalogPath: String = UserDefaults.standard
-        .string(forKey: modelCatalogPathKey) ?? ModelCatalogLoader.defaultPath
+    @AppStorage(modelCatalogPathKey) private var modelCatalogPath: String = ModelCatalogLoader.defaultPath
+    @AppStorage(modelCatalogReloadKey) private var modelCatalogReloadBump: Int = 0
+    @State private var allowAutosave = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1329,7 +1432,7 @@ struct ConfigSettings: View {
                     Picker("Model", selection: self.$configModel) {
                         ForEach(self.models) { choice in
                             Text(
-                                "\(choice.name) — \(choice.provider.uppercased())\(choice.contextWindow.map { " \($0 / 1000)k ctx" } ?? "")")
+                                "\(choice.name) — \(choice.provider.uppercased())")
                                 .tag(choice.id)
                         }
                         Text("Manual entry…").tag("__custom__")
@@ -1337,6 +1440,9 @@ struct ConfigSettings: View {
                     .labelsHidden()
                     .frame(width: 360)
                     .disabled(self.modelsLoading || (!self.modelError.isNilOrEmpty && self.models.isEmpty))
+                    .onChange(of: self.configModel) { _, _ in
+                        self.autosaveConfig()
+                    }
 
                     if self.configModel == "__custom__" {
                         TextField("Enter model ID", text: self.$customModel)
@@ -1344,7 +1450,14 @@ struct ConfigSettings: View {
                             .frame(width: 320)
                             .onChange(of: self.customModel) { _, newValue in
                                 self.configModel = newValue
+                                self.autosaveConfig()
                             }
+                    }
+
+                    if let contextLabel = self.selectedContextLabel {
+                        Text(contextLabel)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
 
                     HStack(spacing: 10) {
@@ -1355,18 +1468,8 @@ struct ConfigSettings: View {
                         }
                         .disabled(self.modelsLoading)
 
-                        Button {
-                            self.chooseCatalogFile()
-                        } label: {
-                            Label("Choose file…", systemImage: "folder")
-                        }
-
                         if let modelError {
                             Text(modelError)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        } else if !self.models.isEmpty {
-                            Text("Loaded \(self.models.count) models")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -1378,46 +1481,36 @@ struct ConfigSettings: View {
                 TextField("Path", text: self.$configStorePath)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 360)
+                    .onChange(of: self.configStorePath) { _, _ in
+                        self.autosaveConfig()
+                    }
             }
 
             LabeledContent("Context tokens") {
                 TextField("Optional", text: self.$configContextTokens)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 160)
-            }
-
-            HStack(spacing: 12) {
-                Button {
-                    Task { await self.saveConfig() }
-                } label: {
-                    Label(self.configSaving ? "Saving…" : "Save config", systemImage: "square.and.arrow.down")
-                        .labelStyle(.titleAndIcon)
-                }
-                .disabled(self.configSaving)
-
-                Button {
-                    self.loadConfig()
-                } label: {
-                    Label("Revert", systemImage: "arrow.uturn.backward")
-                }
-                .disabled(self.configSaving)
-
-                if let configStatus {
-                    Text(configStatus)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                    .onChange(of: self.configContextTokens) { _, _ in
+                        self.autosaveConfig()
+                    }
             }
 
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
+        .onChange(of: self.modelCatalogPath) { _, _ in
+            Task { await self.loadModels() }
+        }
+        .onChange(of: self.modelCatalogReloadBump) { _, _ in
+            Task { await self.loadModels() }
+        }
         .task {
             guard !self.hasLoaded else { return }
             self.hasLoaded = true
             self.loadConfig()
             await self.loadModels()
+            self.allowAutosave = true
         }
     }
 
@@ -1430,10 +1523,9 @@ struct ConfigSettings: View {
     private func loadConfig() {
         let url = self.configURL()
         guard let data = try? Data(contentsOf: url) else {
-            self.configModel = ""
+            self.configModel = SessionLoader.fallbackModel
             self.configStorePath = SessionLoader.defaultStorePath
             self.configContextTokens = ""
-            self.configStatus = "Using defaults (no config file yet)"
             return
         }
         guard
@@ -1441,7 +1533,6 @@ struct ConfigSettings: View {
             let inbound = parsed["inbound"] as? [String: Any],
             let reply = inbound["reply"] as? [String: Any]
         else {
-            self.configStatus = "Invalid config file; using defaults"
             return
         }
 
@@ -1453,15 +1544,19 @@ struct ConfigSettings: View {
             self.configModel = loadedModel
             self.customModel = loadedModel
         } else {
-            self.configModel = ""
-            self.customModel = ""
+            self.configModel = SessionLoader.fallbackModel
+            self.customModel = SessionLoader.fallbackModel
         }
         if let ctx = (agent?["contextTokens"] as? NSNumber)?.intValue {
             self.configContextTokens = "\(ctx)"
         } else {
             self.configContextTokens = ""
         }
-        self.configStatus = "Loaded from config"
+    }
+
+    private func autosaveConfig() {
+        guard self.allowAutosave else { return }
+        Task { await self.saveConfig() }
     }
 
     private func saveConfig() async {
@@ -1496,10 +1591,7 @@ struct ConfigSettings: View {
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true)
             try data.write(to: url, options: [.atomic])
-            self.configStatus = "Saved to \(url.path)"
-        } catch {
-            self.configStatus = "Save failed: \(error.localizedDescription)"
-        }
+        } catch {}
     }
 
     private func loadModels() async {
@@ -1521,21 +1613,18 @@ struct ConfigSettings: View {
         self.modelsLoading = false
     }
 
-    private func chooseCatalogFile() {
-        let panel = NSOpenPanel()
-        panel.title = "Select models.generated.ts"
-        if let tsType = UTType(filenameExtension: "ts") {
-            panel.allowedContentTypes = [tsType]
-        } else {
-            panel.allowedFileTypes = ["ts"] // fallback
+    private var selectedContextLabel: String? {
+        let chosenId = (self.configModel == "__custom__") ? self.customModel : self.configModel
+        guard
+            !chosenId.isEmpty,
+            let choice = self.models.first(where: { $0.id == chosenId }),
+            let context = choice.contextWindow
+        else {
+            return nil
         }
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = URL(fileURLWithPath: self.modelCatalogPath).deletingLastPathComponent()
-        if panel.runModal() == .OK, let url = panel.url {
-            self.modelCatalogPath = url.path
-            UserDefaults.standard.set(url.path, forKey: modelCatalogPathKey)
-            Task { await self.loadModels() }
-        }
+
+        let human = context >= 1000 ? "\(context / 1000)k" : "\(context)"
+        return "Context window: \(human) tokens"
     }
 }
 
@@ -1630,8 +1719,8 @@ private struct Badge: View {
 
 struct SettingsRootView: View {
     @ObservedObject var state: AppState
-    @State private var permStatus: [Capability: Bool] = [:]
-    @State private var loadingPerms = false
+    @ObservedObject private var permissionMonitor = PermissionMonitor.shared
+    @State private var monitoringPermissions = false
     @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
@@ -1653,7 +1742,7 @@ struct SettingsRootView: View {
                 .tag(SettingsTab.voiceWake)
 
             PermissionsSettings(
-                status: self.permStatus,
+                status: self.permissionMonitor.status,
                 refresh: self.refreshPerms,
                 showOnboarding: { OnboardingController.shared.show() })
                 .tabItem { Label("Permissions", systemImage: "lock.shield") }
@@ -1684,12 +1773,17 @@ struct SettingsRootView: View {
             if let pending = SettingsTabRouter.consumePending() {
                 self.selectedTab = self.validTab(for: pending)
             }
+            self.updatePermissionMonitoring(for: self.selectedTab)
         }
         .onChange(of: self.state.debugPaneEnabled) { _, enabled in
             if !enabled, self.selectedTab == .debug {
                 self.selectedTab = .general
             }
         }
+        .onChange(of: self.selectedTab) { _, newValue in
+            self.updatePermissionMonitoring(for: newValue)
+        }
+        .onDisappear { self.stopPermissionMonitoring() }
         .task { await self.refreshPerms() }
     }
 
@@ -1700,10 +1794,24 @@ struct SettingsRootView: View {
 
     @MainActor
     private func refreshPerms() async {
-        guard !self.loadingPerms else { return }
-        self.loadingPerms = true
-        self.permStatus = await PermissionManager.status()
-        self.loadingPerms = false
+        await self.permissionMonitor.refreshNow()
+    }
+
+    private func updatePermissionMonitoring(for tab: SettingsTab) {
+        let shouldMonitor = tab == .permissions
+        if shouldMonitor, !self.monitoringPermissions {
+            self.monitoringPermissions = true
+            PermissionMonitor.shared.register()
+        } else if !shouldMonitor, self.monitoringPermissions {
+            self.monitoringPermissions = false
+            PermissionMonitor.shared.unregister()
+        }
+    }
+
+    private func stopPermissionMonitoring() {
+        guard self.monitoringPermissions else { return }
+        self.monitoringPermissions = false
+        PermissionMonitor.shared.unregister()
     }
 }
 
@@ -2587,6 +2695,12 @@ struct PermissionsSettings: View {
 }
 
 struct DebugSettings: View {
+    @AppStorage(modelCatalogPathKey) private var modelCatalogPath: String = ModelCatalogLoader.defaultPath
+    @AppStorage(modelCatalogReloadKey) private var modelCatalogReloadBump: Int = 0
+    @State private var modelsCount: Int?
+    @State private var modelsLoading = false
+    @State private var modelsError: String?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             LabeledContent("PID") { Text("\(ProcessInfo.processInfo.processIdentifier)") }
@@ -2594,6 +2708,46 @@ struct DebugSettings: View {
                 Button("Open /tmp/clawdis.log") { NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp/clawdis.log")) }
             }
             LabeledContent("Binary path") { Text(Bundle.main.bundlePath).font(.footnote) }
+            LabeledContent("Model catalog") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(self.modelCatalogPath)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    HStack(spacing: 8) {
+                        Button {
+                            self.chooseCatalogFile()
+                        } label: {
+                            Label("Choose models.generated.ts…", systemImage: "folder")
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            Task { await self.reloadModels() }
+                        } label: {
+                            Label(self.modelsLoading ? "Reloading…" : "Reload models", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(self.modelsLoading)
+                    }
+                    if let modelsError {
+                        Text(modelsError)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else if let modelsCount {
+                        Text("Loaded \(modelsCount) models")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("Used by the Config tab model picker; point at a different build when debugging.")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            Button("Send Test Notification") {
+                Task { _ = await NotificationManager().send(title: "Clawdis", body: "Test notification", sound: nil) }
+            }
+            .buttonStyle(.bordered)
             HStack {
                 Button("Restart app") { self.relaunch() }
                 Button("Reveal app in Finder") { self.revealApp() }
@@ -2603,6 +2757,39 @@ struct DebugSettings: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
+        .task { await self.reloadModels() }
+    }
+
+    private func chooseCatalogFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Select models.generated.ts"
+        if let tsType = UTType(filenameExtension: "ts") {
+            panel.allowedContentTypes = [tsType]
+        } else {
+            panel.allowedFileTypes = ["ts"] // fallback
+        }
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: self.modelCatalogPath).deletingLastPathComponent()
+        if panel.runModal() == .OK, let url = panel.url {
+            self.modelCatalogPath = url.path
+            self.modelCatalogReloadBump += 1
+            Task { await self.reloadModels() }
+        }
+    }
+
+    private func reloadModels() async {
+        guard !self.modelsLoading else { return }
+        self.modelsLoading = true
+        self.modelsError = nil
+        self.modelCatalogReloadBump += 1
+        defer { self.modelsLoading = false }
+        do {
+            let loaded = try await ModelCatalogLoader.load(from: self.modelCatalogPath)
+            self.modelsCount = loaded.count
+        } catch {
+            self.modelsCount = nil
+            self.modelsError = error.localizedDescription
+        }
     }
 
     private func relaunch() {
@@ -2944,15 +3131,17 @@ final class OnboardingController {
 
 struct OnboardingView: View {
     @State private var currentPage = 0
-    @State private var permStatus: [Capability: Bool] = [:]
     @State private var isRequesting = false
     @State private var installingCLI = false
     @State private var cliStatus: String?
     @State private var copied = false
+    @State private var monitoringPermissions = false
     @ObservedObject private var state = AppStateStore.shared
+    @ObservedObject private var permissionMonitor = PermissionMonitor.shared
 
     private let pageWidth: CGFloat = 640
     private let contentHeight: CGFloat = 260
+    private let permissionsPageIndex = 2
     private var pageCount: Int { 6 }
     private var buttonTitle: String { self.currentPage == self.pageCount - 1 ? "Finish" : "Next" }
     private let devLinkCommand = "ln -sf $(pwd)/apps/macos/.build/debug/ClawdisCLI /usr/local/bin/clawdis-mac"
@@ -2977,7 +3166,7 @@ struct OnboardingView: View {
                 .animation(
                     .interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25),
                     value: self.currentPage)
-                .frame(width: self.pageWidth, height: self.contentHeight, alignment: .top)
+                .frame(height: self.contentHeight, alignment: .top)
                 .clipped()
             }
             .frame(height: 260)
@@ -2986,7 +3175,14 @@ struct OnboardingView: View {
         }
         .frame(width: self.pageWidth, height: 560)
         .background(Color(NSColor.windowBackgroundColor))
-        .onAppear { self.currentPage = 0 }
+        .onAppear {
+            self.currentPage = 0
+            self.updatePermissionMonitoring(for: 0)
+        }
+        .onChange(of: self.currentPage) { _, newValue in
+            self.updatePermissionMonitoring(for: newValue)
+        }
+        .onDisappear { self.stopPermissionMonitoring() }
         .task { await self.refreshPerms() }
     }
 
@@ -3043,7 +3239,7 @@ struct OnboardingView: View {
 
             self.onboardingCard {
                 ForEach(Capability.allCases, id: \.self) { cap in
-                    PermissionRow(capability: cap, status: self.permStatus[cap] ?? false) {
+                    PermissionRow(capability: cap, status: self.permissionMonitor.status[cap] ?? false) {
                         Task { await self.request(cap) }
                     }
                 }
@@ -3118,15 +3314,20 @@ struct OnboardingView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             self.onboardingCard {
-                Toggle("Launch at login", isOn: self.$state.launchAtLogin)
-                    .toggleStyle(.switch)
-                    .onChange(of: self.state.launchAtLogin) { _, newValue in
-                        AppStateStore.updateLaunchAtLogin(enabled: newValue)
-                    }
+                HStack {
+                    Spacer()
+                    Toggle("Launch at login", isOn: self.$state.launchAtLogin)
+                        .toggleStyle(.switch)
+                        .onChange(of: self.state.launchAtLogin) { _, newValue in
+                            AppStateStore.updateLaunchAtLogin(enabled: newValue)
+                        }
+                    Spacer()
+                }
                 Text(
                     "You can pause from the menu bar anytime. Settings keeps a \"Show onboarding\" button if you need to revisit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }
@@ -3261,7 +3462,7 @@ struct OnboardingView: View {
 
     @MainActor
     private func refreshPerms() async {
-        self.permStatus = await PermissionManager.status()
+        await self.permissionMonitor.refreshNow()
     }
 
     @MainActor
@@ -3271,6 +3472,23 @@ struct OnboardingView: View {
         defer { isRequesting = false }
         _ = await PermissionManager.ensure([cap], interactive: true)
         await self.refreshPerms()
+    }
+
+    private func updatePermissionMonitoring(for pageIndex: Int) {
+        let shouldMonitor = pageIndex == self.permissionsPageIndex
+        if shouldMonitor, !self.monitoringPermissions {
+            self.monitoringPermissions = true
+            PermissionMonitor.shared.register()
+        } else if !shouldMonitor, self.monitoringPermissions {
+            self.monitoringPermissions = false
+            PermissionMonitor.shared.unregister()
+        }
+    }
+
+    private func stopPermissionMonitoring() {
+        guard self.monitoringPermissions else { return }
+        self.monitoringPermissions = false
+        PermissionMonitor.shared.unregister()
     }
 
     private func installCLI() async {
