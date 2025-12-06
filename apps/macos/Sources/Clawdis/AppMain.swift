@@ -32,6 +32,10 @@ private let modelCatalogPathKey = "clawdis.modelCatalogPath"
 private let modelCatalogReloadKey = "clawdis.modelCatalogReload"
 private let voiceWakeSupported: Bool = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
 
+enum UIStrings {
+    static let welcomeTitle = "Welcome to Clawdis"
+}
+
 // MARK: - App model
 
 @MainActor
@@ -2026,13 +2030,13 @@ final class VoiceWakeTester {
         guard let request = recognitionRequest else { return }
 
         self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self, !self.isStopping else { return }
             let text = result?.bestTranscription.formattedString ?? ""
             let matched = Self.matches(text: text, triggers: triggers)
             let isFinal = result?.isFinal ?? false
             let errorMessage = error?.localizedDescription
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                // Hop to the MainActor before touching state to avoid isolation assertions
+                guard let self, !self.isStopping else { return }
                 self.handleResult(
                     matched: matched,
                     text: text,
@@ -3160,9 +3164,12 @@ final class OnboardingController {
         }
         let hosting = NSHostingController(rootView: OnboardingView())
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Welcome to Clawdis"
+        window.title = UIStrings.welcomeTitle
         window.setContentSize(NSSize(width: 640, height: 560))
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
