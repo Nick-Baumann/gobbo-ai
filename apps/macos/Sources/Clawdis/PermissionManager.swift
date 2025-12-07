@@ -78,13 +78,13 @@ enum PermissionManager {
             case .speechRecognition:
                 let status = SFSpeechRecognizer.authorizationStatus()
                 if status == .notDetermined, interactive {
-                    let ok = await withCheckedContinuation { cont in
-                        SFSpeechRecognizer.requestAuthorization { auth in cont.resume(returning: auth == .authorized) }
+                    await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
+                        SFSpeechRecognizer.requestAuthorization { _ in
+                            DispatchQueue.main.async { cont.resume() }
+                        }
                     }
-                    results[cap] = ok
-                } else {
-                    results[cap] = status == .authorized
                 }
+                results[cap] = SFSpeechRecognizer.authorizationStatus() == .authorized
             }
         }
         return results

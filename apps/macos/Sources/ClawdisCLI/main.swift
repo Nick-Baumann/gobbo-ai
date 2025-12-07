@@ -171,44 +171,59 @@ struct ClawdisCLI {
 
     private static func loadInfo() -> [String: Any] {
         if let dict = Bundle.main.infoDictionary, !dict.isEmpty { return dict }
-        guard let exePath = executablePath() else { return [:] }
-        let infoURL = exePath
+        guard let exe = CommandLine.arguments.first else { return [:] }
+        let url = URL(fileURLWithPath: exe)
+            .resolvingSymlinksInPath()
             .deletingLastPathComponent() // MacOS
             .deletingLastPathComponent() // Contents
             .appendingPathComponent("Info.plist")
-        if let data = try? Data(contentsOf: infoURL),
-           let dict = (try? PropertyListSerialization.propertyList(
-               from: data,
-               options: [],
-               format: nil)) as? [String: Any] {
+        if let data = try? Data(contentsOf: url),
+           let dict = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+        {
             return dict
         }
         return [:]
     }
 
-    private static func executablePath() -> URL? {
-        if let cstr = _dyld_get_image_name(0) {
-            return URL(fileURLWithPath: String(cString: cstr)).resolvingSymlinksInPath()
+    private static func send(request: Request) async throws -> Response {
+        try await ensureAppRunning()
+
+        var lastError: Error?
+        for _ in 0..<10 {
+            let conn = NSXPCConnection(machServiceName: serviceName)
+            let interface = NSXPCInterface(with: ClawdisXPCProtocol.self)
+            conn.remoteObjectInterface = interface
+            conn.resume()
+
+            let data = try JSONEncoder().encode(request)
+            do {
+                let service = AsyncXPCConnection.RemoteXPCService<ClawdisXPCProtocol>(connection: conn)
+                let raw: Data = try await service.withValueErrorCompletion { proxy, completion in
+                    struct CompletionBox: @unchecked Sendable { let handler: (Data?, Error?) -> Void }
+                    let box = CompletionBox(handler: completion)
+                    proxy.handle(data, withReply: { data, error in box.handler(data, error) })
+                }
+                conn.invalidate()
+                return try JSONDecoder().decode(Response.self, from: raw)
+            } catch {
+                lastError = error
+                conn.invalidate()
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
         }
-        return nil
+        throw lastError ?? CLIError.help
     }
 
-    private static func send(request: Request) async throws -> Response {
-        let conn = NSXPCConnection(machServiceName: serviceName)
-        let interface = NSXPCInterface(with: ClawdisXPCProtocol.self)
-        conn.remoteObjectInterface = interface
-        conn.resume()
-        defer { conn.invalidate() }
-
-        let data = try JSONEncoder().encode(request)
-
-        let service = AsyncXPCConnection.RemoteXPCService<ClawdisXPCProtocol>(connection: conn)
-        let raw: Data = try await service.withValueErrorCompletion { proxy, completion in
-            struct CompletionBox: @unchecked Sendable { let handler: (Data?, Error?) -> Void }
-            let box = CompletionBox(handler: completion)
-            proxy.handle(data, withReply: { data, error in box.handler(data, error) })
-        }
-        return try JSONDecoder().decode(Response.self, from: raw)
+    private static func ensureAppRunning() async throws {
+        let appURL = URL(fileURLWithPath: (CommandLine.arguments.first ?? ""))
+            .resolvingSymlinksInPath()
+            .deletingLastPathComponent() // MacOS
+            .deletingLastPathComponent() // Contents
+        let proc = Process()
+        proc.launchPath = "/usr/bin/open"
+        proc.arguments = ["-n", appURL.path]
+        try proc.run()
+        try? await Task.sleep(nanoseconds: 100_000_000)
     }
 }
 

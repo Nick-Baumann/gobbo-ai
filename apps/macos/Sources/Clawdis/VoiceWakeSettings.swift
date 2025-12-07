@@ -155,13 +155,15 @@ final class VoiceWakeTester {
         guard let request = recognitionRequest else { return }
 
         self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self, !self.isStopping else { return }
             let text = result?.bestTranscription.formattedString ?? ""
             let matched = Self.matches(text: text, triggers: triggers)
             let isFinal = result?.isFinal ?? false
             let errorMessage = error?.localizedDescription
-            Task { @MainActor [weak self] in
+
+            Task { [weak self] in
                 guard let self, !self.isStopping else { return }
-                self.handleResult(
+                await self.handleResult(
                     matched: matched,
                     text: text,
                     isFinal: isFinal,
@@ -181,14 +183,12 @@ final class VoiceWakeTester {
         self.audioEngine.inputNode.removeTap(onBus: 0)
     }
 
-    @MainActor
     private func handleResult(
         matched: Bool,
         text: String,
         isFinal: Bool,
         errorMessage: String?,
-        onUpdate: @escaping @Sendable (VoiceWakeTestState) -> Void)
-    {
+        onUpdate: @escaping @Sendable (VoiceWakeTestState) -> Void) async {
         if !text.isEmpty {
             self.lastHeard = Date()
         }
@@ -196,30 +196,34 @@ final class VoiceWakeTester {
             self.holdingAfterDetect = true
             self.detectedText = text
             self.logger.info("voice wake detected; forwarding (len=\(text.count))")
-            AppStateStore.shared.triggerVoiceEars()
-            let config = AppStateStore.shared.voiceWakeForwardConfig
+            await MainActor.run { AppStateStore.shared.triggerVoiceEars() }
+            let config = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
             Task.detached {
                 await VoiceWakeForwarder.forward(transcript: text, config: config)
             }
-            onUpdate(.detected(text))
+            Task { @MainActor in onUpdate(.detected(text)) }
             self.holdUntilSilence(onUpdate: onUpdate)
             return
         }
         if let errorMessage {
             self.stop()
-            onUpdate(.failed(errorMessage))
+            Task { @MainActor in onUpdate(.failed(errorMessage)) }
             return
         }
         if isFinal {
             self.stop()
-            onUpdate(text.isEmpty ? .failed("No speech detected") : .failed("No trigger heard: “\(text)”"))
+            let state: VoiceWakeTestState = text.isEmpty
+                ? .failed("No speech detected")
+                : .failed("No trigger heard: “\(text)”")
+            Task { @MainActor in onUpdate(state) }
         } else {
-            onUpdate(text.isEmpty ? .listening : .hearing(text))
+            let state: VoiceWakeTestState = text.isEmpty ? .listening : .hearing(text)
+            Task { @MainActor in onUpdate(state) }
         }
     }
 
     private func holdUntilSilence(onUpdate: @escaping @Sendable (VoiceWakeTestState) -> Void) {
-        Task { @MainActor [weak self] in
+        Task { [weak self] in
             guard let self else { return }
             let start = self.detectionStart ?? Date()
             let deadline = start.addingTimeInterval(10)
@@ -235,7 +239,7 @@ final class VoiceWakeTester {
                 self.stop()
                 if let detectedText {
                     self.logger.info("voice wake hold finished; len=\(detectedText.count)")
-                    onUpdate(.detected(detectedText))
+                    Task { @MainActor in onUpdate(.detected(detectedText)) }
                 }
             }
         }

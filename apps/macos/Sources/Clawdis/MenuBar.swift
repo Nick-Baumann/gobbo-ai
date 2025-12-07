@@ -389,6 +389,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
 
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if self.isDuplicateInstance() {
+            NSApp.terminate(nil)
+            return
+        }
         self.state = AppStateStore.shared
         AppActivationPolicy.apply(showDockIcon: self.state?.showDockIcon ?? false)
         if let state {
@@ -427,5 +431,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
         connection.exportedObject = ClawdisXPCService()
         connection.resume()
         return true
+    }
+
+    private func isDuplicateInstance() -> Bool {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return false }
+        let running = NSWorkspace.shared.runningApplications.filter { $0.bundleIdentifier == bundleID }
+        return running.count > 1
     }
 }
