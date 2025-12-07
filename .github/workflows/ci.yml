@@ -51,10 +51,15 @@ jobs:
         run: pnpm build
 
   macos-app:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26.1
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.1.app
+          xcodebuild -version
 
       - name: Install SwiftLint / SwiftFormat
         run: |
