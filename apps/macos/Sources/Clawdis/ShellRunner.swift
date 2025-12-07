@@ -22,24 +22,32 @@ enum ShellRunner {
             return Response(ok: false, message: "failed to start: \(error.localizedDescription)")
         }
 
-        let waitTask = Task.detached { () -> (Int32, Data, Data) in
+        let waitTask = Task { () -> Response in
             process.waitUntilExit()
             let out = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
             let err = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            return (process.terminationStatus, out, err)
+            let status = process.terminationStatus
+            let combined = out.isEmpty ? err : out
+            return Response(ok: status == 0, message: status == 0 ? nil : "exit \(status)", payload: combined)
         }
 
         if let timeout, timeout > 0 {
             let nanos = UInt64(timeout * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: nanos)
-            if process.isRunning {
-                process.terminate()
-                return Response(ok: false, message: "timeout")
+            let response = await withTaskGroup(of: Response.self) { group in
+                group.addTask { await waitTask.value }
+                group.addTask {
+                    try? await Task.sleep(nanoseconds: nanos)
+                    if process.isRunning { process.terminate() }
+                    _ = await waitTask.value // drain pipes after termination
+                    return Response(ok: false, message: "timeout")
+                }
+                let first = await group.next()!
+                group.cancelAll()
+                return first
             }
+            return response
         }
 
-        let (status, out, err) = await waitTask.value
-        let combined = out.isEmpty ? err : out
-        return Response(ok: status == 0, message: status == 0 ? nil : "exit \(status)", payload: combined)
+        return await waitTask.value
     }
 }
