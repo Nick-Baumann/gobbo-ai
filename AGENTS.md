@@ -32,6 +32,7 @@
 ## Security & Configuration Tips
 - Web provider stores creds at `~/.clawdis/credentials/`; rerun `clawdis login` if logged out.
 - Pi/Tau sessions live under `~/.clawdis/sessions/` by default; the base directory is not configurable.
+- Never commit or publish real phone numbers, videos, or live configuration values. Use obviously fake placeholders in docs, tests, and examples.
 
 ## Agent-Specific Notes
 - Relay is managed by launchctl (label `com.steipete.clawdis`). After code changes restart with `launchctl kickstart -k gui/$UID/com.steipete.clawdis` and verify via `launchctl list | grep clawdis`. Use tmux only if you spin up a temporary relay yourself and clean it up afterward.
