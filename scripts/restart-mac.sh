@@ -14,6 +14,9 @@ LAUNCH_AGENT="${HOME}/Library/LaunchAgents/com.steipete.clawdis.plist"
 log()  { printf '%s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+# Ensure local node binaries (rolldown, tsc, pnpm) are discoverable for the steps below.
+export PATH="${ROOT_DIR}/node_modules/.bin:${PATH}"
+
 run_step() {
   local label="$1"; shift
   log "==> ${label}"

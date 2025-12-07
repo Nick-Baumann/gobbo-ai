@@ -8,6 +8,7 @@ First Clawdis release after the Warelay rebrand. This is a semver-major because 
 - Renamed to **Clawdis**: defaults now live under `~/.clawdis` (sessions in `~/.clawdis/sessions/`, IPC at `~/.clawdis/clawdis.sock`, logs in `/tmp/clawdis`). Launchd labels and config filenames follow the new name; legacy stores are copied forward on first run.
 - Pi/Tau only: `inbound.reply.agent.kind` accepts only `"pi"`, and the agent CLI/CLI flags for Claude/Codex/Gemini were removed. The Pi CLI runs in RPC mode with a persistent worker.
 - WhatsApp Web is the only transport; Twilio support and related CLI flags/tests were removed.
+- Direct chats now collapse into a single `main` session by default (no config needed); groups stay isolated as `group:<jid>`.
 
 ### macOS companion app
 - **Clawdis.app menu bar companion**: packaged, signed bundle with relay start/stop, launchd toggle, project-root and pnpm/node auto-resolution, live log shortcut, restart button, and status/recipient table plus badges/dimming for attention and paused states.
@@ -31,6 +32,10 @@ First Clawdis release after the Warelay rebrand. This is a semver-major because 
 - Media server blocks symlink/path traversal, clears temporary downloads, and rotates logs daily (24h retention).
 - Session store purged on logout; IPC socket directory permissions tightened (0700/0600).
 - Launchd PATH and helper lookup hardened for packaged macOS builds; health probes surface missing binaries quickly.
+
+### Docs
+- Added `docs/telegram.md` outlining the upcoming Telegram Bot API provider (grammY-based) and how it will share the `main` session.
+- CLI now exposes `relay:telegram` and text/media sends via `--provider telegram`; typing/webhook still pending.
 
 ## 1.5.0 — 2025-12-05
 

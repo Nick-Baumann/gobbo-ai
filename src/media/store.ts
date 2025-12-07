@@ -8,7 +8,7 @@ import { CONFIG_DIR } from "../utils.js";
 import { detectMime, extensionForMime } from "./mime.js";
 
 const MEDIA_DIR = path.join(CONFIG_DIR, "media");
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_BYTES = 5 * 1024 * 1024; // 5MB default
 const DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 export function getMediaDir() {
@@ -159,9 +159,12 @@ export async function saveMediaBuffer(
   buffer: Buffer,
   contentType?: string,
   subdir = "inbound",
+  maxBytes = MAX_BYTES,
 ): Promise<SavedMedia> {
-  if (buffer.byteLength > MAX_BYTES) {
-    throw new Error("Media exceeds 5MB limit");
+  if (buffer.byteLength > maxBytes) {
+    throw new Error(
+      `Media exceeds ${(maxBytes / (1024 * 1024)).toFixed(0)}MB limit`,
+    );
   }
   const dir = path.join(MEDIA_DIR, subdir);
   await fs.mkdir(dir, { recursive: true });

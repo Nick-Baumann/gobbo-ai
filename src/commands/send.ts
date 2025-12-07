@@ -7,6 +7,7 @@ export async function sendCommand(
   opts: {
     to: string;
     message: string;
+    provider?: string;
     json?: boolean;
     dryRun?: boolean;
     media?: string;
@@ -14,10 +15,41 @@ export async function sendCommand(
   deps: CliDeps,
   runtime: RuntimeEnv,
 ) {
+  const provider = (opts.provider ?? "whatsapp").toLowerCase();
+
   if (opts.dryRun) {
     runtime.log(
-      `[dry-run] would send via web -> ${opts.to}: ${opts.message}${opts.media ? ` (media ${opts.media})` : ""}`,
+      `[dry-run] would send via ${provider} -> ${opts.to}: ${opts.message}${opts.media ? ` (media ${opts.media})` : ""}`,
     );
+    return;
+  }
+
+  if (provider === "telegram") {
+    const result = await deps.sendMessageTelegram(opts.to, opts.message, {
+      token: process.env.TELEGRAM_BOT_TOKEN,
+      mediaUrl: opts.media,
+    });
+    runtime.log(
+      success(
+        `✅ Sent via telegram. Message ID: ${result.messageId} (chat ${result.chatId})`,
+      ),
+    );
+    if (opts.json) {
+      runtime.log(
+        JSON.stringify(
+          {
+            provider: "telegram",
+            via: "direct",
+            to: opts.to,
+            chatId: result.chatId,
+            messageId: result.messageId,
+            mediaUrl: opts.media ?? null,
+          },
+          null,
+          2,
+        ),
+      );
+    }
     return;
   }
 
@@ -55,7 +87,7 @@ export async function sendCommand(
 
   // Fall back to direct connection (creates new Baileys socket)
   const res = await deps
-    .sendMessageWeb(opts.to, opts.message, {
+    .sendMessageWhatsApp(opts.to, opts.message, {
       verbose: false,
       mediaUrl: opts.media,
     })

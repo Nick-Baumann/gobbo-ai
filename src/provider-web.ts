@@ -19,7 +19,7 @@ export {
 } from "./web/inbound.js";
 export { loginWeb } from "./web/login.js";
 export { loadWebMedia, optimizeImageToJpeg } from "./web/media.js";
-export { sendMessageWeb } from "./web/outbound.js";
+export { sendMessageWhatsApp } from "./web/outbound.js";
 export {
   createWaSocket,
   formatError,

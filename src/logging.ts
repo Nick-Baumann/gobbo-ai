@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import util from "node:util";
 
-import pino, { type Bindings, type LevelWithSilent, type Logger } from "pino";
+import { Logger as TsLogger } from "tslog";
 import { loadConfig, type WarelayConfig } from "./config/config.js";
 import { isVerbose } from "./globals.js";
 
@@ -15,7 +15,7 @@ const LOG_PREFIX = "clawdis";
 const LOG_SUFFIX = ".log";
 const MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 
-const ALLOWED_LEVELS: readonly LevelWithSilent[] = [
+const ALLOWED_LEVELS = [
   "silent",
   "fatal",
   "error",
@@ -23,30 +23,32 @@ const ALLOWED_LEVELS: readonly LevelWithSilent[] = [
   "info",
   "debug",
   "trace",
-];
+] as const;
+
+type Level = (typeof ALLOWED_LEVELS)[number];
 
 export type LoggerSettings = {
-  level?: LevelWithSilent;
+  level?: Level;
   file?: string;
 };
 
+type LogObj = Record<string, unknown>;
+
 type ResolvedSettings = {
-  level: LevelWithSilent;
+  level: Level;
   file: string;
 };
 export type LoggerResolvedSettings = ResolvedSettings;
 
-let cachedLogger: Logger | null = null;
+let cachedLogger: TsLogger<LogObj> | null = null;
 let cachedSettings: ResolvedSettings | null = null;
 let overrideSettings: LoggerSettings | null = null;
 let consolePatched = false;
 
-function normalizeLevel(level?: string): LevelWithSilent {
+function normalizeLevel(level?: string): Level {
   if (isVerbose()) return "trace";
   const candidate = level ?? "info";
-  return ALLOWED_LEVELS.includes(candidate as LevelWithSilent)
-    ? (candidate as LevelWithSilent)
-    : "info";
+  return ALLOWED_LEVELS.includes(candidate as Level) ? (candidate as Level) : "info";
 }
 
 function resolveSettings(): ResolvedSettings {
@@ -62,28 +64,48 @@ function settingsChanged(a: ResolvedSettings | null, b: ResolvedSettings) {
   return a.level !== b.level || a.file !== b.file;
 }
 
-function buildLogger(settings: ResolvedSettings): Logger {
+function levelToMinLevel(level: Level): number {
+  // tslog level ordering: fatal=0, error=1, warn=2, info=3, debug=4, trace=5
+  const map: Record<Level, number> = {
+    fatal: 0,
+    error: 1,
+    warn: 2,
+    info: 3,
+    debug: 4,
+    trace: 5,
+    silent: Number.POSITIVE_INFINITY,
+  };
+  return map[level];
+}
+
+function buildLogger(settings: ResolvedSettings): TsLogger<LogObj> {
   fs.mkdirSync(path.dirname(settings.file), { recursive: true });
   // Clean up stale rolling logs when using a dated log filename.
   if (isRollingPath(settings.file)) {
     pruneOldRollingLogs(path.dirname(settings.file));
   }
-  const destination = pino.destination({
-    dest: settings.file,
-    mkdir: true,
-    sync: true, // deterministic for tests; log volume is modest.
+  const logger = new TsLogger<LogObj>({
+    name: "clawdis",
+    minLevel: levelToMinLevel(settings.level),
+    type: "hidden", // no ansi formatting
   });
-  return pino(
-    {
-      level: settings.level,
-      base: undefined,
-      timestamp: pino.stdTimeFunctions.isoTime,
-    },
-    destination,
+
+  logger.attachTransport(
+    (logObj) => {
+      try {
+        const time = (logObj as any)?.date?.toISOString?.() ?? new Date().toISOString();
+        const line = JSON.stringify({ ...logObj, time });
+        fs.appendFileSync(settings.file, line + "\n", { encoding: "utf8" });
+      } catch {
+        // never block on logging failures
+      }
+    }
   );
+
+  return logger;
 }
 
-export function getLogger(): Logger {
+export function getLogger(): TsLogger<LogObj> {
   const settings = resolveSettings();
   if (!cachedLogger || settingsChanged(cachedSettings, settings)) {
     cachedLogger = buildLogger(settings);
@@ -93,11 +115,54 @@ export function getLogger(): Logger {
 }
 
 export function getChildLogger(
-  bindings?: Bindings,
-  opts?: { level?: LevelWithSilent },
-): Logger {
-  return getLogger().child(bindings ?? {}, opts);
+  bindings?: Record<string, unknown>,
+  opts?: { level?: Level },
+): TsLogger<LogObj> {
+  const base = getLogger();
+  const minLevel = opts?.level ? levelToMinLevel(opts.level) : undefined;
+  const name = bindings ? JSON.stringify(bindings) : undefined;
+  return base.getSubLogger({
+    name,
+    minLevel,
+    prefix: bindings ? [name ?? ""] : [],
+  });
 }
+
+export type LogLevel = Level;
+
+// Baileys expects a pino-like logger shape. Provide a lightweight adapter.
+export function toPinoLikeLogger(
+  logger: TsLogger<LogObj>,
+  level: Level,
+): PinoLikeLogger {
+  const buildChild = (bindings?: Record<string, unknown>) =>
+    toPinoLikeLogger(
+      logger.getSubLogger({ name: bindings ? JSON.stringify(bindings) : undefined }),
+      level,
+    );
+
+  return {
+    level,
+    child: buildChild,
+    trace: (...args: unknown[]) => logger.trace(...args),
+    debug: (...args: unknown[]) => logger.debug(...args),
+    info: (...args: unknown[]) => logger.info(...args),
+    warn: (...args: unknown[]) => logger.warn(...args),
+    error: (...args: unknown[]) => logger.error(...args),
+    fatal: (...args: unknown[]) => logger.fatal(...args),
+  };
+}
+
+export type PinoLikeLogger = {
+  level: string;
+  child: (bindings?: Record<string, unknown>) => PinoLikeLogger;
+  trace: (...args: unknown[]) => void;
+  debug: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  fatal: (...args: unknown[]) => void;
+};
 
 export function getResolvedLoggerSettings(): LoggerResolvedSettings {
   return resolveSettings();
@@ -136,7 +201,7 @@ export function enableConsoleCapture(): void {
   };
 
   const forward =
-    (level: LevelWithSilent, orig: (...args: unknown[]) => void) =>
+    (level: Level, orig: (...args: unknown[]) => void) =>
     (...args: unknown[]) => {
       const formatted = util.format(...args);
       try {

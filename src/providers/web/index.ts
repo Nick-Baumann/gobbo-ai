@@ -6,7 +6,7 @@ export {
   monitorWebInbox,
   monitorWebProvider,
   pickProvider,
-  sendMessageWeb,
+  sendMessageWhatsApp,
   WA_WEB_AUTH_DIR,
   waitForWaConnection,
   webAuthExists,

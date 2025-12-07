@@ -9,7 +9,7 @@ import { toWhatsappJid } from "../utils.js";
 import { loadWebMedia } from "./media.js";
 import { createWaSocket, waitForWaConnection } from "./session.js";
 
-export async function sendMessageWeb(
+export async function sendMessageWhatsApp(
   to: string,
   body: string,
   options: { verbose: boolean; mediaUrl?: string },

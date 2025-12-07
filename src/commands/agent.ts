@@ -378,13 +378,13 @@ export async function agentCommand(
       }
       if (!sentViaIpc) {
         if (text || media.length === 0) {
-          await deps.sendMessageWeb(targetTo, text, {
+          await deps.sendMessageWhatsApp(targetTo, text, {
             verbose: false,
             mediaUrl: media[0],
           });
         }
         for (const extra of media.slice(1)) {
-          await deps.sendMessageWeb(targetTo, "", {
+          await deps.sendMessageWhatsApp(targetTo, "", {
             verbose: false,
             mediaUrl: extra,
           });

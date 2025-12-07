@@ -30,7 +30,7 @@ import { assertProvider, normalizeE164, toWhatsappJid } from "./utils.js";
 
 dotenv.config({ quiet: true });
 
-// Capture all console output into pino logs while keeping stdout/stderr behavior.
+// Capture all console output into structured logs while keeping stdout/stderr behavior.
 enableConsoleCapture();
 
 import { buildProgram } from "./cli/program.js";

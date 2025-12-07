@@ -18,7 +18,8 @@ const runtime: RuntimeEnv = {
 };
 
 const makeDeps = (overrides: Partial<CliDeps> = {}): CliDeps => ({
-  sendMessageWeb: vi.fn(),
+  sendMessageWhatsApp: vi.fn(),
+  sendMessageTelegram: vi.fn(),
   ...overrides,
 });
 
@@ -34,7 +35,7 @@ describe("sendCommand", () => {
       deps,
       runtime,
     );
-    expect(deps.sendMessageWeb).not.toHaveBeenCalled();
+    expect(deps.sendMessageWhatsApp).not.toHaveBeenCalled();
   });
 
   it("uses IPC when available", async () => {
@@ -48,14 +49,16 @@ describe("sendCommand", () => {
       deps,
       runtime,
     );
-    expect(deps.sendMessageWeb).not.toHaveBeenCalled();
+    expect(deps.sendMessageWhatsApp).not.toHaveBeenCalled();
     expect(runtime.log).toHaveBeenCalledWith(expect.stringContaining("ipc1"));
   });
 
   it("falls back to direct send when IPC fails", async () => {
     sendViaIpcMock.mockResolvedValueOnce({ success: false, error: "nope" });
     const deps = makeDeps({
-      sendMessageWeb: vi.fn().mockResolvedValue({ messageId: "direct1" }),
+      sendMessageWhatsApp: vi
+        .fn()
+        .mockResolvedValue({ messageId: "direct1" }),
     });
     await sendCommand(
       {
@@ -66,13 +69,34 @@ describe("sendCommand", () => {
       deps,
       runtime,
     );
-    expect(deps.sendMessageWeb).toHaveBeenCalled();
+    expect(deps.sendMessageWhatsApp).toHaveBeenCalled();
+  });
+
+  it("routes to telegram provider", async () => {
+    const deps = makeDeps({
+      sendMessageTelegram: vi
+        .fn()
+        .mockResolvedValue({ messageId: "t1", chatId: "123" }),
+    });
+    await sendCommand(
+      { to: "123", message: "hi", provider: "telegram" },
+      deps,
+      runtime,
+    );
+    expect(deps.sendMessageTelegram).toHaveBeenCalledWith(
+      "123",
+      "hi",
+      expect.objectContaining({ token: expect.any(String) }),
+    );
+    expect(deps.sendMessageWhatsApp).not.toHaveBeenCalled();
   });
 
   it("emits json output", async () => {
     sendViaIpcMock.mockResolvedValueOnce(null);
     const deps = makeDeps({
-      sendMessageWeb: vi.fn().mockResolvedValue({ messageId: "direct2" }),
+      sendMessageWhatsApp: vi
+        .fn()
+        .mockResolvedValue({ messageId: "direct2" }),
     });
     await sendCommand(
       {

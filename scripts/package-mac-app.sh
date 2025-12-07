@@ -119,7 +119,10 @@ pnpm install \
   --config.shared-workspace-lockfile=false \
   --lockfile-dir "$ROOT_DIR" \
   --dir "$TMP_DEPLOY"
-rsync -aL "$TMP_DEPLOY/node_modules" "$RELAY_DIR/"
+PNPM_STORE_DIR="$TMP_DEPLOY/.pnpm-store" \
+PNPM_HOME="$HOME/Library/pnpm" \
+pnpm rebuild sharp --config.ignore-workspace-root-check=true --dir "$TMP_DEPLOY"
+rsync -aL "$TMP_DEPLOY/node_modules/" "$RELAY_DIR/node_modules/"
 rm -rf "$TMP_DEPLOY"
 
 if [ -f "$CLI_BIN" ]; then

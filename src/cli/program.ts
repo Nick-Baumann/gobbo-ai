@@ -135,15 +135,19 @@ export function buildProgram() {
 
   program
     .command("send")
-    .description("Send a WhatsApp message (web provider)")
+    .description("Send a message (WhatsApp web or Telegram bot)")
     .requiredOption(
       "-t, --to <number>",
-      "Recipient number in E.164 (e.g. +15555550123)",
+      "Recipient: E.164 for WhatsApp (e.g. +15555550123) or Telegram chat id/@username",
     )
     .requiredOption("-m, --message <text>", "Message body")
     .option(
       "--media <path-or-url>",
       "Attach media (image/audio/video/document). Accepts local paths or URLs.",
+    )
+    .option(
+      "--provider <provider>",
+      "Delivery provider: whatsapp|telegram (default: whatsapp)",
     )
     .option("--dry-run", "Print payload and skip sending", false)
     .option("--json", "Output result as JSON", false)
@@ -558,6 +562,42 @@ Examples:
             `Web relay failed: ${String(err)}. Re-link with 'clawdis login --provider web'.`,
           ),
         );
+        defaultRuntime.exit(1);
+      }
+    });
+
+  program
+    .command("relay:telegram")
+    .description("Auto-reply to Telegram (Bot API, long-poll)")
+    .option("--verbose", "Verbose logging", false)
+    .addHelpText(
+      "after",
+      `
+Examples:
+  clawdis relay:telegram                # uses TELEGRAM_BOT_TOKEN env
+  TELEGRAM_BOT_TOKEN=xxx clawdis relay:telegram --verbose
+`,
+    )
+    .action(async (opts) => {
+      setVerbose(Boolean(opts.verbose));
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (!token) {
+        defaultRuntime.error(
+          danger("Set TELEGRAM_BOT_TOKEN to use telegram relay"),
+        );
+        defaultRuntime.exit(1);
+        return;
+      }
+      try {
+        await import("../telegram/monitor.js").then((m) =>
+          m.monitorTelegramProvider({
+            verbose: Boolean(opts.verbose),
+            token,
+            runtime: defaultRuntime,
+          }),
+        );
+      } catch (err) {
+        defaultRuntime.error(danger(`Telegram relay failed: ${String(err)}`));
         defaultRuntime.exit(1);
       }
     });
