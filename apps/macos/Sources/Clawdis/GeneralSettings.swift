@@ -90,11 +90,13 @@ var body: some View {
                 Text("Remote over SSH").tag(AppState.ConnectionMode.remote)
             }
             .pickerStyle(.segmented)
-            .frame(width: 320)
+            .frame(width: 360)
 
             if self.state.connectionMode == .remote {
                 self.remoteCard
             }
+
+            self.healthRow
         }
     }
 
