@@ -89,11 +89,21 @@ private struct MenuContent: View {
             Circle()
                 .fill(self.statusColor(status))
                 .frame(width: 8, height: 8)
-            Text(status.label)
+            Text(self.relayLabel(status))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
         }
         .padding(.vertical, 4)
+    }
+
+    private func relayLabel(_ status: RelayProcessManager.Status) -> String {
+        switch status {
+        case .running: return "Running"
+        case .starting: return "Starting…"
+        case .restarting: return "Restarting…"
+        case let .failed(reason): return "Failed: \(reason)"
+        case .stopped: return "Stopped"
+        }
     }
 
     private var healthStatusRow: some View {
