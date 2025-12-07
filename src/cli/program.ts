@@ -568,7 +568,7 @@ Examples:
 
   program
     .command("relay:telegram")
-    .description("Auto-reply to Telegram (Bot API, long-poll)")
+    .description("Auto-reply to Telegram (Bot API via grammY)")
     .option("--verbose", "Verbose logging", false)
     .option("--webhook", "Run webhook server instead of long-poll", false)
     .option(
@@ -582,6 +582,10 @@ Examples:
     .option(
       "--port <port>",
       "Port for webhook server (default 8787)",
+    )
+    .option(
+      "--webhook-url <url>",
+      "Public webhook URL to register (overrides localhost autodetect)",
     )
     .addHelpText(
       "after",
@@ -608,15 +612,19 @@ Examples:
         const port = opts.port ? Number.parseInt(String(opts.port), 10) : 8787;
         const path = opts.webhookPath ?? "/telegram-webhook";
         try {
-          await import("../telegram/webhook-server.js").then((m) =>
-            m.startTelegramWebhookServer({
-              token,
-              port,
-              path,
-              secret: opts.webhookSecret ?? loadConfig().telegram?.webhookSecret,
-              runtime: defaultRuntime,
-            }),
-          );
+          const { monitorTelegramProvider } = await import("../telegram/monitor.js");
+          await monitorTelegramProvider({
+            token,
+            useWebhook: true,
+            webhookPath: path,
+            webhookPort: port,
+            webhookSecret:
+              opts.webhookSecret ?? loadConfig().telegram?.webhookSecret,
+            runtime: defaultRuntime,
+            proxyFetch: undefined,
+            // register with provided public URL when given
+            webhookUrl: opts.webhookUrl,
+          });
         } catch (err) {
           defaultRuntime.error(
             danger(`Telegram webhook server failed: ${String(err)}`),
@@ -628,7 +636,6 @@ Examples:
       try {
         await import("../telegram/monitor.js").then((m) =>
           m.monitorTelegramProvider({
-            verbose: Boolean(opts.verbose),
             token,
             runtime: defaultRuntime,
           }),
