@@ -1,9 +1,9 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { agentCommand } from "../commands/agent.js";
+import { healthCommand } from "../commands/health.js";
 import { sendCommand } from "../commands/send.js";
 import { sessionsCommand } from "../commands/sessions.js";
-import { healthCommand } from "../commands/health.js";
 import { statusCommand } from "../commands/status.js";
 import { loadConfig } from "../config/config.js";
 import { danger, info, setVerbose } from "../globals.js";
@@ -236,6 +236,10 @@ Examples:
         if (!line.trim()) return;
         try {
           const cmd = JSON.parse(line);
+          if (cmd.type === "status") {
+            respond({ type: "result", ok: true });
+            return;
+          }
           if (cmd.type !== "send" || !cmd.text) {
             respond({ type: "error", error: "unsupported command" });
             return;
@@ -253,12 +257,14 @@ Examples:
             to?: string;
             sessionId?: string;
             thinking?: string;
+            deliver?: boolean;
             json: boolean;
           } = {
             message: String(cmd.text),
             to: cmd.to ? String(cmd.to) : undefined,
             sessionId: cmd.session ? String(cmd.session) : undefined,
             thinking: cmd.thinking ? String(cmd.thinking) : undefined,
+            deliver: Boolean(cmd.deliver),
             json: true,
           };
 
@@ -572,20 +578,29 @@ Examples:
 
   program
     .command("health")
-    .description("Probe WhatsApp Web health (creds + Baileys connect) and session store")
+    .description(
+      "Probe WhatsApp Web health (creds + Baileys connect) and session store",
+    )
     .option("--json", "Output JSON instead of text", false)
     .option("--timeout <ms>", "Connection timeout in milliseconds", "10000")
     .option("--verbose", "Verbose logging", false)
     .action(async (opts) => {
       setVerbose(Boolean(opts.verbose));
-      const timeout = opts.timeout ? Number.parseInt(String(opts.timeout), 10) : undefined;
+      const timeout = opts.timeout
+        ? Number.parseInt(String(opts.timeout), 10)
+        : undefined;
       if (timeout !== undefined && (Number.isNaN(timeout) || timeout <= 0)) {
-        defaultRuntime.error("--timeout must be a positive integer (milliseconds)");
+        defaultRuntime.error(
+          "--timeout must be a positive integer (milliseconds)",
+        );
         defaultRuntime.exit(1);
         return;
       }
       try {
-        await healthCommand({ json: Boolean(opts.json), timeoutMs: timeout }, defaultRuntime);
+        await healthCommand(
+          { json: Boolean(opts.json), timeoutMs: timeout },
+          defaultRuntime,
+        );
       } catch (err) {
         defaultRuntime.error(String(err));
         defaultRuntime.exit(1);

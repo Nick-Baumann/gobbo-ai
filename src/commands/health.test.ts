@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { healthCommand } from "./health.js";
 
@@ -23,7 +23,10 @@ const waitForWaConnection = vi.fn();
 const webAuthExists = vi.fn();
 
 vi.mock("../web/session.js", () => ({
-  createWaSocket: vi.fn(async () => ({ ws: { close: vi.fn() }, ev: { on: vi.fn() } })),
+  createWaSocket: vi.fn(async () => ({
+    ws: { close: vi.fn() },
+    ev: { on: vi.fn() },
+  })),
   waitForWaConnection: (...args: unknown[]) => waitForWaConnection(...args),
   webAuthExists: (...args: unknown[]) => webAuthExists(...args),
   getStatusCode: vi.fn(() => 440),

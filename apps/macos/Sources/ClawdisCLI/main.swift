@@ -140,6 +140,8 @@ struct ClawdisCLI {
             var message: String?
             var thinking: String?
             var session: String?
+            var deliver = false
+            var to: String?
 
             while !args.isEmpty {
                 let arg = args.removeFirst()
@@ -147,6 +149,8 @@ struct ClawdisCLI {
                 case "--message": message = args.popFirst()
                 case "--thinking": thinking = args.popFirst()
                 case "--session": session = args.popFirst()
+                case "--deliver": deliver = true
+                case "--to": to = args.popFirst()
                 default:
                     // Support bare message as last argument
                     if message == nil {
@@ -156,7 +160,7 @@ struct ClawdisCLI {
             }
 
             guard let message else { throw CLIError.help }
-            return .agent(message: message, thinking: thinking, session: session)
+            return .agent(message: message, thinking: thinking, session: session, deliver: deliver, to: to)
 
         default:
             throw CLIError.help
@@ -178,7 +182,7 @@ struct ClawdisCLI {
           clawdis-mac run [--cwd <path>] [--env KEY=VAL] [--timeout <sec>] [--needs-screen-recording] <command ...>
           clawdis-mac status
           clawdis-mac rpc-status
-          clawdis-mac agent --message <text> [--thinking <low|default|high>] [--session <key>]
+          clawdis-mac agent --message <text> [--thinking <low|default|high>] [--session <key>] [--deliver] [--to <E.164>]
           clawdis-mac --help
 
         Returns JSON to stdout:

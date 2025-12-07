@@ -13,17 +13,25 @@ actor AgentRPC {
 
     private struct RpcError: Error { let message: String }
 
-    func send(text: String, thinking: String?, session: String) async -> (ok: Bool, text: String?, error: String?) {
+    func send(
+        text: String,
+        thinking: String?,
+        session: String,
+        deliver: Bool,
+        to: String?) async -> (ok: Bool, text: String?, error: String?)
+    {
         guard process?.isRunning == true else {
             return (false, nil, "rpc worker not running")
         }
         do {
-            let payload: [String: Any] = [
+            var payload: [String: Any] = [
                 "type": "send",
                 "text": text,
                 "session": session,
                 "thinking": thinking ?? "default",
+                "deliver": deliver,
             ]
+            if let to { payload["to"] = to }
             let data = try JSONSerialization.data(withJSONObject: payload)
             guard let stdinHandle else { throw RpcError(message: "stdin missing") }
             stdinHandle.write(data)

@@ -23,6 +23,7 @@ import {
 } from "../config/sessions.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
+import { normalizeE164 } from "../utils.js";
 import { sendViaIpc } from "../web/ipc.js";
 
 type AgentCommandOpts = {
@@ -162,13 +163,13 @@ export async function agentCommand(
   if (!opts.to && !opts.sessionId) {
     throw new Error("Pass --to <E.164> or --session-id to choose a session");
   }
-  if (opts.deliver && !opts.to) {
-    throw new Error("Delivering to WhatsApp requires --to <E.164>");
-  }
 
   const cfg = loadConfig();
   const replyCfg = assertCommandConfig(cfg);
   const sessionCfg = replyCfg.session;
+  const allowFrom = (cfg.inbound?.allowFrom ?? [])
+    .map((val) => normalizeE164(val))
+    .filter((val) => val.length > 1);
 
   const thinkOverride = normalizeThinkLevel(opts.thinking);
   if (opts.thinking && !thinkOverride) {
@@ -340,6 +341,12 @@ export async function agentCommand(
   }
 
   const deliver = opts.deliver === true;
+  const targetTo = opts.to ? normalizeE164(opts.to) : allowFrom[0];
+  if (deliver && !targetTo) {
+    throw new Error(
+      "Delivering to WhatsApp requires --to <E.164> or inbound.allowFrom[0]",
+    );
+  }
 
   for (const payload of payloads) {
     const lines: string[] = [];
@@ -351,29 +358,29 @@ export async function agentCommand(
     }
     runtime.log(lines.join("\n"));
 
-    if (deliver && opts.to) {
+    if (deliver && targetTo) {
       const text = payload.text ?? "";
       const media = mediaList;
       // Prefer IPC to reuse the running relay; fall back to direct web send.
       let sentViaIpc = false;
-      const ipcResult = await sendViaIpc(opts.to, text, media[0]);
+      const ipcResult = await sendViaIpc(targetTo, text, media[0]);
       if (ipcResult) {
         sentViaIpc = ipcResult.success;
         if (ipcResult.success && media.length > 1) {
           for (const extra of media.slice(1)) {
-            await sendViaIpc(opts.to, "", extra);
+            await sendViaIpc(targetTo, "", extra);
           }
         }
       }
       if (!sentViaIpc) {
         if (text || media.length === 0) {
-          await deps.sendMessageWeb(opts.to, text, {
+          await deps.sendMessageWeb(targetTo, text, {
             verbose: false,
             mediaUrl: media[0],
           });
         }
         for (const extra of media.slice(1)) {
-          await deps.sendMessageWeb(opts.to, "", {
+          await deps.sendMessageWeb(targetTo, "", {
             verbose: false,
             mediaUrl: extra,
           });

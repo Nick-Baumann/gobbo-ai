@@ -2,10 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadConfig } from "../config/config.js";
-import {
-  loadSessionStore,
-  resolveStorePath,
-} from "../config/sessions.js";
+import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { info } from "../globals.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { resolveHeartbeatSeconds } from "../web/reconnect.js";
@@ -37,7 +34,11 @@ type HealthSummary = {
   sessions: {
     path: string;
     count: number;
-    recent: Array<{ key: string; updatedAt: number | null; age: number | null }>;
+    recent: Array<{
+      key: string;
+      updatedAt: number | null;
+      age: number | null;
+    }>;
   };
   ipc: { path: string; exists: boolean };
 };
@@ -54,7 +55,12 @@ async function probeWebConnect(timeoutMs: number): Promise<HealthConnect> {
         setTimeout(() => reject(new Error("timeout")), timeoutMs),
       ),
     ]);
-    return { ok: true, status: null, error: null, elapsedMs: Date.now() - started };
+    return {
+      ok: true,
+      status: null,
+      error: null,
+      elapsedMs: Date.now() - started,
+    };
   } catch (err) {
     return {
       ok: false,
@@ -126,18 +132,25 @@ export async function healthCommand(
     }
     if (connect) {
       const base = connect.ok
-        ? info(`Connect: ok (${connect.elapsedMs}ms)`) : `Connect: failed (${connect.status ?? "unknown"})`;
+        ? info(`Connect: ok (${connect.elapsedMs}ms)`)
+        : `Connect: failed (${connect.status ?? "unknown"})`;
       runtime.log(base + (connect.error ? ` - ${connect.error}` : ""));
     }
     runtime.log(info(`Heartbeat interval: ${heartbeatSeconds}s`));
-    runtime.log(info(`Session store: ${storePath} (${sessions.length} entries)`));
+    runtime.log(
+      info(`Session store: ${storePath} (${sessions.length} entries)`),
+    );
     if (recent.length > 0) {
       runtime.log("Recent sessions:");
       for (const r of recent) {
-        runtime.log(`- ${r.key} (${r.updatedAt ? `${Math.round((Date.now() - r.updatedAt) / 60000)}m ago` : "no activity"})`);
+        runtime.log(
+          `- ${r.key} (${r.updatedAt ? `${Math.round((Date.now() - r.updatedAt) / 60000)}m ago` : "no activity"})`,
+        );
       }
     }
-    runtime.log(info(`IPC socket: ${ipcExists ? "present" : "missing"} (${ipcPath})`));
+    runtime.log(
+      info(`IPC socket: ${ipcExists ? "present" : "missing"} (${ipcPath})`),
+    );
   }
 
   if (fatal) {

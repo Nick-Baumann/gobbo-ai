@@ -11,7 +11,7 @@ import Testing
     }
 
     @Test func rejectEmptyMessage() async {
-        let result = await AgentRPC.shared.send(text: "", thinking: nil, session: "main")
+        let result = await AgentRPC.shared.send(text: "", thinking: nil, session: "main", deliver: false, to: nil)
         #expect(result.ok == false)
     }
 }

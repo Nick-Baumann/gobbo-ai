@@ -72,14 +72,16 @@ final class ClawdisXPCService: NSObject, ClawdisXPCProtocol {
             }
             return await ShellRunner.run(command: command, cwd: cwd, env: env, timeout: timeoutSec)
 
-        case let .agent(message, thinking, session):
+        case let .agent(message, thinking, session, deliver, to):
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return Response(ok: false, message: "message empty") }
             let sessionKey = session ?? "main"
             let rpcResult = await AgentRPC.shared.send(
                 text: trimmed,
                 thinking: thinking,
-                session: sessionKey)
+                session: sessionKey,
+                deliver: deliver,
+                to: to)
             return rpcResult.ok
                 ? Response(ok: true, message: rpcResult.text ?? "sent")
                 : Response(ok: false, message: rpcResult.error ?? "failed to send")
@@ -89,12 +91,16 @@ final class ClawdisXPCService: NSObject, ClawdisXPCProtocol {
     private static func runAgentCLI(
         message: String,
         thinking: String?,
-        session: String) async -> (ok: Bool, text: String?, error: String?)
+        session: String,
+        deliver: Bool,
+        to: String?) async -> (ok: Bool, text: String?, error: String?)
     {
         let projectRoot = CommandResolver.projectRootPath()
         var command = CommandResolver.clawdisCommand(subcommand: "agent")
         command += ["--message", message, "--json"]
-        if !session.isEmpty { command += ["--to", session] }
+        if let to { command += ["--to", to] }
+        if deliver { command += ["--deliver"] }
+        if !session.isEmpty { command += ["--session-id", session] }
         if let thinking { command += ["--thinking", thinking] }
 
         let process = Process()

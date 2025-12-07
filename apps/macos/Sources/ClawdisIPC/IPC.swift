@@ -25,7 +25,7 @@ public enum Request: Sendable {
         timeoutSec: Double?,
         needsScreenRecording: Bool)
     case status
-    case agent(message: String, thinking: String?, session: String?)
+    case agent(message: String, thinking: String?, session: String?, deliver: Bool, to: String?)
     case rpcStatus
 }
 
@@ -53,7 +53,7 @@ extension Request: Codable {
         case caps, interactive
         case displayID, windowID, format
         case command, cwd, env, timeoutSec, needsScreenRecording
-        case message, thinking, session
+        case message, thinking, session, deliver, to
         case rpcStatus
     }
 
@@ -98,11 +98,13 @@ extension Request: Codable {
         case .status:
             try container.encode(Kind.status, forKey: .type)
 
-        case let .agent(message, thinking, session):
+        case let .agent(message, thinking, session, deliver, to):
             try container.encode(Kind.agent, forKey: .type)
             try container.encode(message, forKey: .message)
             try container.encodeIfPresent(thinking, forKey: .thinking)
             try container.encodeIfPresent(session, forKey: .session)
+            try container.encode(deliver, forKey: .deliver)
+            try container.encodeIfPresent(to, forKey: .to)
 
         case .rpcStatus:
             try container.encode(Kind.rpcStatus, forKey: .type)
@@ -145,7 +147,9 @@ extension Request: Codable {
             let message = try container.decode(String.self, forKey: .message)
             let thinking = try container.decodeIfPresent(String.self, forKey: .thinking)
             let session = try container.decodeIfPresent(String.self, forKey: .session)
-            self = .agent(message: message, thinking: thinking, session: session)
+            let deliver = try container.decode(Bool.self, forKey: .deliver)
+            let to = try container.decodeIfPresent(String.self, forKey: .to)
+            self = .agent(message: message, thinking: thinking, session: session, deliver: deliver, to: to)
 
         case .rpcStatus:
             self = .rpcStatus
