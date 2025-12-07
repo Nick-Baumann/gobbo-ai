@@ -83,7 +83,7 @@ final class AppState: ObservableObject {
     init() {
         self.isPaused = UserDefaults.standard.bool(forKey: pauseDefaultsKey)
         self.defaultSound = UserDefaults.standard.string(forKey: "clawdis.defaultSound") ?? ""
-        self.launchAtLogin = SMAppService.mainApp.status == .enabled
+        self.launchAtLogin = LaunchAgentManager.status()
         self.onboardingSeen = UserDefaults.standard.bool(forKey: "clawdis.onboardingSeen")
         self.debugPaneEnabled = UserDefaults.standard.bool(forKey: "clawdis.debugPaneEnabled")
         let savedVoiceWake = UserDefaults.standard.bool(forKey: swabbleEnabledKey)
@@ -125,11 +125,7 @@ enum AppStateStore {
     static var defaultSound: String { UserDefaults.standard.string(forKey: "clawdis.defaultSound") ?? "" }
 
     static func updateLaunchAtLogin(enabled: Bool) {
-        if enabled {
-            try? SMAppService.mainApp.register()
-        } else {
-            try? SMAppService.mainApp.unregister()
-        }
+        LaunchAgentManager.set(enabled: enabled, bundlePath: Bundle.main.bundlePath)
     }
 }
 

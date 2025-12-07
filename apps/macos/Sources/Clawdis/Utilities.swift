@@ -20,6 +20,76 @@ enum LaunchdManager {
     }
 }
 
+enum LaunchAgentManager {
+    private static var plistURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/com.steipete.clawdis.plist")
+    }
+
+    static func status() -> Bool {
+        guard FileManager.default.fileExists(atPath: self.plistURL.path) else { return false }
+        let result = self.runLaunchctl(["print", "gui/\(getuid())/\(launchdLabel)"])
+        return result == 0
+    }
+
+    static func set(enabled: Bool, bundlePath: String) {
+        if enabled {
+            self.writePlist(bundlePath: bundlePath)
+            _ = self.runLaunchctl(["bootout", "gui/\(getuid())/\(launchdLabel)"])
+            _ = self.runLaunchctl(["bootstrap", "gui/\(getuid())", self.plistURL.path])
+            _ = self.runLaunchctl(["kickstart", "-k", "gui/\(getuid())/\(launchdLabel)"])
+        } else {
+            _ = self.runLaunchctl(["bootout", "gui/\(getuid())/\(launchdLabel)"])
+            try? FileManager.default.removeItem(at: self.plistURL)
+        }
+    }
+
+    private static func writePlist(bundlePath: String) {
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>Label</key>
+          <string>com.steipete.clawdis</string>
+          <key>ProgramArguments</key>
+          <array>
+            <string>\(bundlePath)/Contents/MacOS/Clawdis</string>
+          </array>
+          <key>WorkingDirectory</key>
+          <string>\(FileManager.default.homeDirectoryForCurrentUser.path)</string>
+          <key>RunAtLoad</key>
+          <true/>
+          <key>KeepAlive</key>
+          <true/>
+          <key>MachServices</key>
+          <dict>
+            <key>com.steipete.clawdis.xpc</key>
+            <true/>
+          </dict>
+          <key>StandardOutPath</key>
+          <string>/tmp/clawdis.log</string>
+          <key>StandardErrorPath</key>
+          <string>/tmp/clawdis.log</string>
+        </dict>
+        </plist>
+        """
+        try? plist.write(to: self.plistURL, atomically: true, encoding: .utf8)
+    }
+
+    @discardableResult
+    private static func runLaunchctl(_ args: [String]) -> Int32 {
+        let process = Process()
+        process.launchPath = "/bin/launchctl"
+        process.arguments = args
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        try? process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+}
+
 @MainActor
 enum CLIInstaller {
     static func install(statusHandler: @escaping @Sendable (String) async -> Void) async {
