@@ -44,6 +44,8 @@ struct OnboardingView: View {
     @State private var cliStatus: String?
     @State private var copied = false
     @State private var monitoringPermissions = false
+    @State private var cliInstalled = false
+    @State private var cliInstallLocation: String?
     @ObservedObject private var state = AppStateStore.shared
     @ObservedObject private var permissionMonitor = PermissionMonitor.shared
 
@@ -91,7 +93,10 @@ struct OnboardingView: View {
             self.updatePermissionMonitoring(for: newValue)
         }
         .onDisappear { self.stopPermissionMonitoring() }
-        .task { await self.refreshPerms() }
+        .task {
+            await self.refreshPerms()
+            self.refreshCLIStatus()
+        }
     }
 
     private func welcomePage() -> some View {
@@ -208,7 +213,7 @@ struct OnboardingView: View {
                 .frame(maxWidth: 520)
                 .fixedSize(horizontal: false, vertical: true)
 
-            self.onboardingCard {
+            self.onboardingCard(spacing: 10) {
                 HStack(spacing: 12) {
                     Button {
                         Task { await self.installCLI() }
@@ -216,7 +221,7 @@ struct OnboardingView: View {
                         if self.installingCLI {
                             ProgressView()
                         } else {
-                            Text("Install helper")
+                            Text(self.cliInstalled ? "Reinstall helper" : "Install helper")
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -226,18 +231,24 @@ struct OnboardingView: View {
                         self.copyToPasteboard(self.devLinkCommand)
                     }
                     .disabled(self.installingCLI)
+
+                    if self.cliInstalled, let loc = self.cliInstallLocation {
+                        Label("Installed at \(loc)", systemImage: "checkmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.green)
+                    }
                 }
 
                 if let cliStatus {
                     Text(cliStatus)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } else if !self.cliInstalled, self.cliInstallLocation == nil {
+                    Text(
+                        "We install into /usr/local/bin and /opt/homebrew/bin. Rerun anytime if you move the build output.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-
-                Text(
-                    "We install into /usr/local/bin and /opt/homebrew/bin. Rerun anytime if you move the build output.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -441,6 +452,13 @@ struct OnboardingView: View {
         await CLIInstaller.install { message in
             await MainActor.run { self.cliStatus = message }
         }
+        self.refreshCLIStatus()
+    }
+
+    private func refreshCLIStatus() {
+        let installLocation = CLIInstaller.installedLocation()
+        self.cliInstallLocation = installLocation
+        self.cliInstalled = installLocation != nil
     }
 
     private func copyToPasteboard(_ text: String) {
