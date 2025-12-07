@@ -16,6 +16,7 @@ enum VoiceWakeForwarder {
         case invalidTarget
         case launchFailed(String)
         case nonZeroExit(Int32, String)
+        case cliMissingOrFailed(Int32, String)
 
         var errorDescription: String? {
             switch self {
@@ -26,6 +27,11 @@ enum VoiceWakeForwarder {
                 return clipped.isEmpty
                     ? "ssh exited with code \(code)"
                     : "ssh exited with code \(code): \(clipped)"
+            case let .cliMissingOrFailed(code, output):
+                let clipped = output.prefix(240)
+                return clipped.isEmpty
+                    ? "clawdis-mac failed on remote (code \(code))"
+                    : "clawdis-mac failed on remote (code \(code)): \(clipped)"
             }
         }
     }
@@ -94,15 +100,18 @@ enum VoiceWakeForwarder {
 
         let userHost = parsed.user.map { "\($0)@\(parsed.host)" } ?? parsed.host
 
-        var args: [String] = [
+        var baseArgs: [String] = [
             "-o", "BatchMode=yes",
             "-o", "IdentitiesOnly=yes",
             "-o", "ConnectTimeout=4",
         ]
-        if parsed.port > 0 { args.append(contentsOf: ["-p", String(parsed.port)]) }
+        if parsed.port > 0 { baseArgs.append(contentsOf: ["-p", String(parsed.port)]) }
         if !config.identityPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            args.append(contentsOf: ["-i", config.identityPath])
+            baseArgs.append(contentsOf: ["-i", config.identityPath])
         }
+
+        // Stage 1: plain SSH connectivity.
+        var args = baseArgs
         args.append(contentsOf: [userHost, "true"])
 
         let process = Process()
@@ -119,10 +128,29 @@ enum VoiceWakeForwarder {
         }
 
         let output = await self.wait(process, timeout: 6, capturing: pipe)
-        if process.terminationStatus == 0 {
+        if process.terminationStatus != 0 {
+            return .failure(.nonZeroExit(process.terminationStatus, output))
+        }
+
+        // Stage 2: ensure remote clawdis-mac is present and responsive.
+        var checkArgs = baseArgs
+        checkArgs.append(contentsOf: [userHost, "clawdis-mac", "status"])
+        let checkProc = Process()
+        checkProc.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        checkProc.arguments = checkArgs
+        let checkPipe = Pipe()
+        checkProc.standardOutput = checkPipe
+        checkProc.standardError = checkPipe
+        do {
+            try checkProc.run()
+        } catch {
+            return .failure(.launchFailed(error.localizedDescription))
+        }
+        let statusOut = await self.wait(checkProc, timeout: 6, capturing: checkPipe)
+        if checkProc.terminationStatus == 0 {
             return .success(())
         }
-        return .failure(.nonZeroExit(process.terminationStatus, output))
+        return .failure(.cliMissingOrFailed(checkProc.terminationStatus, statusOut))
     }
 
     static func renderedCommand(template: String, transcript: String) -> String {
