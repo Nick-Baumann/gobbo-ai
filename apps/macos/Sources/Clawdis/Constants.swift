@@ -12,6 +12,16 @@ let defaultVoiceWakeTriggers = ["clawd", "claude"]
 let voiceWakeMicKey = "clawdis.voiceWakeMicID"
 let voiceWakeLocaleKey = "clawdis.voiceWakeLocaleID"
 let voiceWakeAdditionalLocalesKey = "clawdis.voiceWakeAdditionalLocaleIDs"
+let voiceWakeForwardEnabledKey = "clawdis.voiceWakeForwardEnabled"
+let voiceWakeForwardTargetKey = "clawdis.voiceWakeForwardTarget"
+let voiceWakeForwardHostKey = "clawdis.voiceWakeForwardHost"
+let voiceWakeForwardUserKey = "clawdis.voiceWakeForwardUser"
+let voiceWakeForwardPortKey = "clawdis.voiceWakeForwardPort"
+let voiceWakeForwardIdentityKey = "clawdis.voiceWakeForwardIdentity"
+let voiceWakeForwardCommandKey = "clawdis.voiceWakeForwardCommand"
 let modelCatalogPathKey = "clawdis.modelCatalogPath"
 let modelCatalogReloadKey = "clawdis.modelCatalogReload"
 let voiceWakeSupported: Bool = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
+let defaultVoiceWakeForwardCommand = "clawdis-mac agent --message \"${text}\" --thinking low"
+let defaultVoiceWakeForwardPort = 22
+let defaultVoiceWakeForwardTimeout: TimeInterval = 6

@@ -7,47 +7,50 @@ struct SettingsRootView: View {
     @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        TabView(selection: self.$selectedTab) {
-            GeneralSettings(state: self.state)
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag(SettingsTab.general)
+        ScrollView(.vertical) {
+            TabView(selection: self.$selectedTab) {
+                GeneralSettings(state: self.state)
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                    .tag(SettingsTab.general)
 
-            VoiceWakeSettings(state: self.state)
-                .tabItem { Label("Voice Wake", systemImage: "waveform.circle") }
-                .tag(SettingsTab.voiceWake)
+                VoiceWakeSettings(state: self.state)
+                    .tabItem { Label("Voice Wake", systemImage: "waveform.circle") }
+                    .tag(SettingsTab.voiceWake)
 
-            ConfigSettings()
-                .tabItem { Label("Config", systemImage: "slider.horizontal.3") }
-                .tag(SettingsTab.config)
+                ConfigSettings()
+                    .tabItem { Label("Config", systemImage: "slider.horizontal.3") }
+                    .tag(SettingsTab.config)
 
-            PermissionsSettings(
-                status: self.permissionMonitor.status,
-                refresh: self.refreshPerms,
-                showOnboarding: { OnboardingController.shared.show() })
-                .tabItem { Label("Permissions", systemImage: "lock.shield") }
-                .tag(SettingsTab.permissions)
+                PermissionsSettings(
+                    status: self.permissionMonitor.status,
+                    refresh: self.refreshPerms,
+                    showOnboarding: { OnboardingController.shared.show() })
+                    .tabItem { Label("Permissions", systemImage: "lock.shield") }
+                    .tag(SettingsTab.permissions)
 
-            SessionsSettings()
-                .tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }
-                .tag(SettingsTab.sessions)
+                SessionsSettings()
+                    .tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }
+                    .tag(SettingsTab.sessions)
 
-            ToolsSettings()
-                .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
-                .tag(SettingsTab.tools)
+                ToolsSettings()
+                    .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                    .tag(SettingsTab.tools)
 
-            if self.state.debugPaneEnabled {
-                DebugSettings()
-                    .tabItem { Label("Debug", systemImage: "ant") }
-                    .tag(SettingsTab.debug)
+                if self.state.debugPaneEnabled {
+                    DebugSettings()
+                        .tabItem { Label("Debug", systemImage: "ant") }
+                        .tag(SettingsTab.debug)
+                }
+
+                AboutSettings()
+                    .tabItem { Label("About", systemImage: "info.circle") }
+                    .tag(SettingsTab.about)
             }
-
-            AboutSettings()
-                .tabItem { Label("About", systemImage: "info.circle") }
-                .tag(SettingsTab.about)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 22)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 22)
-        .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight, alignment: .topLeading)
+        .frame(minWidth: SettingsTab.windowWidth, minHeight: SettingsTab.windowHeight)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onReceive(NotificationCenter.default.publisher(for: .clawdisSelectSettingsTab)) { note in
             if let tab = note.object as? SettingsTab {

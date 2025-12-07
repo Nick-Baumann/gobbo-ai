@@ -176,6 +176,10 @@ final class VoiceWakeTester {
         if matched, !text.isEmpty {
             self.stop()
             AppStateStore.shared.triggerVoiceEars()
+            let config = AppStateStore.shared.voiceWakeForwardConfig
+            Task.detached {
+                await VoiceWakeForwarder.forward(transcript: text, config: config)
+            }
             onUpdate(.detected(text))
             return
         }
@@ -248,6 +252,7 @@ struct VoiceWakeSettings: View {
     @State private var meterError: String?
     private let meter = MicLevelMonitor()
     @State private var availableLocales: [Locale] = []
+    @State private var showForwardAdvanced = false
 
     private struct IndexedWord: Identifiable {
         let id: Int
@@ -275,6 +280,8 @@ struct VoiceWakeSettings: View {
             self.localePicker
             self.micPicker
             self.levelMeter
+
+            self.forwardSection
 
             self.testCard
 
@@ -664,6 +671,56 @@ struct VoiceWakeSettings: View {
                 Text(meterError)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var forwardSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: self.$state.voiceWakeForwardEnabled) {
+                Text("Forward wake to host (SSH)")
+            }
+            if self.state.voiceWakeForwardEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("SSH target") {
+                        TextField("steipete@peters-mac-studio-1", text: self.$state.voiceWakeForwardTarget)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 280)
+                    }
+
+                    DisclosureGroup(isExpanded: self.$showForwardAdvanced) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            LabeledContent("Identity file") {
+                                TextField(
+                                    "/Users/you/.ssh/voicewake_ed25519",
+                                    text: self.$state.voiceWakeForwardIdentity)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 320)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Remote command template")
+                                    .font(.callout.weight(.semibold))
+                                TextField(
+                                    "clawdis-mac agent --message \"${text}\" --thinking low",
+                                    text: self.$state.voiceWakeForwardCommand,
+                                    axis: .vertical)
+                                    .textFieldStyle(.roundedBorder)
+                                Text(
+                                    "${text} is replaced with the transcript."
+                                        + "\nIt is also piped to stdin if you prefer $(cat).")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(.top, 4)
+                    } label: {
+                        Text("Advanced")
+                            .font(.callout.weight(.semibold))
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
