@@ -38,6 +38,7 @@ Clawdis treats **one session as primary**. By default the canonical key is `main
 ## Inspecting
 - `pnpm clawdis status` — shows store path and recent sessions.
 - `pnpm clawdis sessions --json` — dumps every entry (filter with `--active <minutes>`).
+- Send `/status` in chat to see whether the agent is reachable, how much of the session context is used, current thinking/verbose toggles, and when your WhatsApp web creds were last refreshed (helps spot relink needs).
 - JSONL transcripts can be opened directly to review full turns.
 
 ## Tips

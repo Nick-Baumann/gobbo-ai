@@ -22,6 +22,9 @@ import {
   type MsgContext,
   type TemplateContext,
 } from "./templating.js";
+import { buildStatusMessage } from "./status.js";
+import { resolveHeartbeatSeconds } from "../web/reconnect.js";
+import { getWebAuthAgeMs, webAuthExists } from "../web/session.js";
 import {
   normalizeThinkLevel,
   normalizeVerboseLevel,
@@ -501,6 +504,30 @@ export async function getReplyFromConfig(
     return {
       text: "⚙️ Restarting clawdis via launchctl; give me a few seconds to come back online.",
     };
+  }
+
+  if (
+    rawBodyNormalized === "/status" ||
+    rawBodyNormalized === "status" ||
+    rawBodyNormalized.startsWith("/status ")
+  ) {
+    const webLinked = await webAuthExists();
+    const webAuthAgeMs = getWebAuthAgeMs();
+    const heartbeatSeconds = resolveHeartbeatSeconds(cfg, undefined);
+    const statusText = buildStatusMessage({
+      reply,
+      sessionEntry,
+      sessionKey,
+      sessionScope,
+      storePath,
+      resolvedThink: resolvedThinkLevel,
+      resolvedVerbose: resolvedVerboseLevel,
+      webLinked,
+      webAuthAgeMs,
+      heartbeatSeconds,
+    });
+    cleanupTyping();
+    return { text: statusText };
   }
 
   const abortRequested =

@@ -3,6 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as tauRpc from "../process/tau-rpc.js";
 import { getReplyFromConfig } from "./reply.js";
 
+const webMocks = vi.hoisted(() => ({
+  webAuthExists: vi.fn().mockResolvedValue(true),
+  getWebAuthAgeMs: vi.fn().mockReturnValue(120_000),
+}));
+
+vi.mock("../web/session.js", () => webMocks);
+
 const baseCfg = {
   inbound: {
     reply: {
@@ -49,6 +56,23 @@ describe("trigger handling", () => {
     );
     const text = Array.isArray(res) ? res[0]?.text : res?.text;
     expect(text?.startsWith("⚙️ Restarting" ?? "")).toBe(true);
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it("reports status without invoking the agent", async () => {
+    const runner = vi.fn();
+    const res = await getReplyFromConfig(
+      {
+        Body: "/status",
+        From: "+1002",
+        To: "+2000",
+      },
+      {},
+      baseCfg,
+      runner,
+    );
+    const text = Array.isArray(res) ? res[0]?.text : res?.text;
+    expect(text).toContain("Status");
     expect(runner).not.toHaveBeenCalled();
   });
 

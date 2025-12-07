@@ -78,6 +78,7 @@ Or use the `process` tool to background long commands.
 ```bash
 # Check status
 clawdis status
+# Or from chat: send /status for agent + context usage
 
 # View recent connection events
 tail -100 /tmp/clawdis/clawdis.log | grep "connection\|disconnect\|logout"

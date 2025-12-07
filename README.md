@@ -127,8 +127,11 @@ clawdis relay      # Start listening
 | `clawdis send` | Send a message |
 | `clawdis agent` | Talk directly to the agent (no WhatsApp send) |
 | `clawdis relay` | Start auto-reply loop |
-| `clawdis status` | Show recent messages |
+| `clawdis status` | Web session health + session store summary |
 | `clawdis heartbeat` | Trigger a heartbeat |
+
+In chat, send `/status` to see if the agent is reachable, how much context the session has used, and the current thinking/verbose toggles—no agent call required.
+`/status` also shows whether your WhatsApp web session is linked and how long ago the creds were refreshed so you know when to re-scan the QR.
 
 ### Sessions, surfaces, and WebChat
 
