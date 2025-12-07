@@ -10,6 +10,8 @@ struct DebugSettings: View {
     @State private var modelsError: String?
     @ObservedObject private var relayManager = RelayProcessManager.shared
     @State private var relayRootInput: String = RelayProcessManager.shared.projectRootPath()
+    @State private var sessionStorePath: String = SessionLoader.defaultStorePath
+    @State private var sessionStoreSaveError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -65,6 +67,27 @@ struct DebugSettings: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            LabeledContent("Session store") {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        TextField("Path", text: self.$sessionStorePath)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption.monospaced())
+                            .frame(width: 340)
+                        Button("Save") { self.saveSessionStorePath() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    if let sessionStoreSaveError {
+                        Text(sessionStoreSaveError)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Used by the CLI session loader; stored in ~/.clawdis/clawdis.json.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             LabeledContent("Model catalog") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(self.modelCatalogPath)
@@ -115,7 +138,10 @@ struct DebugSettings: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .task { await self.reloadModels() }
+        .task {
+            await self.reloadModels()
+            self.loadSessionStorePath()
+        }
     }
 
     private var pinoLogPath: String {
@@ -199,5 +225,57 @@ struct DebugSettings: View {
 
     private func saveRelayRoot() {
         RelayProcessManager.shared.setProjectRoot(path: self.relayRootInput)
+    }
+
+    private func loadSessionStorePath() {
+        let url = self.configURL()
+        guard
+            let data = try? Data(contentsOf: url),
+            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let inbound = parsed["inbound"] as? [String: Any],
+            let reply = inbound["reply"] as? [String: Any],
+            let session = reply["session"] as? [String: Any],
+            let path = session["store"] as? String
+        else {
+            self.sessionStorePath = SessionLoader.defaultStorePath
+            return
+        }
+        self.sessionStorePath = path
+    }
+
+    private func saveSessionStorePath() {
+        let trimmed = self.sessionStorePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        var root: [String: Any] = [:]
+        let url = self.configURL()
+        if let data = try? Data(contentsOf: url),
+           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        {
+            root = parsed
+        }
+
+        var inbound = root["inbound"] as? [String: Any] ?? [:]
+        var reply = inbound["reply"] as? [String: Any] ?? [:]
+        var session = reply["session"] as? [String: Any] ?? [:]
+        session["store"] = trimmed.isEmpty ? SessionLoader.defaultStorePath : trimmed
+        reply["session"] = session
+        inbound["reply"] = reply
+        root["inbound"] = inbound
+
+        do {
+            let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            try data.write(to: url, options: [.atomic])
+            self.sessionStoreSaveError = nil
+        } catch {
+            self.sessionStoreSaveError = error.localizedDescription
+        }
+    }
+
+    private func configURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".clawdis")
+            .appendingPathComponent("clawdis.json")
     }
 }

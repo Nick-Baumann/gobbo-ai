@@ -4,7 +4,6 @@ import SwiftUI
 struct ConfigSettings: View {
     @State private var configModel: String = ""
     @State private var customModel: String = ""
-    @State private var configStorePath: String = SessionLoader.defaultStorePath
     @State private var configSaving = false
     @State private var hasLoaded = false
     @State private var models: [ModelChoice] = []
@@ -93,15 +92,6 @@ struct ConfigSettings: View {
                 }
             }
 
-            LabeledContent("Session store") {
-                TextField("Path", text: self.$configStorePath)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 360)
-                    .onChange(of: self.configStorePath) { _, _ in
-                        self.autosaveConfig()
-                    }
-            }
-
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -128,26 +118,13 @@ struct ConfigSettings: View {
     }
 
     private func loadConfig() {
-        let url = self.configURL()
-        guard let data = try? Data(contentsOf: url) else {
-            self.configModel = SessionLoader.fallbackModel
-            self.configStorePath = SessionLoader.defaultStorePath
-            return
-        }
-        guard
-            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let inbound = parsed["inbound"] as? [String: Any],
-            let reply = inbound["reply"] as? [String: Any]
-        else {
-            return
-        }
+        let parsed = self.loadConfigDict()
+        let inbound = parsed["inbound"] as? [String: Any]
+        let reply = inbound?["reply"] as? [String: Any]
+        let agent = reply?["agent"] as? [String: Any]
+        let heartbeatMinutes = reply?["heartbeatMinutes"] as? Int
+        let heartbeatBody = reply?["heartbeatBody"] as? String
 
-        let session = reply["session"] as? [String: Any]
-        let agent = reply["agent"] as? [String: Any]
-        let heartbeatMinutes = reply["heartbeatMinutes"] as? Int
-        let heartbeatBody = reply["heartbeatBody"] as? String
-
-        self.configStorePath = (session?["store"] as? String) ?? SessionLoader.defaultStorePath
         let loadedModel = (agent?["model"] as? String) ?? ""
         if !loadedModel.isEmpty {
             self.configModel = loadedModel
@@ -171,19 +148,16 @@ struct ConfigSettings: View {
         self.configSaving = true
         defer { self.configSaving = false }
 
-        var session: [String: Any] = [:]
-        var agent: [String: Any] = [:]
-        var reply: [String: Any] = [:]
-
-        let trimmedStore = self.configStorePath.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedStore.isEmpty { session["store"] = trimmedStore }
+        var root = self.loadConfigDict()
+        var inbound = root["inbound"] as? [String: Any] ?? [:]
+        var reply = inbound["reply"] as? [String: Any] ?? [:]
+        var agent = reply["agent"] as? [String: Any] ?? [:]
 
         let chosenModel = (self.configModel == "__custom__" ? self.customModel : self.configModel)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedModel = chosenModel
         if !trimmedModel.isEmpty { agent["model"] = trimmedModel }
 
-        reply["session"] = session
         reply["agent"] = agent
 
         if let heartbeatMinutes {
@@ -195,8 +169,8 @@ struct ConfigSettings: View {
             reply["heartbeatBody"] = trimmedBody
         }
 
-        let inbound: [String: Any] = ["reply": reply]
-        let root: [String: Any] = ["inbound": inbound]
+        inbound["reply"] = reply
+        root["inbound"] = inbound
 
         do {
             let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
@@ -206,6 +180,12 @@ struct ConfigSettings: View {
                 withIntermediateDirectories: true)
             try data.write(to: url, options: [.atomic])
         } catch {}
+    }
+
+    private func loadConfigDict() -> [String: Any] {
+        let url = self.configURL()
+        guard let data = try? Data(contentsOf: url) else { return [:] }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
     private func loadModels() async {
