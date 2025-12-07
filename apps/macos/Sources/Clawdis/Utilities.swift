@@ -90,6 +90,29 @@ enum LaunchAgentManager {
 
 @MainActor
 enum CLIInstaller {
+    static func installedLocation() -> String? {
+        let fm = FileManager.default
+
+        for basePath in cliHelperSearchPaths {
+            let candidate = URL(fileURLWithPath: basePath).appendingPathComponent("clawdis-mac").path
+            var isDirectory: ObjCBool = false
+
+            guard fm.fileExists(atPath: candidate, isDirectory: &isDirectory), !isDirectory.boolValue else {
+                continue
+            }
+
+            if fm.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
+    static func isInstalled() -> Bool {
+        self.installedLocation() != nil
+    }
+
     static func install(statusHandler: @escaping @Sendable (String) async -> Void) async {
         let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/ClawdisCLI")
         guard FileManager.default.isExecutableFile(atPath: helper.path) else {

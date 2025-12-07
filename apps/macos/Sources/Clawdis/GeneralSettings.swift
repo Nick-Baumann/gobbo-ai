@@ -5,6 +5,8 @@ struct GeneralSettings: View {
     @ObservedObject var state: AppState
     @State private var isInstallingCLI = false
     @State private var cliStatus: String?
+    @State private var cliInstalled = false
+    @State private var cliInstallLocation: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -63,6 +65,7 @@ struct GeneralSettings: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 22)
+        .onAppear { self.refreshCLIStatus() }
     }
 
     private var activeBinding: Binding<Bool> {
@@ -80,17 +83,36 @@ struct GeneralSettings: View {
                     if self.isInstallingCLI {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text("Install CLI helper")
+                        Text(self.cliInstalled ? "Reinstall CLI helper" : "Install CLI helper")
                     }
                 }
                 .disabled(self.isInstallingCLI)
 
-                if let status = cliStatus {
-                    Text(status)
-                        .font(.caption)
+                if self.isInstallingCLI {
+                    Text("Working...")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                } else if self.cliInstalled {
+                    Label("Installed", systemImage: "checkmark.circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Not installed")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
+            }
+
+            if let status = cliStatus {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            } else if let installLocation = self.cliInstallLocation {
+                Text("Found at \(installLocation)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
             Text("Symlink \"clawdis-mac\" into /usr/local/bin and /opt/homebrew/bin for scripts.")
                 .font(.callout)
@@ -104,7 +126,16 @@ struct GeneralSettings: View {
         self.isInstallingCLI = true
         defer { isInstallingCLI = false }
         await CLIInstaller.install { status in
-            await MainActor.run { self.cliStatus = status }
+            await MainActor.run {
+                self.cliStatus = status
+                self.refreshCLIStatus()
+            }
         }
+    }
+
+    private func refreshCLIStatus() {
+        let installLocation = CLIInstaller.installedLocation()
+        self.cliInstallLocation = installLocation
+        self.cliInstalled = installLocation != nil
     }
 }
