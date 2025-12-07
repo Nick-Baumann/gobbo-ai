@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import util from "node:util";
 
@@ -7,7 +6,9 @@ import pino, { type Bindings, type LevelWithSilent, type Logger } from "pino";
 import { loadConfig, type WarelayConfig } from "./config/config.js";
 import { isVerbose } from "./globals.js";
 
-export const DEFAULT_LOG_DIR = path.join(os.tmpdir(), "clawdis");
+// Pin to /tmp so mac Debug UI and docs match; os.tmpdir() can be a per-user
+// randomized path on macOS which made the “Open log” button a no-op.
+export const DEFAULT_LOG_DIR = "/tmp/clawdis";
 export const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "clawdis.log"); // legacy single-file path
 
 const LOG_PREFIX = "clawdis";
