@@ -20,6 +20,10 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
         config.userContentController = contentController
         config.preferences.isElementFullscreenEnabled = true
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        // Allow module imports between local file:// resources (needed because WebKit treats distinct
+        // file URLs as cross-origin by default).
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        config.preferences.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
 
         // Inject callback receiver stub
         let callbackScript = """
