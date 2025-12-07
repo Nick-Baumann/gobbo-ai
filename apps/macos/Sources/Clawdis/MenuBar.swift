@@ -453,6 +453,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
             RelayProcessManager.shared.setActive(!state.isPaused)
         }
         Task { try? await AgentRPC.shared.start() }
+        Task { await HealthStore.shared.refresh(onDemand: true) }
         self.startListener()
         self.scheduleFirstRunOnboardingIfNeeded()
 
