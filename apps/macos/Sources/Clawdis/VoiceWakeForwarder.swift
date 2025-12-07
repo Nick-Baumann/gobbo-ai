@@ -50,7 +50,9 @@ enum VoiceWakeForwarder {
         }
 
         steps.append("if [ -z \"$CLI\" ]; then CLI=$(command -v clawdis-mac 2>/dev/null || true); fi")
-        steps.append("if [ -z \"$CLI\" ]; then for c in \(searchList); do [ -x \"$c\" ] && CLI=\"$c\" && break; done; fi")
+        steps
+            .append(
+                "if [ -z \"$CLI\" ]; then for c in \(searchList); do [ -x \"$c\" ] && CLI=\"$c\" && break; done; fi")
         steps.append("if [ -z \"$CLI\" ]; then echo 'clawdis-mac missing'; exit 127; fi")
 
         if echoPath {
@@ -61,17 +63,16 @@ enum VoiceWakeForwarder {
     }
 
     static func commandWithCliPath(_ command: String, target: String, echoCliPath: Bool = false) -> String {
-        let rewritten: String
-        if command.contains("clawdis-mac") {
-            rewritten = command.replacingOccurrences(of: "clawdis-mac", with: "\"$CLI\"")
+        let rewritten: String = if command.contains("clawdis-mac") {
+            command.replacingOccurrences(of: "clawdis-mac", with: "\"$CLI\"")
         } else {
-            rewritten = "\"$CLI\" \(command)"
+            "\"$CLI\" \(command)"
         }
 
         return "\(self.cliLookupPrefix(target: target, echoPath: echoCliPath)); \(rewritten)"
     }
 
-#if DEBUG
+    #if DEBUG
     // Test-only helpers
     static func _testSetCliCache(target: String, path: String) {
         self.cliCache.set((target: target, path: path))
@@ -80,7 +81,7 @@ enum VoiceWakeForwarder {
     static func _testGetCliCache() -> (target: String, path: String)? {
         self.cliCache.get()
     }
-#endif
+    #endif
 
     enum VoiceWakeForwardError: LocalizedError, Equatable {
         case invalidTarget
@@ -109,7 +110,10 @@ enum VoiceWakeForwarder {
     }
 
     @discardableResult
-    static func forward(transcript: String, config: VoiceWakeForwardConfig) async -> Result<Void, VoiceWakeForwardError> {
+    static func forward(
+        transcript: String,
+        config: VoiceWakeForwardConfig) async -> Result<Void, VoiceWakeForwardError>
+    {
         guard config.enabled else { return .failure(.disabled) }
         let destination = config.target.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let parsed = self.parse(target: destination) else {
@@ -236,7 +240,8 @@ enum VoiceWakeForwarder {
         if checkProc.terminationStatus == 0 {
             if let cliLine = statusOut
                 .split(separator: "\n")
-                .last(where: { $0.hasPrefix("__CLI:") }) {
+                .last(where: { $0.hasPrefix("__CLI:") })
+            {
                 let path = String(cliLine.dropFirst("__CLI:".count))
                 if !path.isEmpty {
                     self.cliCache.set((target: destination, path: path))

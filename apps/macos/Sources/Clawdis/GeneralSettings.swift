@@ -172,7 +172,8 @@ struct GeneralSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let recent = snap.sessions.recent.first {
-                    Text("Last activity: \(recent.key) \(recent.updatedAt != nil ? relativeAge(from: Date(timeIntervalSince1970: (recent.updatedAt ?? 0) / 1000)) : "unknown")")
+                    Text(
+                        "Last activity: \(recent.key) \(recent.updatedAt != nil ? relativeAge(from: Date(timeIntervalSince1970: (recent.updatedAt ?? 0) / 1000)) : "unknown")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -216,8 +217,8 @@ struct GeneralSettings: View {
     }
 }
 
-private extension GeneralSettings {
-    func revealLogs() {
+extension GeneralSettings {
+    private func revealLogs() {
         let path = URL(fileURLWithPath: "/tmp/clawdis/clawdis.log")
         if FileManager.default.fileExists(atPath: path.path) {
             NSWorkspace.shared.selectFile(path.path, inFileViewerRootedAtPath: path.deletingLastPathComponent().path)

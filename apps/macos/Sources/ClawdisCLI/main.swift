@@ -32,10 +32,10 @@ struct ClawdisCLI {
             FileHandle.standardOutput.write(Data([0x0A]))
             exit(response.ok ? 0 : 1)
         } catch CLIError.help {
-            printHelp()
+            self.printHelp()
             exit(0)
         } catch CLIError.version {
-            printVersion()
+            self.printVersion()
             exit(0)
         } catch {
             fputs("clawdis-mac error: \(error)\n", stderr)
@@ -52,6 +52,7 @@ struct ClawdisCLI {
         switch command {
         case "--help", "-h", "help":
             throw CLIError.help
+
         case "--version", "-V", "version":
             throw CLIError.version
 
@@ -192,7 +193,7 @@ struct ClawdisCLI {
     }
 
     private static func printVersion() {
-        let info = loadInfo()
+        let info = self.loadInfo()
         let version = info["CFBundleShortVersionString"] as? String ?? "unknown"
         let build = info["CFBundleVersion"] as? String ?? ""
         let git = info["ClawdisGitCommit"] as? String ?? "unknown"
@@ -209,7 +210,8 @@ struct ClawdisCLI {
             .deletingLastPathComponent() // Contents
             .appendingPathComponent("Info.plist")
         if let data = try? Data(contentsOf: url),
-           let dict = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+           let dict = try? PropertyListSerialization
+               .propertyList(from: data, options: [], format: nil) as? [String: Any]
         {
             return dict
         }
@@ -217,7 +219,7 @@ struct ClawdisCLI {
     }
 
     private static func send(request: Request) async throws -> Response {
-        try await ensureAppRunning()
+        try await self.ensureAppRunning()
 
         var lastError: Error?
         for _ in 0..<10 {
@@ -246,7 +248,7 @@ struct ClawdisCLI {
     }
 
     private static func ensureAppRunning() async throws {
-        let appURL = URL(fileURLWithPath: (CommandLine.arguments.first ?? ""))
+        let appURL = URL(fileURLWithPath: CommandLine.arguments.first ?? "")
             .resolvingSymlinksInPath()
             .deletingLastPathComponent() // MacOS
             .deletingLastPathComponent() // Contents

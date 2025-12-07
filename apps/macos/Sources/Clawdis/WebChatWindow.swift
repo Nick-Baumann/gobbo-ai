@@ -143,7 +143,11 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
         webChatLogger.debug("didCommit url=\(webView.url?.absoluteString ?? "nil", privacy: .public)")
     }
 
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: any Error)
+    {
         webChatLogger.error("didFailProvisional error=\(error.localizedDescription, privacy: .public)")
     }
 

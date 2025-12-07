@@ -21,7 +21,7 @@ actor AgentRPC {
         deliver: Bool,
         to: String?) async -> (ok: Bool, text: String?, error: String?)
     {
-        if process?.isRunning != true {
+        if self.process?.isRunning != true {
             do {
                 try await self.start()
             } catch {
@@ -51,7 +51,8 @@ actor AgentRPC {
                     if let payloadDict = parsed["payload"] as? [String: Any],
                        let payloads = payloadDict["payloads"] as? [[String: Any]],
                        let first = payloads.first,
-                       let txt = first["text"] as? String {
+                       let txt = first["text"] as? String
+                    {
                         return (true, txt, nil)
                     }
                     return (true, nil, nil)
@@ -62,14 +63,14 @@ actor AgentRPC {
             }
             return (false, nil, "rpc returned unexpected response: \(line)")
         } catch {
-            logger.error("rpc send failed: \(error.localizedDescription, privacy: .public)")
-            await stop()
+            self.logger.error("rpc send failed: \(error.localizedDescription, privacy: .public)")
+            await self.stop()
             return (false, nil, error.localizedDescription)
         }
     }
 
     func status() async -> (ok: Bool, error: String?) {
-        if process?.isRunning != true {
+        if self.process?.isRunning != true {
             do {
                 try await self.start()
             } catch {
@@ -88,14 +89,14 @@ actor AgentRPC {
             if let ok = parsed?["ok"] as? Bool, ok { return (true, nil) }
             return (false, parsed?["error"] as? String ?? "rpc status failed: \(line)")
         } catch {
-            logger.error("rpc status failed: \(error.localizedDescription, privacy: .public)")
-            await stop()
+            self.logger.error("rpc status failed: \(error.localizedDescription, privacy: .public)")
+            await self.stop()
             return (false, error.localizedDescription)
         }
     }
 
     func setHeartbeatsEnabled(_ enabled: Bool) async -> Bool {
-        guard process?.isRunning == true else { return false }
+        guard self.process?.isRunning == true else { return false }
         do {
             let payload: [String: Any] = ["type": "set-heartbeats", "enabled": enabled]
             let data = try JSONSerialization.data(withJSONObject: payload)
@@ -108,8 +109,8 @@ actor AgentRPC {
             if let ok = parsed?["ok"] as? Bool, ok { return true }
             return false
         } catch {
-            logger.error("rpc set-heartbeats failed: \(error.localizedDescription, privacy: .public)")
-            await stop()
+            self.logger.error("rpc set-heartbeats failed: \(error.localizedDescription, privacy: .public)")
+            await self.stop()
             return false
         }
     }
@@ -155,12 +156,12 @@ actor AgentRPC {
     }
 
     private func stop() async {
-        stdoutHandle?.readabilityHandler = nil
-        process?.terminate()
-        process = nil
-        stdinHandle = nil
-        stdoutHandle = nil
-        buffer.removeAll(keepingCapacity: false)
+        self.stdoutHandle?.readabilityHandler = nil
+        self.process?.terminate()
+        self.process = nil
+        self.stdinHandle = nil
+        self.stdoutHandle = nil
+        self.buffer.removeAll(keepingCapacity: false)
         let waiters = self.waiters
         self.waiters.removeAll()
         for waiter in waiters {
@@ -169,13 +170,13 @@ actor AgentRPC {
     }
 
     private func ingest(data: Data) {
-        buffer.append(data)
+        self.buffer.append(data)
         while let range = buffer.firstRange(of: Data([0x0A])) {
-            let lineData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
-            buffer.removeSubrange(buffer.startIndex...range.lowerBound)
+            let lineData = self.buffer.subdata(in: self.buffer.startIndex..<range.lowerBound)
+            self.buffer.removeSubrange(self.buffer.startIndex...range.lowerBound)
             guard let line = String(data: lineData, encoding: .utf8) else { continue }
             if let waiter = waiters.first {
-                waiters.removeFirst()
+                self.waiters.removeFirst()
                 waiter.resume(returning: line)
             }
         }
@@ -183,7 +184,7 @@ actor AgentRPC {
 
     private func nextLine() async throws -> String {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
-            waiters.append(cont)
+            self.waiters.append(cont)
         }
     }
 }

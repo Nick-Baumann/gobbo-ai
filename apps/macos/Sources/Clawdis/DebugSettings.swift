@@ -109,7 +109,9 @@ struct DebugSettings: View {
                             Button {
                                 Task { await self.reloadModels() }
                             } label: {
-                                Label(self.modelsLoading ? "Reloading…" : "Reload models", systemImage: "arrow.clockwise")
+                                Label(
+                                    self.modelsLoading ? "Reloading…" : "Reload models",
+                                    systemImage: "arrow.clockwise")
                             }
                             .buttonStyle(.bordered)
                             .disabled(self.modelsLoading)
@@ -129,7 +131,9 @@ struct DebugSettings: View {
                     }
                 }
                 Button("Send Test Notification") {
-                    Task { _ = await NotificationManager().send(title: "Clawdis", body: "Test notification", sound: nil) }
+                    Task {
+                        _ = await NotificationManager().send(title: "Clawdis", body: "Test notification", sound: nil)
+                    }
                 }
                 .buttonStyle(.bordered)
                 VStack(alignment: .leading, spacing: 6) {
@@ -153,7 +157,8 @@ struct DebugSettings: View {
                                 .font(.caption)
                                 .foregroundStyle(.red)
                         } else {
-                            Text("Uses the Voice Wake path: forwards over SSH when configured, otherwise runs locally via rpc.")
+                            Text(
+                                "Uses the Voice Wake path: forwards over SSH when configured, otherwise runs locally via rpc.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

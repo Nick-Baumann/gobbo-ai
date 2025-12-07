@@ -137,7 +137,7 @@ enum CLIInstaller {
         let targetList = targets.map(self.shellEscape).joined(separator: " ")
         let cmds = [
             "mkdir -p /usr/local/bin /opt/homebrew/bin",
-            targets.map { "ln -sf \(escapedSource) \($0)" }.joined(separator: "; ")
+            targets.map { "ln -sf \(escapedSource) \($0)" }.joined(separator: "; "),
         ].joined(separator: "; ")
 
         let script = """
@@ -180,7 +180,8 @@ enum CommandResolver {
 
     static func projectRoot() -> URL {
         if let stored = UserDefaults.standard.string(forKey: self.projectRootDefaultsKey),
-           let url = self.expandPath(stored) {
+           let url = self.expandPath(stored)
+        {
             return url
         }
         let fallback = FileManager.default.homeDirectoryForCurrentUser

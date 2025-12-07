@@ -1,11 +1,10 @@
 import AppKit
+import Darwin
 import Foundation
 import MenuBarExtraAccess
-import SwiftUI
+import OSLog
 import Security
-import OSLog
-import OSLog
-import Darwin
+import SwiftUI
 
 @main
 struct ClawdisApp: App {
@@ -98,11 +97,11 @@ private struct MenuContent: View {
 
     private func relayLabel(_ status: RelayProcessManager.Status) -> String {
         switch status {
-        case .running: return "Running"
-        case .starting: return "Starting…"
-        case .restarting: return "Restarting…"
-        case let .failed(reason): return "Failed: \(reason)"
-        case .stopped: return "Stopped"
+        case .running: "Running"
+        case .starting: "Starting…"
+        case .restarting: "Restarting…"
+        case let .failed(reason): "Failed: \(reason)"
+        case .stopped: "Stopped"
         }
     }
 
@@ -497,7 +496,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
 
         // Developer/testing helper: auto-open WebChat when launched with --webchat
         if CommandLine.arguments.contains("--webchat") {
-            webChatAutoLogger.debug("Auto-opening web chat via --webchat flag")
+            self.webChatAutoLogger.debug("Auto-opening web chat via --webchat flag")
             WebChatManager.shared.show(sessionKey: "main")
         }
     }
@@ -581,7 +580,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
         var infoCF: CFDictionary?
         guard SecCodeCopySigningInformation(sCode, SecCSFlags(), &infoCF) == errSecSuccess,
               let info = infoCF as? [String: Any],
-              let teamID = info[kSecCodeInfoTeamIdentifier as String] as? String else {
+              let teamID = info[kSecCodeInfoTeamIdentifier as String] as? String
+        else {
             return false
         }
 

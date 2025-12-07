@@ -34,32 +34,32 @@ actor VoiceWakeRuntime {
         }
 
         guard voiceWakeSupported, snapshot.0 else {
-            stop()
+            self.stop()
             return
         }
 
         guard PermissionManager.voiceWakePermissionsGranted() else {
-            logger.debug("voicewake runtime not starting: permissions missing")
-            stop()
+            self.logger.debug("voicewake runtime not starting: permissions missing")
+            self.stop()
             return
         }
 
         let config = snapshot.1
 
-        if config == currentConfig, recognitionTask != nil {
+        if config == self.currentConfig, self.recognitionTask != nil {
             return
         }
 
-        stop()
-        await start(with: config)
+        self.stop()
+        await self.start(with: config)
     }
 
     private func start(with config: RuntimeConfig) async {
         do {
-            configureSession(localeID: config.localeID)
+            self.configureSession(localeID: config.localeID)
 
             guard let recognizer, recognizer.isAvailable else {
-                logger.error("voicewake runtime: speech recognizer unavailable")
+                self.logger.error("voicewake runtime: speech recognizer unavailable")
                 return
             }
 
@@ -67,19 +67,19 @@ actor VoiceWakeRuntime {
             self.recognitionRequest?.shouldReportPartialResults = true
             guard let request = self.recognitionRequest else { return }
 
-            let input = audioEngine.inputNode
+            let input = self.audioEngine.inputNode
             let format = input.outputFormat(forBus: 0)
             input.removeTap(onBus: 0)
             input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak request] buffer, _ in
                 request?.append(buffer)
             }
 
-            audioEngine.prepare()
-            try audioEngine.start()
+            self.audioEngine.prepare()
+            try self.audioEngine.start()
 
-            currentConfig = config
-            lastHeard = Date()
-            cooldownUntil = nil
+            self.currentConfig = config
+            self.lastHeard = Date()
+            self.cooldownUntil = nil
 
             self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                 guard let self else { return }
@@ -87,22 +87,22 @@ actor VoiceWakeRuntime {
                 Task { await self.handleRecognition(transcript: transcript, error: error, config: config) }
             }
 
-            logger.info("voicewake runtime started")
+            self.logger.info("voicewake runtime started")
         } catch {
-            logger.error("voicewake runtime failed to start: \(error.localizedDescription, privacy: .public)")
-            stop()
+            self.logger.error("voicewake runtime failed to start: \(error.localizedDescription, privacy: .public)")
+            self.stop()
         }
     }
 
     private func stop() {
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        recognitionRequest?.endAudio()
-        recognitionRequest = nil
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.stop()
-        currentConfig = nil
-        logger.debug("voicewake runtime stopped")
+        self.recognitionTask?.cancel()
+        self.recognitionTask = nil
+        self.recognitionRequest?.endAudio()
+        self.recognitionRequest = nil
+        self.audioEngine.inputNode.removeTap(onBus: 0)
+        self.audioEngine.stop()
+        self.currentConfig = nil
+        self.logger.debug("voicewake runtime stopped")
     }
 
     private func configureSession(localeID: String?) {
@@ -113,20 +113,21 @@ actor VoiceWakeRuntime {
     private func handleRecognition(
         transcript: String?,
         error: Error?,
-        config: RuntimeConfig) async {
+        config: RuntimeConfig) async
+    {
         if let error {
-            logger.debug("voicewake recognition error: \(error.localizedDescription, privacy: .public)")
+            self.logger.debug("voicewake recognition error: \(error.localizedDescription, privacy: .public)")
         }
 
         guard let transcript else { return }
-        if !transcript.isEmpty { lastHeard = Date() }
+        if !transcript.isEmpty { self.lastHeard = Date() }
 
         if Self.matches(text: transcript, triggers: config.triggers) {
             let now = Date()
             if let cooldown = cooldownUntil, now < cooldown {
                 return
             }
-            cooldownUntil = now.addingTimeInterval(2.5)
+            self.cooldownUntil = now.addingTimeInterval(2.5)
             await MainActor.run { AppStateStore.shared.triggerVoiceEars() }
             let forwardConfig = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
             if forwardConfig.enabled {
@@ -148,9 +149,9 @@ actor VoiceWakeRuntime {
         return false
     }
 
-#if DEBUG
+    #if DEBUG
     static func _testMatches(text: String, triggers: [String]) -> Bool {
-        Self.matches(text: text, triggers: triggers)
+        self.matches(text: text, triggers: triggers)
     }
-#endif
+    #endif
 }

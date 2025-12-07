@@ -167,7 +167,7 @@ enum AppleScriptPermission {
         let result = appleScript?.executeAndReturnError(&error)
 
         if let error, let code = error["NSAppleScriptErrorNumber"] as? Int {
-            if code == -1_743 { // errAEEventWouldRequireUserConsent
+            if code == -1743 { // errAEEventWouldRequireUserConsent
                 Self.logger.debug("AppleScript permission denied (-1743)")
                 return false
             }
@@ -180,12 +180,12 @@ enum AppleScriptPermission {
     /// Triggers the TCC prompt and opens System Settings → Privacy & Security → Automation.
     @MainActor
     static func requestAuthorization() async {
-        _ = isAuthorized() // first attempt triggers the dialog if not granted
+        _ = self.isAuthorized() // first attempt triggers the dialog if not granted
 
         // Open the Automation pane to help the user if the prompt was dismissed.
         let urlStrings = [
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
-            "x-apple.systempreferences:com.apple.preference.security"
+            "x-apple.systempreferences:com.apple.preference.security",
         ]
 
         for candidate in urlStrings {

@@ -142,7 +142,7 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(true, forKey: heartbeatsEnabledKey)
         }
 
-        if self.swabbleEnabled && !PermissionManager.voiceWakePermissionsGranted() {
+        if self.swabbleEnabled, !PermissionManager.voiceWakePermissionsGranted() {
             self.swabbleEnabled = false
         }
 

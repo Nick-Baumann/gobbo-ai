@@ -14,7 +14,7 @@ final class WebChatServer: @unchecked Sendable {
 
     /// Start the local HTTP server if it isn't already running. Safe to call multiple times.
     func start(root: URL) {
-        queue.async {
+        self.queue.async {
             if self.listener != nil { return }
             self.root = root
             let params = NWParameters.tcp
@@ -26,8 +26,9 @@ final class WebChatServer: @unchecked Sendable {
                     case .ready:
                         self?.port = listener.port
                         webChatServerLogger.debug("WebChatServer ready on 127.0.0.1:\(listener.port?.rawValue ?? 0)")
-                    case .failed(let error):
-                        webChatServerLogger.error("WebChatServer failed: \(error.localizedDescription, privacy: .public)")
+                    case let .failed(error):
+                        webChatServerLogger
+                            .error("WebChatServer failed: \(error.localizedDescription, privacy: .public)")
                         self?.listener = nil
                     default:
                         break
@@ -39,7 +40,8 @@ final class WebChatServer: @unchecked Sendable {
                 listener.start(queue: self.queue)
                 self.listener = listener
             } catch {
-                webChatServerLogger.error("WebChatServer could not start: \(error.localizedDescription, privacy: .public)")
+                webChatServerLogger
+                    .error("WebChatServer could not start: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -47,7 +49,7 @@ final class WebChatServer: @unchecked Sendable {
     /// Returns the base URL once the server is ready, otherwise nil.
     func baseURL() -> URL? {
         var url: URL?
-        queue.sync {
+        self.queue.sync {
             if let port {
                 url = URL(string: "http://127.0.0.1:\(port.rawValue)/webchat/")
             }
@@ -60,14 +62,15 @@ final class WebChatServer: @unchecked Sendable {
             switch state {
             case .ready:
                 self.receive(on: connection)
-            case .failed(let error):
-                webChatServerLogger.error("WebChatServer connection failed: \(error.localizedDescription, privacy: .public)")
+            case let .failed(error):
+                webChatServerLogger
+                    .error("WebChatServer connection failed: \(error.localizedDescription, privacy: .public)")
                 connection.cancel()
             default:
                 break
             }
         }
-        connection.start(queue: queue)
+        connection.start(queue: self.queue)
     }
 
     private func receive(on connection: NWConnection) {
@@ -109,15 +112,15 @@ final class WebChatServer: @unchecked Sendable {
         }
         let fileURL = root.appendingPathComponent(path)
         guard fileURL.path.hasPrefix(root.path) else {
-            send(status: 403, mime: "text/plain", body: Data("Forbidden".utf8), over: connection)
+            self.send(status: 403, mime: "text/plain", body: Data("Forbidden".utf8), over: connection)
             return
         }
         guard let data = try? Data(contentsOf: fileURL) else {
-            send(status: 404, mime: "text/plain", body: Data("Not Found".utf8), over: connection)
+            self.send(status: 404, mime: "text/plain", body: Data("Not Found".utf8), over: connection)
             return
         }
-        let mime = mimeType(forExtension: fileURL.pathExtension)
-        send(status: 200, mime: mime, body: data, over: connection)
+        let mime = self.mimeType(forExtension: fileURL.pathExtension)
+        self.send(status: 200, mime: mime, body: data, over: connection)
     }
 
     private func send(status: Int, mime: String, body: Data, over connection: NWConnection) {
@@ -134,28 +137,28 @@ final class WebChatServer: @unchecked Sendable {
 
     private func statusText(_ code: Int) -> String {
         switch code {
-        case 200: return "OK"
-        case 403: return "Forbidden"
-        case 404: return "Not Found"
-        default: return "Error"
+        case 200: "OK"
+        case 403: "Forbidden"
+        case 404: "Not Found"
+        default: "Error"
         }
     }
 
     private func mimeType(forExtension ext: String) -> String {
         switch ext.lowercased() {
-        case "html", "htm": return "text/html; charset=utf-8"
-        case "js", "mjs": return "application/javascript; charset=utf-8"
-        case "css": return "text/css; charset=utf-8"
-        case "json": return "application/json; charset=utf-8"
-        case "map": return "application/json; charset=utf-8"
-        case "svg": return "image/svg+xml"
-        case "png": return "image/png"
-        case "jpg", "jpeg": return "image/jpeg"
-        case "gif": return "image/gif"
-        case "woff2": return "font/woff2"
-        case "woff": return "font/woff"
-        case "ttf": return "font/ttf"
-        default: return "application/octet-stream"
+        case "html", "htm": "text/html; charset=utf-8"
+        case "js", "mjs": "application/javascript; charset=utf-8"
+        case "css": "text/css; charset=utf-8"
+        case "json": "application/json; charset=utf-8"
+        case "map": "application/json; charset=utf-8"
+        case "svg": "image/svg+xml"
+        case "png": "image/png"
+        case "jpg", "jpeg": "image/jpeg"
+        case "gif": "image/gif"
+        case "woff2": "font/woff2"
+        case "woff": "font/woff"
+        case "ttf": "font/ttf"
+        default: "application/octet-stream"
         }
     }
 }

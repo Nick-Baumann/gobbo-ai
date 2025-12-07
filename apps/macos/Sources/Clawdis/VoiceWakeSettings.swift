@@ -188,7 +188,8 @@ final class VoiceWakeTester {
         text: String,
         isFinal: Bool,
         errorMessage: String?,
-        onUpdate: @escaping @Sendable (VoiceWakeTestState) -> Void) async {
+        onUpdate: @escaping @Sendable (VoiceWakeTestState) -> Void) async
+    {
         if !text.isEmpty {
             self.lastHeard = Date()
         }
