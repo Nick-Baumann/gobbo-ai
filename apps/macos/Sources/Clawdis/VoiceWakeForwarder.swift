@@ -86,6 +86,7 @@ enum VoiceWakeForwarder {
         case launchFailed(String)
         case nonZeroExit(Int32, String)
         case cliMissingOrFailed(Int32, String)
+        case disabled
 
         var errorDescription: String? {
             switch self {
@@ -101,16 +102,18 @@ enum VoiceWakeForwarder {
                 return clipped.isEmpty
                     ? "clawdis-mac failed on remote (code \(code))"
                     : "clawdis-mac failed on remote (code \(code)): \(clipped)"
+            case .disabled: return "Voice wake forwarding disabled"
             }
         }
     }
 
-    static func forward(transcript: String, config: VoiceWakeForwardConfig) async {
-        guard config.enabled else { return }
+    @discardableResult
+    static func forward(transcript: String, config: VoiceWakeForwardConfig) async -> Result<Void, VoiceWakeForwardError> {
+        guard config.enabled else { return .failure(.disabled) }
         let destination = config.target.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let parsed = self.parse(target: destination) else {
             self.logger.error("voice wake forward skipped: host missing")
-            return
+            return .failure(.invalidTarget)
         }
 
         let userHost = parsed.user.map { "\($0)@\(parsed.host)" } ?? parsed.host
@@ -144,7 +147,7 @@ enum VoiceWakeForwarder {
             try process.run()
         } catch {
             self.logger.error("voice wake forward failed to start ssh: \(error.localizedDescription, privacy: .public)")
-            return
+            return .failure(.launchFailed(error.localizedDescription))
         }
 
         if let data = transcript.data(using: .utf8) {
@@ -155,12 +158,17 @@ enum VoiceWakeForwarder {
         let out = await self.wait(process, timeout: config.timeout)
         if process.terminationStatus == 0 {
             self.logger.info("voice wake forward ok host=\(userHost, privacy: .public)")
-        } else {
-            // surface the failure instead of being silent
-            let clipped = out.prefix(240)
-            self.logger.error(
-                "voice wake forward failed exit=\(process.terminationStatus) host=\(userHost, privacy: .public) out=\(clipped, privacy: .public)")
+            return .success(())
         }
+
+        // surface the failure instead of being silent
+        let clipped = out.prefix(240)
+        self.logger.error(
+            "voice wake forward failed exit=\(process.terminationStatus) host=\(userHost, privacy: .public) out=\(clipped, privacy: .public)")
+        if process.terminationStatus == 127 {
+            return .failure(.cliMissingOrFailed(process.terminationStatus, out))
+        }
+        return .failure(.nonZeroExit(process.terminationStatus, out))
     }
 
     static func checkConnection(config: VoiceWakeForwardConfig) async -> Result<Void, VoiceWakeForwardError> {

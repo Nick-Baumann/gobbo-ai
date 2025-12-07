@@ -12,6 +12,9 @@ struct DebugSettings: View {
     @State private var relayRootInput: String = RelayProcessManager.shared.projectRootPath()
     @State private var sessionStorePath: String = SessionLoader.defaultStorePath
     @State private var sessionStoreSaveError: String?
+    @State private var debugSendInFlight = false
+    @State private var debugSendStatus: String?
+    @State private var debugSendError: String?
 
     var body: some View {
         ScrollView(.vertical) {
@@ -129,6 +132,31 @@ struct DebugSettings: View {
                     Task { _ = await NotificationManager().send(title: "Clawdis", body: "Test notification", sound: nil) }
                 }
                 .buttonStyle(.bordered)
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        Task { await self.sendVoiceDebug() }
+                    } label: {
+                        Label(
+                            self.debugSendInFlight ? "Sending debug voice…" : "Send debug voice via forwarder",
+                            systemImage: self.debugSendInFlight ? "bolt.horizontal.circle" : "waveform")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(self.debugSendInFlight)
+
+                    if let debugSendStatus {
+                        Text(debugSendStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if let debugSendError {
+                        Text(debugSendError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("Sends the same command path as Voice Wake (ssh target + clawdis-mac agent → rpc → node cli → p-agent → WhatsApp).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 HStack {
                     Button("Restart app") { self.relaunch() }
                     Button("Reveal app in Finder") { self.revealApp() }
@@ -208,6 +236,30 @@ struct DebugSettings: View {
         } catch {
             self.modelsCount = nil
             self.modelsError = error.localizedDescription
+        }
+    }
+
+    private func sendVoiceDebug() async {
+        await MainActor.run {
+            self.debugSendInFlight = true
+            self.debugSendError = nil
+            self.debugSendStatus = nil
+        }
+
+        let message = "This is a debug test from the Mac app. Reply with \"Debug test works (and a funny pun)\" if you received that."
+        let config = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
+        let result = await VoiceWakeForwarder.forward(transcript: message, config: config)
+
+        await MainActor.run {
+            self.debugSendInFlight = false
+            switch result {
+            case .success:
+                self.debugSendStatus = "Sent via \(config.target). Await WhatsApp reply."
+                self.debugSendError = nil
+            case let .failure(error):
+                self.debugSendStatus = nil
+                self.debugSendError = error.localizedDescription
+            }
         }
     }
 
