@@ -17,7 +17,7 @@ import {
   setHeartbeatsEnabled,
   type WebMonitorTuning,
 } from "../provider-web.js";
-import { defaultRuntime } from "../runtime.js";
+import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { VERSION } from "../version.js";
 import {
   resolveHeartbeatSeconds,
@@ -252,10 +252,12 @@ Examples:
           }
 
           const logs: string[] = [];
-          const runtime = {
+          const runtime: RuntimeEnv = {
             log: (msg: string) => logs.push(String(msg)),
             error: (msg: string) => logs.push(String(msg)),
-            exit: (_code: number) => {},
+            exit: (_code: number): never => {
+              throw new Error("agentCommand requested exit");
+            },
           };
 
           const opts: {

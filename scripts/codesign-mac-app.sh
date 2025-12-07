@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_BUNDLE="${1:-dist/Clawdis.app}"
 IDENTITY="${SIGN_IDENTITY:-}"
-ENT_TMP=$(mktemp /tmp/clawdis-entitlements.XXXXXX.plist)
+ENT_TMP=$(mktemp -t clawdis-entitlements)
 
 if [ ! -d "$APP_BUNDLE" ]; then
   echo "App bundle not found: $APP_BUNDLE" >&2
@@ -51,6 +51,8 @@ cat > "$ENT_TMP" <<'PLIST'
 <dict>
     <key>com.apple.security.hardened-runtime</key>
     <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
     <key>com.apple.security.automation.apple-events</key>
     <true/>
     <key>com.apple.security.device.audio-input</key>
@@ -73,6 +75,13 @@ if [ -f "$APP_BUNDLE/Contents/MacOS/Clawdis" ]; then
 fi
 if [ -f "$APP_BUNDLE/Contents/MacOS/ClawdisCLI" ]; then
   echo "Signing CLI helper"; sign_item "$APP_BUNDLE/Contents/MacOS/ClawdisCLI"
+fi
+
+# Sign bundled relay runtime bits (bun, native addons, libvips dylibs)
+if [ -d "$APP_BUNDLE/Contents/Resources/Relay" ]; then
+  find "$APP_BUNDLE/Contents/Resources/Relay" -type f \( -name "bun" -o -name "*.node" -o -name "*.dylib" \) -print0 | while IFS= read -r -d '' f; do
+    echo "Signing relay payload: $f"; sign_item "$f"
+  done
 fi
 
 # Sign any embedded frameworks/dylibs if they ever appear

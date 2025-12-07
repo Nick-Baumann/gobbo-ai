@@ -157,6 +157,7 @@ final class AppState: ObservableObject {
 
         var storedForwardCommand = UserDefaults.standard
             .string(forKey: voiceWakeForwardCommandKey) ?? defaultVoiceWakeForwardCommand
+        // Guard against older prefs missing flags; the forwarder depends on these for replies.
         if !storedForwardCommand.contains("--deliver") || !storedForwardCommand.contains("--session") {
             storedForwardCommand = defaultVoiceWakeForwardCommand
             UserDefaults.standard.set(storedForwardCommand, forKey: voiceWakeForwardCommandKey)
