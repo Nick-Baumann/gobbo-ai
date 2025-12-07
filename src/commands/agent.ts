@@ -316,6 +316,14 @@ export async function agentCommand(
   }
 
   const payloads = result.payloads ?? [];
+  const deliver = opts.deliver === true;
+  const targetTo = opts.to ? normalizeE164(opts.to) : allowFrom[0];
+  if (deliver && !targetTo) {
+    throw new Error(
+      "Delivering to WhatsApp requires --to <E.164> or inbound.allowFrom[0]",
+    );
+  }
+
   if (opts.json) {
     const normalizedPayloads = payloads.map((p) => ({
       text: p.text ?? "",
@@ -332,7 +340,9 @@ export async function agentCommand(
         2,
       ),
     );
-    return;
+    // If JSON output was requested, suppress additional human-readable logs unless we're
+    // also delivering, in which case we still proceed to send below.
+    if (!deliver) return;
   }
 
   if (payloads.length === 0) {
@@ -340,23 +350,17 @@ export async function agentCommand(
     return;
   }
 
-  const deliver = opts.deliver === true;
-  const targetTo = opts.to ? normalizeE164(opts.to) : allowFrom[0];
-  if (deliver && !targetTo) {
-    throw new Error(
-      "Delivering to WhatsApp requires --to <E.164> or inbound.allowFrom[0]",
-    );
-  }
-
   for (const payload of payloads) {
-    const lines: string[] = [];
-    if (payload.text) lines.push(payload.text.trimEnd());
     const mediaList =
       payload.mediaUrls ?? (payload.mediaUrl ? [payload.mediaUrl] : []);
-    for (const url of mediaList) {
-      lines.push(`MEDIA:${url}`);
+    if (!opts.json) {
+      const lines: string[] = [];
+      if (payload.text) lines.push(payload.text.trimEnd());
+      for (const url of mediaList) {
+        lines.push(`MEDIA:${url}`);
+      }
+      runtime.log(lines.join("\n"));
     }
-    runtime.log(lines.join("\n"));
 
     if (deliver && targetTo) {
       const text = payload.text ?? "";
