@@ -738,14 +738,30 @@ struct VoiceWakeSettings: View {
             }
             if self.state.voiceWakeForwardEnabled {
                 VStack(alignment: .leading, spacing: 8) {
-                    LabeledContent("SSH target") {
+                    HStack(spacing: 10) {
+                        Text("SSH")
+                            .font(.callout.weight(.semibold))
+                            .frame(width: 40, alignment: .leading)
                         TextField("steipete@peters-mac-studio-1", text: self.$state.voiceWakeForwardTarget)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 280)
+                            .frame(maxWidth: .infinity)
                             .onChange(of: self.state.voiceWakeForwardTarget) { _, _ in self.forwardStatus = .idle }
+                        self.forwardStatusIcon
+                            .frame(width: 16, height: 16, alignment: .center)
+                        Button("Test") {
+                            Task { await self.checkForwardConnection() }
+                        }
+                        .disabled(
+                            self.state.voiceWakeForwardTarget
+                                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
 
-                    self.forwardStatusRow
+                    if case let .failed(message) = self.forwardStatus {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(5)
+                    }
 
                     DisclosureGroup(isExpanded: self.$showForwardAdvanced) {
                         VStack(alignment: .leading, spacing: 10) {
@@ -790,31 +806,17 @@ struct VoiceWakeSettings: View {
         }
     }
 
-    private var forwardStatusRow: some View {
-        HStack(spacing: 10) {
+    private var forwardStatusIcon: some View {
+        Group {
             switch self.forwardStatus {
             case .idle:
-                Image(systemName: "circle.dashed")
-                    .foregroundStyle(.secondary)
+                Image(systemName: "circle.dashed").foregroundStyle(.secondary)
             case .checking:
-                ProgressView().controlSize(.small)
+                ProgressView().controlSize(.mini)
             case .ok:
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-            case let .failed(message):
+            case .failed:
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
-                    .help(message)
-            }
-
-            Button("Check connection") {
-                Task { await self.checkForwardConnection() }
-            }
-            .disabled(self.state.voiceWakeForwardTarget.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            if case let .failed(message) = self.forwardStatus {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(5)
             }
         }
     }
