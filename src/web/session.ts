@@ -13,7 +13,7 @@ import qrcode from "qrcode-terminal";
 
 import { SESSION_STORE_DEFAULT } from "../config/sessions.js";
 import { danger, info, success } from "../globals.js";
-import { getChildLogger } from "../logging.js";
+import { getChildLogger, toPinoLikeLogger } from "../logging.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import type { Provider } from "../utils.js";
 import { CONFIG_DIR, ensureDir, jidToE164 } from "../utils.js";
@@ -26,17 +26,13 @@ export const WA_WEB_AUTH_DIR = path.join(CONFIG_DIR, "credentials");
  * Consumers can opt into QR printing for interactive login flows.
  */
 export async function createWaSocket(printQr: boolean, verbose: boolean) {
-  const logger = getChildLogger(
+  const baseLogger = getChildLogger(
     { module: "baileys" },
     {
       level: verbose ? "info" : "silent",
     },
   );
-  // Some Baileys internals call logger.trace even when silent; ensure it's present.
-  const loggerAny = logger as unknown as Record<string, unknown>;
-  if (typeof loggerAny.trace !== "function") {
-    loggerAny.trace = () => {};
-  }
+  const logger = toPinoLikeLogger(baseLogger, verbose ? "info" : "silent");
   await ensureDir(WA_WEB_AUTH_DIR);
   const { state, saveCreds } = await useMultiFileAuthState(WA_WEB_AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();

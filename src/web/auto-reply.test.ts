@@ -18,7 +18,7 @@ import {
   runWebHeartbeatOnce,
   stripHeartbeatToken,
 } from "./auto-reply.js";
-import type { sendMessageWeb } from "./outbound.js";
+import type { sendMessageWhatsApp } from "./outbound.js";
 import {
   resetBaileysMocks,
   resetLoadConfigMock,
@@ -157,7 +157,7 @@ describe("resolveHeartbeatRecipients", () => {
 describe("runWebHeartbeatOnce", () => {
   it("skips when heartbeat token returned", async () => {
     const store = await makeSessionStore();
-    const sender: typeof sendMessageWeb = vi.fn();
+    const sender: typeof sendMessageWhatsApp = vi.fn();
     const resolver = vi.fn(async () => ({ text: HEARTBEAT_TOKEN }));
     await runWebHeartbeatOnce({
       cfg: {
@@ -178,7 +178,7 @@ describe("runWebHeartbeatOnce", () => {
 
   it("sends when alert text present", async () => {
     const store = await makeSessionStore();
-    const sender: typeof sendMessageWeb = vi
+    const sender: typeof sendMessageWhatsApp = vi
       .fn()
       .mockResolvedValue({ messageId: "m1", toJid: "jid" });
     const resolver = vi.fn(async () => ({ text: "ALERT" }));
@@ -201,7 +201,7 @@ describe("runWebHeartbeatOnce", () => {
   it("falls back to most recent session when no to is provided", async () => {
     const store = await makeSessionStore();
     const storePath = store.storePath;
-    const sender: typeof sendMessageWeb = vi
+    const sender: typeof sendMessageWhatsApp = vi
       .fn()
       .mockResolvedValue({ messageId: "m1", toJid: "jid" });
     const resolver = vi.fn(async () => ({ text: "ALERT" }));
@@ -239,7 +239,7 @@ describe("runWebHeartbeatOnce", () => {
     };
     await fs.writeFile(storePath, JSON.stringify(store));
 
-    const sender: typeof sendMessageWeb = vi.fn();
+    const sender: typeof sendMessageWhatsApp = vi.fn();
     const resolver = vi.fn(async () => ({ text: HEARTBEAT_TOKEN }));
     setLoadConfigMock({
       inbound: {
@@ -365,7 +365,7 @@ describe("runWebHeartbeatOnce", () => {
 
   it("sends overrideBody directly and skips resolver", async () => {
     const store = await makeSessionStore();
-    const sender: typeof sendMessageWeb = vi
+    const sender: typeof sendMessageWhatsApp = vi
       .fn()
       .mockResolvedValue({ messageId: "m1", toJid: "jid" });
     const resolver = vi.fn();
@@ -391,7 +391,7 @@ describe("runWebHeartbeatOnce", () => {
 
   it("dry-run overrideBody prints and skips send", async () => {
     const store = await makeSessionStore();
-    const sender: typeof sendMessageWeb = vi.fn();
+    const sender: typeof sendMessageWhatsApp = vi.fn();
     const resolver = vi.fn();
     await runWebHeartbeatOnce({
       cfg: {

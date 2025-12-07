@@ -23,7 +23,7 @@ vi.mock("./media.js", () => ({
   loadWebMedia: (...args: unknown[]) => loadWebMediaMock(...args),
 }));
 
-import { sendMessageWeb } from "./outbound.js";
+import { sendMessageWhatsApp } from "./outbound.js";
 
 const { createWaSocket } = await import("./session.js");
 
@@ -38,7 +38,7 @@ describe("web outbound", () => {
   });
 
   it("sends message via web and closes socket", async () => {
-    await sendMessageWeb("+1555", "hi", { verbose: false });
+    await sendMessageWhatsApp("+1555", "hi", { verbose: false });
     const sock = await createWaSocket();
     expect(sock.sendMessage).toHaveBeenCalled();
     expect(sock.ws.close).toHaveBeenCalled();
@@ -51,7 +51,7 @@ describe("web outbound", () => {
       contentType: "audio/ogg",
       kind: "audio",
     });
-    await sendMessageWeb("+1555", "voice note", {
+    await sendMessageWhatsApp("+1555", "voice note", {
       verbose: false,
       mediaUrl: "/tmp/voice.ogg",
     });
@@ -74,7 +74,7 @@ describe("web outbound", () => {
       contentType: "video/mp4",
       kind: "video",
     });
-    await sendMessageWeb("+1555", "clip", {
+    await sendMessageWhatsApp("+1555", "clip", {
       verbose: false,
       mediaUrl: "/tmp/video.mp4",
     });
@@ -97,7 +97,7 @@ describe("web outbound", () => {
       contentType: "image/jpeg",
       kind: "image",
     });
-    await sendMessageWeb("+1555", "pic", {
+    await sendMessageWhatsApp("+1555", "pic", {
       verbose: false,
       mediaUrl: "/tmp/pic.jpg",
     });
@@ -121,7 +121,7 @@ describe("web outbound", () => {
       kind: "document",
       fileName: "file.pdf",
     });
-    await sendMessageWeb("+1555", "doc", {
+    await sendMessageWhatsApp("+1555", "doc", {
       verbose: false,
       mediaUrl: "/tmp/file.pdf",
     });

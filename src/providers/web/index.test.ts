@@ -11,7 +11,7 @@ describe("providers/web entrypoint", () => {
     expect(entry.monitorWebInbox).toBe(impl.monitorWebInbox);
     expect(entry.monitorWebProvider).toBe(impl.monitorWebProvider);
     expect(entry.pickProvider).toBe(impl.pickProvider);
-    expect(entry.sendMessageWeb).toBe(impl.sendMessageWeb);
+    expect(entry.sendMessageWhatsApp).toBe(impl.sendMessageWhatsApp);
     expect(entry.WA_WEB_AUTH_DIR).toBe(impl.WA_WEB_AUTH_DIR);
     expect(entry.waitForWaConnection).toBe(impl.waitForWaConnection);
     expect(entry.webAuthExists).toBe(impl.webAuthExists);

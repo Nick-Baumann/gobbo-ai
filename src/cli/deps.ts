@@ -1,12 +1,15 @@
-import { logWebSelfId, sendMessageWeb } from "../providers/web/index.js";
+import { logWebSelfId, sendMessageWhatsApp } from "../providers/web/index.js";
+import { sendMessageTelegram } from "../telegram/send.js";
 
 export type CliDeps = {
-  sendMessageWeb: typeof sendMessageWeb;
+  sendMessageWhatsApp: typeof sendMessageWhatsApp;
+  sendMessageTelegram: typeof sendMessageTelegram;
 };
 
 export function createDefaultDeps(): CliDeps {
   return {
-    sendMessageWeb,
+    sendMessageWhatsApp,
+    sendMessageTelegram,
   };
 }
 

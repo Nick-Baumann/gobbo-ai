@@ -16,15 +16,15 @@ import { isVerbose, logVerbose } from "../globals.js";
 import { triggerWarelayRestart } from "../infra/restart.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { defaultRuntime } from "../runtime.js";
+import { resolveHeartbeatSeconds } from "../web/reconnect.js";
+import { getWebAuthAgeMs, webAuthExists } from "../web/session.js";
 import { runCommandReply } from "./command-reply.js";
+import { buildStatusMessage } from "./status.js";
 import {
   applyTemplate,
   type MsgContext,
   type TemplateContext,
 } from "./templating.js";
-import { buildStatusMessage } from "./status.js";
-import { resolveHeartbeatSeconds } from "../web/reconnect.js";
-import { getWebAuthAgeMs, webAuthExists } from "../web/session.js";
 import {
   normalizeThinkLevel,
   normalizeVerboseLevel,

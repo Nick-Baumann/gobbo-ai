@@ -19,7 +19,7 @@ import { jidToE164, normalizeE164 } from "../utils.js";
 import { monitorWebInbox } from "./inbound.js";
 import { sendViaIpc, startIpcServer, stopIpcServer } from "./ipc.js";
 import { loadWebMedia } from "./media.js";
-import { sendMessageWeb } from "./outbound.js";
+import { sendMessageWhatsApp } from "./outbound.js";
 import {
   computeBackoff,
   newConnectionId,
@@ -55,7 +55,7 @@ async function sendWithIpcFallback(
     return { messageId: ipcResult.messageId, toJid: `${to}@s.whatsapp.net` };
   }
   // Fall back to direct send
-  return sendMessageWeb(to, message, opts);
+  return sendMessageWhatsApp(to, message, opts);
 }
 
 const DEFAULT_WEB_MEDIA_BYTES = 5 * 1024 * 1024;
@@ -194,7 +194,7 @@ export async function runWebHeartbeatOnce(opts: {
   verbose?: boolean;
   replyResolver?: typeof getReplyFromConfig;
   runtime?: RuntimeEnv;
-  sender?: typeof sendMessageWeb;
+  sender?: typeof sendMessageWhatsApp;
   sessionId?: string;
   overrideBody?: string;
   dryRun?: boolean;

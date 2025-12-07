@@ -1,6 +1,6 @@
 # Session Management
 
-Clawdis treats **one session as primary**. By default the canonical key is `main`; set `inbound.reply.session.mainKey` to change it. Older/local sessions can stay on disk, but only the primary key is used for desktop/web chat and direct agent calls.
+Clawdis treats **one session as primary**. By default the canonical key is `main` for every direct chat; no configuration is required. You can rename it via `inbound.reply.session.mainKey` if you really want, but there is still only a single primary session. Older/local sessions can stay on disk, but only the primary key is used for desktop/web chat and direct agent calls.
 
 ## Where state lives
 - Store file: `~/.clawdis/sessions/sessions.json` (legacy: `~/.clawdis/sessions.json`).
@@ -17,7 +17,7 @@ Clawdis treats **one session as primary**. By default the canonical key is `main
 - Reset triggers: exact `/new` (plus any extras in `resetTriggers`) start a fresh session id and pass the remainder of the message through.
 - Manual reset: delete specific keys from the store or remove the JSONL transcript; the next message recreates them.
 
-## Configuration (primary-only example)
+## Configuration (optional rename example)
 ```json5
 // ~/.clawdis/clawdis.json
 {
@@ -28,7 +28,7 @@ Clawdis treats **one session as primary**. By default the canonical key is `main
         idleMinutes: 120,
         resetTriggers: ["/new"],
         store: "~/.clawdis/sessions/sessions.json",
-        mainKey: "main"           // marks the primary session
+        mainKey: "main"           // optional rename; still a single primary
       }
     }
   }

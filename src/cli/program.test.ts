@@ -7,6 +7,7 @@ const monitorWebProvider = vi.fn();
 const logWebSelfId = vi.fn();
 const waitForever = vi.fn();
 const spawnRelayTmux = vi.fn().mockResolvedValue("clawdis-relay");
+const monitorTelegramProvider = vi.fn();
 
 const runtime = {
   log: vi.fn(),
@@ -22,6 +23,9 @@ vi.mock("../runtime.js", () => ({ defaultRuntime: runtime }));
 vi.mock("../provider-web.js", () => ({
   loginWeb,
   monitorWebProvider,
+}));
+vi.mock("../telegram/monitor.js", () => ({
+  monitorTelegramProvider,
 }));
 vi.mock("./deps.js", () => ({
   createDefaultDeps: () => ({ waitForever }),
@@ -84,6 +88,15 @@ describe("cli program", () => {
       "pnpm clawdis relay --verbose --heartbeat-now",
       shouldAttach,
     );
+  });
+
+  it("runs telegram relay when token set", async () => {
+    const program = buildProgram();
+    const prev = process.env.TELEGRAM_BOT_TOKEN;
+    process.env.TELEGRAM_BOT_TOKEN = "token123";
+    await program.parseAsync(["relay:telegram"], { from: "user" });
+    expect(monitorTelegramProvider).toHaveBeenCalled();
+    process.env.TELEGRAM_BOT_TOKEN = prev;
   });
 
   it("runs status command", async () => {

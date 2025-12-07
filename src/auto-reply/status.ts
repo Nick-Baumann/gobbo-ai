@@ -1,7 +1,6 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
-import path from "node:path";
-import { spawnSync } from "node:child_process";
 
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL } from "../agents/defaults.js";
@@ -79,9 +78,8 @@ const probeAgentCommand = (command?: string[]): AgentProbe => {
       encoding: "utf-8",
       timeout: 1500,
     });
-    const found = res.status === 0 && res.stdout
-      ? res.stdout.split("\n")[0]?.trim()
-      : "";
+    const found =
+      res.status === 0 && res.stdout ? res.stdout.split("\n")[0]?.trim() : "";
     return {
       ok: Boolean(found),
       detail: found || "not in PATH",
@@ -115,7 +113,7 @@ export function buildStatusMessage(args: StatusArgs): string {
     DEFAULT_CONTEXT_TOKENS;
   const totalTokens =
     entry?.totalTokens ??
-    ((entry?.inputTokens ?? 0) + (entry?.outputTokens ?? 0));
+    (entry?.inputTokens ?? 0) + (entry?.outputTokens ?? 0);
   const agentProbe = probeAgentCommand(args.reply?.command);
 
   const thinkLevel =
@@ -138,7 +136,9 @@ export function buildStatusMessage(args: StatusArgs): string {
   const sessionLine = [
     `Session: ${args.sessionKey ?? "unknown"}`,
     `scope ${args.sessionScope ?? "per-sender"}`,
-    entry?.updatedAt ? `updated ${formatAge(now - entry.updatedAt)}` : "no activity",
+    entry?.updatedAt
+      ? `updated ${formatAge(now - entry.updatedAt)}`
+      : "no activity",
     args.storePath ? `store ${abbreviatePath(args.storePath)}` : undefined,
   ]
     .filter(Boolean)
@@ -155,7 +155,13 @@ export function buildStatusMessage(args: StatusArgs): string {
 
   const helpersLine = "Shortcuts: /new reset | /restart relink";
 
-  return [ "⚙️ Status", webLine, agentLine, contextLine, sessionLine, optionsLine, helpersLine ].join(
-    "\n",
-  );
+  return [
+    "⚙️ Status",
+    webLine,
+    agentLine,
+    contextLine,
+    sessionLine,
+    optionsLine,
+    helpersLine,
+  ].join("\n");
 }
