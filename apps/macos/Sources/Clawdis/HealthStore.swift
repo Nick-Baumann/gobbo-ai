@@ -155,6 +155,10 @@ final class HealthStore: ObservableObject {
             return "Not linked — run clawdis login"
         }
         if let connect = snap.web.connect, !connect.ok {
+            if let err = connect.error, err.contains("timeout") {
+                let elapsed = connect.elapsedMs.map { " after \(Int($0))ms" } ?? ""
+                return "Web connect timed out\(elapsed)"
+            }
             let code = connect.status.map { "status \($0)" } ?? "status unknown"
             let elapsed = connect.elapsedMs.map { "\(Int($0))ms" } ?? "unknown duration"
             let reason = connect.error ?? "connect failed"
