@@ -71,10 +71,42 @@ const startChat = async () => {
   const { Agent } = await import("./agent/agent.js");
   const { ChatPanel } = await import("./ChatPanel.js");
   const { AppStorage, setAppStorage } = await import("./storage/app-storage.js");
+  const { SettingsStore } = await import("./storage/stores/settings-store.js");
+  const { ProviderKeysStore } = await import("./storage/stores/provider-keys-store.js");
+  const { SessionsStore } = await import("./storage/stores/sessions-store.js");
+  const { CustomProvidersStore } = await import("./storage/stores/custom-providers-store.js");
+  const { IndexedDBStorageBackend } = await import("./storage/backends/indexeddb-storage-backend.js");
   const { getModel } = await import("@mariozechner/pi-ai");
   logStatus("boot: modules loaded");
 
-  const storage = new AppStorage();
+  // Initialize storage with an in-browser IndexedDB backend.
+  const backend = new IndexedDBStorageBackend({
+    dbName: "clawdis-webchat",
+    version: 1,
+    stores: [
+      new SettingsStore().getConfig(),
+      new ProviderKeysStore().getConfig(),
+      new SessionsStore().getConfig(),
+      SessionsStore.getMetadataConfig(),
+      new CustomProvidersStore().getConfig(),
+    ],
+  });
+  const settingsStore = new SettingsStore();
+  const providerKeysStore = new ProviderKeysStore();
+  const sessionsStore = new SessionsStore();
+  const customProvidersStore = new CustomProvidersStore();
+
+  for (const store of [settingsStore, providerKeysStore, sessionsStore, customProvidersStore]) {
+    store.setBackend(backend);
+  }
+
+  const storage = new AppStorage(
+    settingsStore,
+    providerKeysStore,
+    sessionsStore,
+    customProvidersStore,
+    backend,
+  );
   setAppStorage(storage);
 
   const agent = new Agent({
