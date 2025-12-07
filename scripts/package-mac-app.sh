@@ -15,6 +15,9 @@ GIT_COMMIT=$(cd "$ROOT_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "u
 APP_VERSION="${APP_VERSION:-$PKG_VERSION}"
 APP_BUILD="${APP_BUILD:-$PKG_VERSION}"
 
+echo "📦 Building JS (pnpm build)"
+(cd "$ROOT_DIR" && pnpm build)
+
 cd "$ROOT_DIR/apps/macos"
 
 echo "🔨 Building $PRODUCT (debug)"
@@ -26,6 +29,7 @@ echo "🧹 Cleaning old app bundle"
 rm -rf "$APP_ROOT"
 mkdir -p "$APP_ROOT/Contents/MacOS"
 mkdir -p "$APP_ROOT/Contents/Resources"
+mkdir -p "$APP_ROOT/Contents/Resources/Relay"
 
 echo "📄 Writing Info.plist"
 cat > "$APP_ROOT/Contents/Info.plist" <<PLIST
@@ -78,6 +82,36 @@ cp "$ROOT_DIR/apps/macos/Sources/Clawdis/Resources/Clawdis.icns" "$APP_ROOT/Cont
 
 echo "📦 Copying WebChat resources"
 rsync -a "$ROOT_DIR/apps/macos/Sources/Clawdis/Resources/WebChat" "$APP_ROOT/Contents/Resources/"
+
+RELAY_DIR="$APP_ROOT/Contents/Resources/Relay"
+BUN_SRC="${BUN_PATH:-$(command -v bun || true)}"
+if [ -z "$BUN_SRC" ] || [ ! -x "$BUN_SRC" ]; then
+  echo "bun binary not found (set BUN_PATH to override)" >&2
+  exit 1
+fi
+
+echo "🧰 Staging relay runtime (bun + dist + node_modules)"
+cp "$BUN_SRC" "$RELAY_DIR/bun"
+chmod +x "$RELAY_DIR/bun"
+rsync -a --delete --exclude "Clawdis.app" "$ROOT_DIR/dist/" "$RELAY_DIR/dist/"
+cp "$ROOT_DIR/package.json" "$RELAY_DIR/"
+cp "$ROOT_DIR/pnpm-lock.yaml" "$RELAY_DIR/"
+if [ -f "$ROOT_DIR/.npmrc" ]; then
+  cp "$ROOT_DIR/.npmrc" "$RELAY_DIR/"
+fi
+
+echo "📦 Installing prod node_modules into bundle (hoisted, scripts enabled for sharp)"
+PNPM_STORE_DIR="$RELAY_DIR/.pnpm-store" \
+PNPM_HOME="$HOME/Library/pnpm" \
+pnpm install \
+  --prod \
+  --frozen-lockfile \
+  --config.node-linker=hoisted \
+  --config.ignore-workspace-root-check=true \
+  --config.shared-workspace-lockfile=false \
+  --modules-dir "$RELAY_DIR/node_modules" \
+  --lockfile-dir "$ROOT_DIR" \
+  --dir "$RELAY_DIR"
 
 if [ -f "$CLI_BIN" ]; then
   echo "🔧 Copying CLI helper"

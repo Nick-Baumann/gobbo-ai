@@ -108,21 +108,23 @@ final class HealthStore: ObservableObject {
             env: env,
             timeout: 15)
 
-        guard response.ok, let data = response.payload, !data.isEmpty else {
-            self.lastError = response.message ?? "health probe failed"
-            if onDemand { self.snapshot = nil }
+        // Always try to decode JSON even when the CLI exits non-zero; it prints the
+        // failure snapshot before exiting so we can surface a useful message.
+        if let data = response.payload, !data.isEmpty,
+           let decoded = try? JSONDecoder().decode(HealthSnapshot.self, from: data)
+        {
+            self.snapshot = decoded
+            if response.ok {
+                self.lastSuccess = Date()
+                self.lastError = nil
+            } else {
+                self.lastError = self.describeFailure(from: decoded)
+            }
             return
         }
 
-        do {
-            let decoded = try JSONDecoder().decode(HealthSnapshot.self, from: data)
-            self.snapshot = decoded
-            self.lastSuccess = Date()
-            self.lastError = nil
-        } catch {
-            self.lastError = error.localizedDescription
-            if onDemand { self.snapshot = nil }
-        }
+        self.lastError = response.message ?? "health probe failed"
+        if onDemand { self.snapshot = nil }
     }
 
     var state: HealthState {
@@ -146,6 +148,22 @@ final class HealthStore: ObservableObject {
             return "Link stale? status \(code)"
         }
         return "linked · auth \(auth) · socket ok"
+    }
+
+    private func describeFailure(from snap: HealthSnapshot) -> String {
+        if !snap.web.linked {
+            return "Not linked — run clawdis login"
+        }
+        if let connect = snap.web.connect, !connect.ok {
+            let code = connect.status.map { "status \($0)" } ?? "status unknown"
+            let elapsed = connect.elapsedMs.map { "\(Int($0))ms" } ?? "unknown duration"
+            let reason = connect.error ?? "connect failed"
+            return "\(reason) (\(code), \(elapsed))"
+        }
+        if !snap.ipc.exists {
+            return "IPC socket missing at \(snap.ipc.path)"
+        }
+        return "health probe failed"
     }
 }
 
