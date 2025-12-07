@@ -411,6 +411,7 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
 final class WebChatManager {
     static let shared = WebChatManager()
     private var window: WebChatWindowController?
+    private var webView: WKWebView? { self.window?.value(forKey: "webView") as? WKWebView }
 
     func show(sessionKey: String) {
         if self.window == nil {
@@ -419,5 +420,29 @@ final class WebChatManager {
         self.window?.showWindow(nil)
         self.window?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Send a message into the active web chat session. Returns true if enqueued.
+    func sendMessage(_ text: String, thinking: String = "default", sessionKey: String = "main") -> Bool {
+        self.show(sessionKey: sessionKey)
+        guard let webView else { return false }
+        guard let script = try? JSONSerialization.data(withJSONObject: [
+            "text": text,
+            "thinking": thinking,
+        ]) else { return false }
+
+        let payload = String(data: script, encoding: .utf8) ?? ""
+        let js = "window.__clawdisEnqueueOutgoing(\(payload))"
+
+        var success = false
+        webView.evaluateJavaScript(js) { result, error in
+            if error == nil { success = true }
+            if let err = error {
+                webChatLogger.error("enqueue JS error: \(err.localizedDescription, privacy: .public)")
+            } else if let res = result {
+                webChatLogger.debug("enqueue JS result: \(String(describing: res), privacy: .public)")
+            }
+        }
+        return success
     }
 }
