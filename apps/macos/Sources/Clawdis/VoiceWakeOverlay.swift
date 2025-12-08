@@ -381,8 +381,9 @@ private struct VoiceWakeOverlayView: View {
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(
-                .regularMaterial,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.regularMaterial)
+                    .shadow(color: Color.black.opacity(0.22), radius: 14, x: 0, y: 4))
             .onHover { self.isHovering = $0 }
 
             // Close button rendered above and outside the clipped bubble
