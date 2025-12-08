@@ -14,6 +14,12 @@ actor AgentRPC {
         let reason: String?
     }
 
+    struct JobStateEvent: Codable {
+        let id: String
+        let state: String
+        let durationMs: Double?
+    }
+
     static let heartbeatNotification = Notification.Name("clawdis.rpc.heartbeat")
 
     private var process: Process?
@@ -23,6 +29,7 @@ actor AgentRPC {
     private var waiters: [CheckedContinuation<String, Error>] = []
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "agent.rpc")
     private var starting = false
+    private var activeJobs = 0
 
     private struct RpcError: Error { let message: String }
 
@@ -196,11 +203,30 @@ actor AgentRPC {
                 }
                 continue
             }
+            if let jobEvent = self.parseJobStateEvent(from: line) {
+                Task { await self.updateJobState(jobEvent) }
+                continue
+            }
 
             if let waiter = waiters.first {
                 self.waiters.removeFirst()
                 waiter.resume(returning: line)
             }
+        }
+    }
+
+    private func updateJobState(_ evt: JobStateEvent) async {
+        switch evt.state.lowercased() {
+        case "started", "streaming":
+            self.activeJobs &+= 1
+        case "done", "error":
+            self.activeJobs = max(0, self.activeJobs - 1)
+        default:
+            break
+        }
+        let working = self.activeJobs > 0
+        await MainActor.run {
+            AppStateStore.shared.setWorking(working)
         }
     }
 
@@ -220,6 +246,24 @@ actor AgentRPC {
         let decoder = JSONDecoder()
         guard let payloadData = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
         return try? decoder.decode(HeartbeatEvent.self, from: payloadData)
+    }
+
+    private func parseJobStateEvent(from line: String) -> JobStateEvent? {
+        guard let data = line.data(using: .utf8) else { return nil }
+        guard
+            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let type = obj["type"] as? String,
+            type == "event",
+            let evt = obj["event"] as? String,
+            evt == "job-state",
+            let payload = obj["payload"] as? [String: Any]
+        else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        guard let payloadData = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+        return try? decoder.decode(JobStateEvent.self, from: payloadData)
     }
 
     private func nextLine() async throws -> String {

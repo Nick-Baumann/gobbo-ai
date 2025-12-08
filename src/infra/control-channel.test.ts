@@ -50,11 +50,18 @@ describe("control channel", () => {
       const frame = { type: "request", id, method, params };
       client.write(`${JSON.stringify(frame)}\n`);
       const onData = (chunk: Buffer) => {
-        const line = chunk.toString("utf8").trim();
-        const parsed = JSON.parse(line) as { id?: string };
-        if (parsed.id === id) {
-          client.off("data", onData);
-          resolve(parsed as Record<string, unknown>);
+        const lines = chunk.toString("utf8").trim().split(/\n/);
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line) as { id?: string };
+            if (parsed.id === id) {
+              client.off("data", onData);
+              resolve(parsed as Record<string, unknown>);
+              return;
+            }
+          } catch {
+            /* ignore non-JSON noise */
+          }
         }
       };
       client.on("data", onData);
