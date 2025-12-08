@@ -107,6 +107,8 @@ cp "$ROOT_DIR/apps/macos/Sources/Clawdis/Resources/Clawdis.icns" "$APP_ROOT/Cont
 
 echo "📦 Copying WebChat resources"
 rsync -a "$ROOT_DIR/apps/macos/Sources/Clawdis/Resources/WebChat" "$APP_ROOT/Contents/Resources/"
+echo "🧹 Removing unused pdfjs legacy bundle"
+rm -rf "$APP_ROOT/Contents/Resources/WebChat/vendor/pdfjs-dist/legacy"
 
 RELAY_DIR="$APP_ROOT/Contents/Resources/Relay"
 BUN_SRC="${BUN_PATH:-$(command -v bun || true)}"

@@ -212,59 +212,34 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
     private func runAgent(text: String, sessionKey: String) async -> (text: String?, error: String?) {
         await MainActor.run { AppStateStore.shared.setWorking(true) }
         defer { Task { await MainActor.run { AppStateStore.shared.setWorking(false) } } }
-        let data: Data
-        do {
-            data = try await Task.detached(priority: .utility) { () -> Data in
-                let command = CommandResolver.clawdisCommand(
-                    subcommand: "agent",
-                    extraArgs: ["--to", sessionKey, "--message", text, "--json"])
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: command.first ?? "/usr/bin/env")
-                process.arguments = Array(command.dropFirst())
-                if command.first != "/usr/bin/ssh" {
-                    process.currentDirectoryURL = URL(fileURLWithPath: CommandResolver.projectRootPath())
-                }
-
-                var env = ProcessInfo.processInfo.environment
-                env["PATH"] = CommandResolver.preferredPaths().joined(separator: ":")
-                process.environment = env
-
-                let pipe = Pipe()
-                let errPipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = errPipe
-
-                try process.run()
-                process.waitUntilExit()
-                let out = pipe.fileHandleForReading.readDataToEndOfFile()
-                let err = errPipe.fileHandleForReading.readDataToEndOfFile()
-                guard process.terminationStatus == 0 else {
-                    let combined = String(data: out.isEmpty ? err : out, encoding: .utf8)
-                    throw NSError(
-                        domain: "ClawdisAgent",
-                        code: Int(process.terminationStatus),
-                        userInfo: [NSLocalizedDescriptionKey: combined?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown error"])
-                }
-                return out
-            }.value
-        } catch {
-            return (nil, error.localizedDescription)
-        }
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let payloads = obj["payloads"] as? [[String: Any]],
-           let first = payloads.first,
-           let text = first["text"] as? String
-        {
-            return (text, nil)
-        }
-        return (String(data: data, encoding: .utf8), nil)
+        let result = await AgentRPC.shared.send(
+            text: text,
+            thinking: "default",
+            session: sessionKey,
+            deliver: false,
+            to: nil)
+        return (result.text, result.error)
     }
 
     private static func loadInitialMessagesJSON(for sessionKey: String) -> String {
-        guard let sessionId = self.sessionId(for: sessionKey) else { return "[]" }
-        let path = self.expand("~/.clawdis/sessions/\(sessionId).jsonl")
-        guard FileManager.default.fileExists(atPath: path) else { return "[]" }
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return "[]" }
+        // Prefer remote session log when running in remote mode; fall back to local files.
+        var content: String?
+        if self.connectionModeIsRemote(),
+           let sessionId = self.remoteSessionId(for: sessionKey),
+           let data = self.readRemoteFile("$HOME/.clawdis/sessions/\(sessionId).jsonl"),
+           let text = String(data: data, encoding: .utf8)
+        {
+            content = text
+        } else if let sessionId = self.sessionId(for: sessionKey) {
+            let path = self.expand("~/.clawdis/sessions/\(sessionId).jsonl")
+            if FileManager.default.fileExists(atPath: path),
+               let text = try? String(contentsOfFile: path, encoding: .utf8)
+            {
+                content = text
+            }
+        }
+
+        guard let content else { return "[]" }
 
         var messages: [[String: Any]] = []
         for line in content.split(whereSeparator: { $0.isNewline }) {
@@ -296,6 +271,58 @@ final class WebChatWindowController: NSWindowController, WKScriptMessageHandler,
         guard let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         guard let entry = decoded[key] as? [String: Any] else { return nil }
         return entry["sessionId"] as? String
+    }
+
+    // MARK: - Remote session helpers
+
+    private static func connectionModeIsRemote() -> Bool {
+        let modeRaw = UserDefaults.standard.string(forKey: connectionModeKey) ?? "local"
+        return modeRaw == AppState.ConnectionMode.remote.rawValue
+    }
+
+    private static func remoteSettings() -> (target: String, identity: String)? {
+        guard self.connectionModeIsRemote() else { return nil }
+        let rawTarget = UserDefaults.standard.string(forKey: remoteTargetKey) ?? ""
+        let target = VoiceWakeForwarder.sanitizedTarget(rawTarget)
+        let identity = UserDefaults.standard.string(forKey: remoteIdentityKey) ?? ""
+        return (target: target, identity: identity)
+    }
+
+    private static func remoteSessionId(for key: String) -> String? {
+        guard let data = self.readRemoteFile("$HOME/.clawdis/sessions/sessions.json") else { return nil }
+        guard let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        guard let entry = decoded[key] as? [String: Any] else { return nil }
+        return entry["sessionId"] as? String
+    }
+
+    private static func readRemoteFile(_ path: String) -> Data? {
+        guard let settings = self.remoteSettings(),
+              let parsed = VoiceWakeForwarder.parse(target: settings.target)
+        else { return nil }
+
+        var sshArgs: [String] = ["-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes"]
+        if parsed.port > 0 { sshArgs.append(contentsOf: ["-p", String(parsed.port)]) }
+        let identity = settings.identity.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !identity.isEmpty { sshArgs.append(contentsOf: ["-i", identity]) }
+        let userHost = parsed.user.map { "\($0)@\(parsed.host)" } ?? parsed.host
+        sshArgs.append(userHost)
+
+        // Avoid single-quoting to preserve $HOME expansion; escape double quotes instead.
+        let escapedPath = path.replacingOccurrences(of: "\"", with: "\\\"")
+        let script = "cat \"\(escapedPath)\""
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        process.arguments = sshArgs + ["/bin/sh", "-c", script]
+        let out = Pipe()
+        let err = Pipe()
+        process.standardOutput = out
+        process.standardError = err
+
+        do { try process.run() } catch { return nil }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return out.fileHandleForReading.readDataToEndOfFile()
     }
 
     private static func expand(_ path: String) -> String {
