@@ -209,7 +209,7 @@ final class VoiceWakeOverlayController: ObservableObject {
 
         let contentHeight = ceil(used.height + (textInset.height * 2))
         let total = contentHeight + self.verticalPadding * 2
-        return max(48, min(total, 220))
+        return max(48, min(total, 400))
     }
 
     private func dismissTargetFrame(for frame: NSRect, reason: DismissReason, outcome: SendOutcome) -> NSRect? {
@@ -354,7 +354,7 @@ private struct TranscriptTextView: NSViewRepresentable {
         let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
-        scroll.hasVerticalScroller = false
+        scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = false
         scroll.documentView = textView
         return scroll
