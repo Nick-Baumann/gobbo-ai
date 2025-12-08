@@ -28,7 +28,10 @@ actor VoiceWakeRuntime {
     private var currentConfig: RuntimeConfig?
 
     // Tunables
+    // Silence threshold once we've captured user speech (post-trigger).
     private let silenceWindow: TimeInterval = 2.0
+    // Silence threshold when we only heard the trigger but no post-trigger speech yet.
+    private let triggerOnlySilenceWindow: TimeInterval = 5.0
     // Maximum capture duration from trigger until we force-send, to avoid runaway sessions.
     private let captureHardStop: TimeInterval = 120.0
     private let debounceAfterSend: TimeInterval = 0.35
@@ -233,7 +236,8 @@ actor VoiceWakeRuntime {
                 return
             }
 
-            if let last = self.lastHeard, now.timeIntervalSince(last) >= self.silenceWindow {
+            let silenceThreshold = self.heardBeyondTrigger ? self.silenceWindow : self.triggerOnlySilenceWindow
+            if let last = self.lastHeard, now.timeIntervalSince(last) >= silenceThreshold {
                 await self.finalizeCapture(config: config)
                 return
             }
