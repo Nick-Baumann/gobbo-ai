@@ -22,6 +22,8 @@ actor VoiceWakeRuntime {
     private var capturedTranscript: String = ""
     private var isCapturing: Bool = false
     private var heardBeyondTrigger: Bool = false
+    private var committedTranscript: String = ""
+    private var volatileTranscript: String = ""
     private var cooldownUntil: Date?
     private var currentConfig: RuntimeConfig?
 
@@ -97,7 +99,8 @@ actor VoiceWakeRuntime {
             self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                 guard let self else { return }
                 let transcript = result?.bestTranscription.formattedString
-                Task { await self.handleRecognition(transcript: transcript, error: error, config: config) }
+                let isFinal = result?.isFinal ?? false
+                Task { await self.handleRecognition(transcript: transcript, isFinal: isFinal, error: error, config: config) }
             }
 
             self.logger.info("voicewake runtime started")
@@ -134,6 +137,7 @@ actor VoiceWakeRuntime {
 
     private func handleRecognition(
         transcript: String?,
+        isFinal: Bool,
         error: Error?,
         config: RuntimeConfig) async
     {
@@ -150,8 +154,18 @@ actor VoiceWakeRuntime {
                 let trimmed = Self.trimmedAfterTrigger(transcript, triggers: config.triggers)
                 self.capturedTranscript = trimmed
                 self.updateHeardBeyondTrigger(withTrimmed: trimmed)
-                let snapshot = self.capturedTranscript
-                let attributed = Self.makeAttributed(transcript: snapshot, isFinal: false)
+                if isFinal {
+                    self.committedTranscript = trimmed
+                    self.volatileTranscript = ""
+                } else {
+                    self.volatileTranscript = Self.delta(after: self.committedTranscript, current: trimmed)
+                }
+
+                let attributed = Self.makeAttributed(
+                    committed: self.committedTranscript,
+                    volatile: self.volatileTranscript,
+                    isFinal: isFinal)
+                let snapshot = self.committedTranscript + self.volatileTranscript
                 await MainActor.run {
                     VoiceWakeOverlayController.shared.showPartial(transcript: snapshot, attributed: attributed)
                 }
@@ -183,12 +197,17 @@ actor VoiceWakeRuntime {
         self.isCapturing = true
         let trimmed = Self.trimmedAfterTrigger(transcript, triggers: config.triggers)
         self.capturedTranscript = trimmed
+        self.committedTranscript = ""
+        self.volatileTranscript = trimmed
         self.captureStartedAt = Date()
         self.cooldownUntil = nil
         self.heardBeyondTrigger = !trimmed.isEmpty
 
-        let snapshot = self.capturedTranscript
-        let attributed = Self.makeAttributed(transcript: snapshot, isFinal: false)
+        let snapshot = self.committedTranscript + self.volatileTranscript
+        let attributed = Self.makeAttributed(
+            committed: self.committedTranscript,
+            volatile: self.volatileTranscript,
+            isFinal: false)
         await MainActor.run {
             VoiceWakeOverlayController.shared.showPartial(transcript: snapshot, attributed: attributed)
         }
@@ -245,7 +264,10 @@ actor VoiceWakeRuntime {
 
         let forwardConfig = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
         let delay: TimeInterval = (heardBeyondTrigger && !finalTranscript.isEmpty) ? 1.0 : 3.0
-        let finalAttributed = Self.makeAttributed(transcript: finalTranscript, isFinal: true)
+        let finalAttributed = Self.makeAttributed(
+            committed: finalTranscript,
+            volatile: "",
+            isFinal: true)
         await MainActor.run {
             VoiceWakeOverlayController.shared.presentFinal(
                 transcript: finalTranscript,
@@ -258,14 +280,14 @@ actor VoiceWakeRuntime {
         self.restartRecognizer()
     }
 
-private func restartRecognizer() {
+    private func restartRecognizer() {
         // Restart the recognizer so we listen for the next trigger with a clean buffer.
         let current = self.currentConfig
         self.stop()
         if let current {
             Task { await self.start(with: current) }
         }
-}
+    }
 
     private func updateHeardBeyondTrigger(withTrimmed trimmed: String) {
         if !self.heardBeyondTrigger, !trimmed.isEmpty {
@@ -295,7 +317,7 @@ private func restartRecognizer() {
     }
 
     static func _testAttributedColor(isFinal: Bool) -> NSColor {
-        self.makeAttributed(transcript: "sample", isFinal: isFinal)
+        self.makeAttributed(committed: "sample", volatile: "", isFinal: isFinal)
             .attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor ?? .clear
     }
 
@@ -304,9 +326,21 @@ private func restartRecognizer() {
     }
     #endif
 
-    private static func makeAttributed(transcript: String, isFinal: Bool) -> NSAttributedString {
-        let color: NSColor = isFinal ? .labelColor : .secondaryLabelColor
-        let attrs: [NSAttributedString.Key: Any] = [.foregroundColor: color]
-        return NSAttributedString(string: transcript, attributes: attrs)
+    private static func delta(after committed: String, current: String) -> String {
+        if current.hasPrefix(committed) {
+            let start = current.index(current.startIndex, offsetBy: committed.count)
+            return String(current[start...])
+        }
+        return current
+    }
+
+    private static func makeAttributed(committed: String, volatile: String, isFinal: Bool) -> NSAttributedString {
+        let full = NSMutableAttributedString()
+        let committedAttr: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.labelColor]
+        full.append(NSAttributedString(string: committed, attributes: committedAttr))
+        let volatileColor: NSColor = isFinal ? .labelColor : .secondaryLabelColor
+        let volatileAttr: [NSAttributedString.Key: Any] = [.foregroundColor: volatileColor]
+        full.append(NSAttributedString(string: volatile, attributes: volatileAttr))
+        return full
     }
 }
