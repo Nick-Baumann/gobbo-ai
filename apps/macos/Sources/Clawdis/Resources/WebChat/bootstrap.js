@@ -1,7 +1,7 @@
 // Bundled entry point for the macOS WKWebView web chat.
 // This replaces the inline module script in index.html so we can ship a single JS bundle.
 
-/* global window, document, crypto */
+/* global window, document */
 
 if (!globalThis.process) {
   // Some vendor modules peek at process.env; provide a minimal stub for browser.
@@ -11,9 +11,6 @@ if (!globalThis.process) {
 const logStatus = (msg) => {
   try {
     console.log(msg);
-    if (typeof window.__clawdisLog === "function") {
-      window.__clawdisLog(msg);
-    }
     const el = document.getElementById("app");
     if (el && !el.dataset.booted) el.textContent = msg;
   } catch {
@@ -21,13 +18,21 @@ const logStatus = (msg) => {
   }
 };
 
-const getBootstrap = () => {
-  const bootstrap = window.__clawdisBootstrap || {};
+async function fetchBootstrap() {
+  const params = new URLSearchParams(window.location.search);
+  const sessionKey = params.get("session") || "main";
+  const infoUrl = new URL(`./info?session=${encodeURIComponent(sessionKey)}`, window.location.href);
+  const infoResp = await fetch(infoUrl, { credentials: "omit" });
+  if (!infoResp.ok) {
+    throw new Error(`webchat info failed (${infoResp.status})`);
+  }
+  const info = await infoResp.json();
   return {
-    initialMessages: Array.isArray(bootstrap.initialMessages) ? bootstrap.initialMessages : [],
-    sessionKey: typeof bootstrap.sessionKey === "string" ? bootstrap.sessionKey : "main",
+    sessionKey,
+    basePath: info.basePath || "/webchat/",
+    initialMessages: Array.isArray(info.initialMessages) ? info.initialMessages : [],
   };
-};
+}
 
 class NativeTransport {
   constructor(sessionKey) {
@@ -35,10 +40,27 @@ class NativeTransport {
   }
 
   async *run(messages, userMessage, cfg, signal) {
-    const result = await window.__clawdisSend({
-      type: "chat",
-      payload: { text: userMessage.content?.[0]?.text ?? "", sessionKey: this.sessionKey },
+    const rpcUrl = new URL("./rpc", window.location.href);
+    const resultResp = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: userMessage.content?.[0]?.text ?? "",
+        session: this.sessionKey,
+      }),
+      signal,
     });
+
+    if (!resultResp.ok) {
+      throw new Error(`rpc failed (${resultResp.status})`);
+    }
+    const body = await resultResp.json();
+    if (!body.ok) {
+      throw new Error(body.error || "rpc error");
+    }
+    const first = Array.isArray(body.payloads) ? body.payloads[0] : undefined;
+    const text = (first?.text ?? "").toString();
+
     const usage = {
       input: 0,
       output: 0,
@@ -48,7 +70,7 @@ class NativeTransport {
     };
     const assistant = {
       role: "assistant",
-      content: [{ type: "text", text: result.text ?? "" }],
+      content: [{ type: "text", text }],
       api: cfg.model.api,
       provider: cfg.model.provider,
       model: cfg.model.id,
@@ -65,7 +87,8 @@ class NativeTransport {
 }
 
 const startChat = async () => {
-  const { initialMessages, sessionKey } = getBootstrap();
+  logStatus("boot: fetching session info");
+  const { initialMessages, sessionKey } = await fetchBootstrap();
 
   logStatus("boot: starting imports");
   const { Agent } = await import("./agent/agent.js");

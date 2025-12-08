@@ -1,6 +1,6 @@
 # Web Chat (macOS app)
 
-The macOS menu bar app ships a bundled web UI (pi-web-ui) rendered inside WKWebView. It reuses the **primary Clawd session** (`main` by default, configurable via `inbound.reply.session.mainKey`) and never opens a local HTTP port.
+The macOS menu bar app opens the relay’s loopback web chat server in a WKWebView. It reuses the **primary Clawd session** (`main` by default, configurable via `inbound.reply.session.mainKey`). The server is started by the Node relay (default port 18788, see `webchat.port`).
 
 ## Launch & debugging
 - Manual: Lobster menu → “Open Chat”.
@@ -9,13 +9,12 @@ The macOS menu bar app ships a bundled web UI (pi-web-ui) rendered inside WKWebV
 - WK logs: navigation lifecycle, readyState, js location, and JS errors/unhandled rejections are mirrored to OSLog for easier diagnosis.
 
 ## How it’s wired
-- Assets: `apps/macos/Sources/Clawdis/Resources/WebChat/` contains the `pi-web-ui` dist plus a local import map pointing at bundled vendor modules and a tiny `pi-ai` stub. Everything loads from the app bundle (file URLs, no network).
-- Bridge: `WKScriptMessageHandler` named `clawdis` in `WebChatWindow.swift`. JS posts `{type:"chat", payload:{text, sessionKey}}`; Swift shells `pnpm clawdis agent --to <sessionKey> --message <text> --json`, returns the first payload text, and hydrates the UI with prior messages from `~/.clawdis/sessions/<SessionId>.jsonl`.
+- Assets: `apps/macos/Sources/Clawdis/Resources/WebChat/` contains the `pi-web-ui` dist plus a local import map pointing at bundled vendor modules and a tiny `pi-ai` stub. Everything is served from the relay at `/webchat/*`.
+- Bridge: none. The web UI calls `/webchat/rpc` directly; Swift no longer proxies messages.
 - Session: always primary; multiple transports (WhatsApp/Telegram/Desktop) share the same session key so context is unified.
 
 ## Security / surface area
-- No local server is started; everything is `file://` within the app bundle.
-- CSP is set to `default-src 'self' 'unsafe-inline' data: blob:` to keep module imports bundle-local.
+- Loopback server only; remote mode uses SSH port-forwarding from the relay host to the Mac. CSP is set to `default-src 'self' 'unsafe-inline' data: blob:`.
 - Web Inspector is opt-in via right-click; otherwise WKWebView stays in the app sandbox.
 
 ## Known limitations
