@@ -117,6 +117,10 @@ actor VoiceWakeRuntime {
         self.audioEngine.stop()
         self.currentConfig = nil
         self.logger.debug("voicewake runtime stopped")
+
+        Task { @MainActor in
+            VoiceWakeOverlayController.shared.dismiss()
+        }
     }
 
     private func configureSession(localeID: String?) {
@@ -140,6 +144,9 @@ actor VoiceWakeRuntime {
             self.lastHeard = now
             if self.isCapturing {
                 self.capturedTranscript = transcript
+                await MainActor.run {
+                    VoiceWakeOverlayController.shared.showPartial(transcript: transcript)
+                }
             }
         }
 
@@ -169,6 +176,10 @@ actor VoiceWakeRuntime {
         self.capturedTranscript = transcript
         self.captureStartedAt = Date()
         self.cooldownUntil = nil
+
+        await MainActor.run {
+            VoiceWakeOverlayController.shared.showPartial(transcript: transcript)
+        }
 
         await MainActor.run { AppStateStore.shared.triggerVoiceEars(ttl: nil) }
 
@@ -218,26 +229,28 @@ actor VoiceWakeRuntime {
 
         await MainActor.run { AppStateStore.shared.stopVoiceEars() }
 
-        if !finalTranscript.isEmpty {
-            await self.send(transcript: finalTranscript, config: config)
+        guard !finalTranscript.isEmpty else {
+            await MainActor.run { VoiceWakeOverlayController.shared.dismiss(reason: .empty) }
+            self.cooldownUntil = Date().addingTimeInterval(self.debounceAfterSend)
+            self.restartRecognizer()
+            return
+        }
+
+        let forwardConfig = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
+        await MainActor.run {
+            VoiceWakeOverlayController.shared.presentFinal(transcript: finalTranscript, forwardConfig: forwardConfig)
         }
 
         self.cooldownUntil = Date().addingTimeInterval(self.debounceAfterSend)
+        self.restartRecognizer()
+    }
 
+    private func restartRecognizer() {
         // Restart the recognizer so we listen for the next trigger with a clean buffer.
         let current = self.currentConfig
         self.stop()
-        if let current { await self.start(with: current) }
-    }
-
-    private func send(transcript: String, config: RuntimeConfig) async {
-        let forwardConfig = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
-        guard forwardConfig.enabled else { return }
-
-        let payload = VoiceWakeForwarder.prefixedTranscript(transcript)
-
-        Task.detached {
-            await VoiceWakeForwarder.forward(transcript: payload, config: forwardConfig)
+        if let current {
+            Task { await self.start(with: current) }
         }
     }
 
