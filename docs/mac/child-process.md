@@ -29,9 +29,9 @@ Run the Node-based Clawdis/clawdis relay as a direct child of the LSUIElement ap
 - Add a small `RelayProcessManager` (Swift) that owns:
   - `execution: Execution?` from `Swift Subprocess` to track the child.
   - `start(config)` called when “Clawdis Active” flips ON:
-    - binary: bundled Node or packaged relay CLI under `Clawdis.app/Contents/Resources/Relay/`
-    - args: current clawdis/clawdis entrypoint and flags
-    - cwd/env: point to `~/.clawdis` as today; inject `PATH` if the embedded Node isn’t on PATH
+    - binary: host Node or Bun running the bundled relay under `Clawdis.app/Contents/Resources/Relay/`
+    - args: current clawdis entrypoint and flags
+    - cwd/env: point to `~/.clawdis` as today; inject the expanded PATH so Homebrew Node/Bun resolve under launchd
     - output: stream stdout/stderr to `/tmp/clawdis-relay.log` (cap buffer via Subprocess OutputLimits)
     - restart: optional linear/backoff restart if exit was non-zero and Active is still true
   - `stop()` called when Active flips OFF or app terminates: cancel the execution and `waitUntilExit`.
@@ -41,11 +41,9 @@ Run the Node-based Clawdis/clawdis relay as a direct child of the LSUIElement ap
 - Keep the existing `LaunchdManager` around so we can switch back if needed; the toggle can choose between launchd or child mode with a flag if we want both.
 
 ## Packaging and signing
-- Bundle the relay runtime inside the app:
-  - Option A: embed a Node binary + JS entrypoint under `Contents/Resources/Relay/`.
-  - Option B: build a single binary via `pkg`/`nexe` and embed that.
-- Codesign the embedded runtime as nested code with the same team ID; notarization fails if nested code is unsigned.
-- If we keep using Homebrew Node, do *not* let it touch TCC; only the app/XPC should.
+- Bundle the relay payload (dist + production node_modules) under `Contents/Resources/Relay/`; rely on host Node ≥22 or Bun ≥1.3 instead of embedding a runtime.
+- Codesign native addons and dylibs inside the bundle; no nested runtime binary to sign now.
+- Host runtime should not call TCC APIs directly; keep privileged work inside the app/XPC.
 
 ## Logging and observability
 - Stream child stdout/stderr to `/tmp/clawdis-relay.log`; surface the last N lines in the Debug tab.
@@ -59,7 +57,7 @@ Run the Node-based Clawdis/clawdis relay as a direct child of the LSUIElement ap
 
 ## Open questions / follow-ups
 - Do we need dual-mode (launchd for prod, child for dev)? If yes, gate via a setting or build flag.
-- Should we embed Node or keep using the system/Homebrew Node? Embedding improves reproducibility and signing hygiene; Homebrew keeps bundle smaller but risks path/sandbox drift.
+- Embedding a runtime is off the table for now; we rely on host Node/Bun for size/simplicity. Revisit only if host PATH drift becomes painful.
 - Do we want a tiny signed helper for rare TCC actions that cannot be brokered via XPC?
 
 ## Decision snapshot (current recommendation)

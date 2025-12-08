@@ -207,14 +207,42 @@ enum CommandResolver {
         return FileManager.default.fileExists(atPath: relay.path) ? relay : nil
     }
 
-    private static func bundledRelayCommand(subcommand: String, extraArgs: [String]) -> [String]? {
-        guard let relay = self.bundledRelayRoot() else { return nil }
-        let bunPath = relay.appendingPathComponent("bun").path
-        let entry = relay.appendingPathComponent("dist/index.js").path
-        guard FileManager.default.isExecutableFile(atPath: bunPath),
-              FileManager.default.isReadableFile(atPath: entry)
-        else { return nil }
-        return [bunPath, entry, subcommand] + extraArgs
+    private static func relayEntrypoint(in root: URL) -> String? {
+        let distEntry = root.appendingPathComponent("dist/index.js").path
+        if FileManager.default.isReadableFile(atPath: distEntry) { return distEntry }
+        let binEntry = root.appendingPathComponent("bin/clawdis.js").path
+        if FileManager.default.isReadableFile(atPath: binEntry) { return binEntry }
+        return nil
+    }
+
+    private static func runtimeResolution() -> Result<RuntimeResolution, RuntimeResolutionError> {
+        RuntimeLocator.resolve(
+            preferred: ProcessInfo.processInfo.environment["CLAWDIS_RUNTIME"],
+            searchPaths: self.preferredPaths())
+    }
+
+    private static func makeRuntimeCommand(
+        runtime: RuntimeResolution,
+        entrypoint: String,
+        subcommand: String,
+        extraArgs: [String]
+    ) -> [String] {
+        [runtime.path, entrypoint, subcommand] + extraArgs
+    }
+
+    private static func runtimeErrorCommand(_ error: RuntimeResolutionError) -> [String] {
+        let message = RuntimeLocator.describeFailure(error)
+        return self.errorCommand(with: message)
+    }
+
+    private static func errorCommand(with message: String) -> [String] {
+        let script = """
+        cat <<'__CLAWDIS_ERR__' >&2
+        \(message)
+        __CLAWDIS_ERR__
+        exit 1
+        """
+        return ["/bin/sh", "-c", script]
     }
 
     static func projectRoot() -> URL {
@@ -296,22 +324,35 @@ enum CommandResolver {
         {
             return ssh
         }
-        if let bundled = self.bundledRelayCommand(subcommand: subcommand, extraArgs: extraArgs) {
-            return bundled
-        }
-        if let clawdisPath = self.clawdisExecutable() {
-            return [clawdisPath, subcommand] + extraArgs
-        }
-        if let node = self.findExecutable(named: "node") {
-            if let cli = self.nodeCliPath() {
-                return [node, cli, subcommand] + extraArgs
+
+        let runtimeResult = self.runtimeResolution()
+
+        switch runtimeResult {
+        case let .success(runtime):
+            if let relay = self.bundledRelayRoot(),
+               let entry = self.relayEntrypoint(in: relay)
+            {
+                return self.makeRuntimeCommand(runtime: runtime, entrypoint: entry, subcommand: subcommand, extraArgs: extraArgs)
             }
+
+            if let entry = self.relayEntrypoint(in: self.projectRoot()) {
+                return self.makeRuntimeCommand(runtime: runtime, entrypoint: entry, subcommand: subcommand, extraArgs: extraArgs)
+            }
+
+            if let clawdisPath = self.clawdisExecutable() {
+                return [clawdisPath, subcommand] + extraArgs
+            }
+            if let pnpm = self.findExecutable(named: "pnpm") {
+                // Use --silent to avoid pnpm lifecycle banners that would corrupt JSON outputs.
+                return [pnpm, "--silent", "clawdis", subcommand] + extraArgs
+            }
+
+            let missingEntry = "clawdis entrypoint missing (looked for dist/index.js or bin/clawdis.js); run pnpm build."
+            return self.errorCommand(with: missingEntry)
+
+        case let .failure(error):
+            return self.runtimeErrorCommand(error)
         }
-        if let pnpm = self.findExecutable(named: "pnpm") {
-            // Use --silent to avoid pnpm lifecycle banners that would corrupt JSON outputs.
-            return [pnpm, "--silent", "clawdis", subcommand] + extraArgs
-        }
-        return ["clawdis", subcommand] + extraArgs
     }
 
     static func clawdisMacCommand(subcommand: String, extraArgs: [String] = []) -> [String] {

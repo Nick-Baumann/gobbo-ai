@@ -111,15 +111,8 @@ echo "🧹 Removing unused pdfjs legacy bundle"
 rm -rf "$APP_ROOT/Contents/Resources/WebChat/vendor/pdfjs-dist/legacy"
 
 RELAY_DIR="$APP_ROOT/Contents/Resources/Relay"
-BUN_SRC="${BUN_PATH:-$(command -v bun || true)}"
-if [ -z "$BUN_SRC" ] || [ ! -x "$BUN_SRC" ]; then
-  echo "bun binary not found (set BUN_PATH to override)" >&2
-  exit 1
-fi
 
-echo "🧰 Staging relay runtime (bun + dist + node_modules)"
-cp "$BUN_SRC" "$RELAY_DIR/bun"
-chmod +x "$RELAY_DIR/bun"
+echo "🧰 Staging relay payload (dist + node_modules; expects system Node ≥22 or Bun ≥1.3)"
 rsync -a --delete --exclude "Clawdis.app" "$ROOT_DIR/dist/" "$RELAY_DIR/dist/"
 cp "$ROOT_DIR/package.json" "$RELAY_DIR/"
 cp "$ROOT_DIR/pnpm-lock.yaml" "$RELAY_DIR/"
