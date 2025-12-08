@@ -1,23 +1,56 @@
-# Web Chat (macOS menu bar)
+# Web Chat architecture (local + remote)
 
-The macOS Clawdis app embeds the `pi-web-ui` chat surface inside `WKWebView`, wired directly to your **primary session** (`main` unless `inbound.reply.session.mainKey` overrides it). No HTTP server is started; assets are bundled into the app and loaded from `file://`, so nothing is exposed on the network.
+Date: 2025-12-08 · Status: draft plan
 
-## How it works
-- **UI bundle**: `apps/macos/Sources/Clawdis/Resources/WebChat/` contains `pi-web-ui` dist plus vendor deps and a tiny `pi-ai` stub.
-- **Bridge**: a `WKScriptMessageHandler` named `clawdis` passes chat turns to `pnpm clawdis agent --to <sessionKey> --message ... --json` and returns the first payload text. Everything stays in-process—no sockets, no local web server.
-- **Session**: always uses the primary key; history is hydrated from `~/.clawdis/sessions/<SessionId>.jsonl` so turns from WhatsApp/Telegram show up here too.
+## Goal
+- Serve the Clawdis Web Chat UI from the Node relay (loopback-only HTTP), while the macOS app keeps the same UX by embedding it in a WKWebView.
+- Keep remote mode working: when Clawdis runs on a remote host via SSH, the mac app should still show the web chat backed by that remote relay (via an SSH tunnel).
 
-## Building/updating the bundle
-1. Ensure `../pi-mono` is present and `pnpm install` has been run there.
-2. Sync vendor files: copied from `../pi-mono/node_modules` into `apps/macos/Sources/Clawdis/Resources/WebChat/vendor` (run via repo scripts when updating).
-3. The mac app loads assets relative to the bundled folder with an import map; no external CDN or HTTP endpoints are used.
-4. Rebuild/restart the app with `./scripts/restart-mac.sh` (required so the new resources land in the app bundle).
+## Proposed architecture
+1) **Server location**
+   - A tiny HTTP server lives in the Node relay process.
+   - Bind to 127.0.0.1 on a chosen port (fixed or random with discovery endpoint).
+   - Serve static assets for `/webchat/` and a JSON RPC endpoint for sending messages.
 
-## Limitations
-- Text-only, single-turn response (no streaming yet; tools/attachments not plumbed).
-- The embedded `pi-ai` is a stub sufficient for UI wiring; provider selection is fixed to the primary Clawd session.
+2) **Endpoints**
+   - `GET /webchat/*`: serves bundled web assets (current WebChat build, moved from mac bundle into the Node package, e.g., `src/webchat/dist`).
+   - `GET /webchat/info`: returns `{ baseUrl, token? }` for the mac app to embed (token optional; see security below).
+   - `POST /webchat/rpc`: accepts `{ text, session, thinking?, deliver?, to? }` and replies with `{ ok, payloads?, error? }`. Internally calls the same agent pipeline that `clawdis rpc` uses today (in-process, no subprocess).
+   - (Optional) `GET /webchat/history?session=<key>`: returns pre-serialized message history so the mac app doesn’t scrape JSONL. Can be folded into `/webchat/info` as an `initialMessages` field.
 
-## Troubleshooting
-- Right-click → “Inspect Element” opens Web Inspector. Check the console for `boot:` messages.
-- Blank view usually means import map or vendor assets are missing; confirm files exist under `Resources/WebChat/vendor` and the import map points to relative paths.
-- Errors are rendered in-page in red if the boot script fails after parsing.
+3) **Sessions & history**
+   - Use the relay’s own session store (default `~/.clawdis/sessions/sessions.json` on the relay host). No SSH file reads from the mac app anymore.
+   - When the page loads, it receives `initialMessages` from the server (either embedded in `info` or via a history endpoint).
+   - Remote mode automatically shows the remote session because the remote relay owns that store.
+
+4) **Mac app embedding**
+   - On WebChatWindow init, the mac app calls `/webchat/info`:
+     - Local mode: directly over loopback (127.0.0.1:port chosen by relay).
+     - Remote mode: establish/reuse an SSH tunnel forwarding the relay’s webchat port to a local ephemeral port, then call `/webchat/info` through the tunnel and load the returned `baseUrl`.
+   - WKWebView loads `baseUrl` (e.g., `http://127.0.0.1:<forward>/webchat/`).
+   - Web page sends messages to `/webchat/rpc` (same origin as the static assets), so no extra mac plumbing.
+
+5) **Security**
+   - Bind to loopback only. For extra hardening, issue a random short-lived token in `/webchat/info` and require it as a header/query on `/webchat/rpc` and history.
+   - Remote mode relies on SSH port forwarding; no WAN exposure.
+
+6) **Failure handling**
+   - If `/webchat/info` fails, show an in-app error (“Web chat server unreachable”).
+   - Log the chosen port/URL and tunnel target in mac logs for debugging.
+   - History fetch failures fall back to an empty transcript but keep sending enabled.
+
+7) **Migration steps**
+   - Move WebChat bundle into the Node project (e.g., `src/webchat/dist`) and serve statically.
+   - Add the loopback HTTP server and `/webchat` routes to the relay startup.
+   - Expose `/webchat/info` (port + token + optional initialMessages).
+   - Mac app: replace local asset load with the fetched `baseUrl`; use SSH tunnel in remote mode.
+   - Remove mac-side JSONL scraping and `AgentRPC` usage for web chat; keep other agent uses intact.
+   - Tests: webchat loads + sends in local and remote modes; tunnel discovery works; history returns non-empty when sessions exist.
+
+8) **Current behavior (for reference, to be replaced)**
+   - Mac app reads remote session files over SSH (`clawdis sessions --json`, then `cat` the `.jsonl`) and injects history; sends via `clawdis rpc` subprocess. This document tracks the plan to move both pieces into the relay server instead.
+
+## Open questions
+- Fixed port vs random per run? (Random + info endpoint is safer.)
+- Token enforcement default on/off? (Recommended on when remote tunneling isn’t used.)
+- Should `/webchat/rpc` also expose typing/streaming? (Nice-to-have; not required for parity.)
