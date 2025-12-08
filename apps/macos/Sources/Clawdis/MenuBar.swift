@@ -185,13 +185,7 @@ private struct MenuContent: View {
 
     private var voiceWakeMicMenu: some View {
         Menu {
-            Picker("Microphone", selection: self.$state.voiceWakeMicID) {
-                Text(self.defaultMicLabel).tag("")
-                ForEach(self.availableMics) { mic in
-                    Text(mic.name).tag(mic.uid)
-                }
-            }
-            .labelsHidden()
+            self.microphoneMenuItems
 
             if self.loadingMics {
                 Divider()
@@ -206,9 +200,6 @@ private struct MenuContent: View {
                 Spacer()
                 Text(self.selectedMicLabel)
                     .foregroundStyle(.secondary)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
             }
         }
         .task { await self.loadMicrophones() }
@@ -220,6 +211,28 @@ private struct MenuContent: View {
             return match.name
         }
         return "Unavailable"
+    }
+
+    private var microphoneMenuItems: some View {
+        Group {
+            Button {
+                self.state.voiceWakeMicID = ""
+            } label: {
+                Label(self.defaultMicLabel, systemImage: self.state.voiceWakeMicID.isEmpty ? "checkmark" : "")
+                    .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(.plain)
+
+            ForEach(self.availableMics) { mic in
+                Button {
+                    self.state.voiceWakeMicID = mic.uid
+                } label: {
+                    Label(mic.name, systemImage: self.state.voiceWakeMicID == mic.uid ? "checkmark" : "")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var defaultMicLabel: String {
