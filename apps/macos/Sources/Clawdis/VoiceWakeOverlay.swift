@@ -35,7 +35,7 @@ final class VoiceWakeOverlayController: ObservableObject {
         self.present()
     }
 
-    func presentFinal(transcript: String, forwardConfig: VoiceWakeForwardConfig) {
+    func presentFinal(transcript: String, forwardConfig: VoiceWakeForwardConfig, delay: TimeInterval) {
         self.autoSendTask?.cancel()
         self.forwardConfig = forwardConfig
         self.model.text = transcript
@@ -43,7 +43,7 @@ final class VoiceWakeOverlayController: ObservableObject {
         self.model.forwardEnabled = forwardConfig.enabled
         self.model.isSending = false
         self.present()
-        self.scheduleAutoSend()
+        self.scheduleAutoSend(after: delay)
     }
 
     func userBeganEditing() {
@@ -178,10 +178,11 @@ final class VoiceWakeOverlayController: ObservableObject {
         }
     }
 
-    private func scheduleAutoSend() {
+    private func scheduleAutoSend(after delay: TimeInterval) {
         guard let forwardConfig, forwardConfig.enabled else { return }
         self.autoSendTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            let nanos = UInt64(delay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanos)
             self?.sendNow()
         }
     }

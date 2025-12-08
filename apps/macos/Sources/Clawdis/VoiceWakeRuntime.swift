@@ -18,6 +18,7 @@ actor VoiceWakeRuntime {
     private var captureTask: Task<Void, Never>?
     private var capturedTranscript: String = ""
     private var isCapturing: Bool = false
+    private var heardBeyondTrigger: Bool = false
     private var cooldownUntil: Date?
     private var currentConfig: RuntimeConfig?
 
@@ -144,6 +145,7 @@ actor VoiceWakeRuntime {
             self.lastHeard = now
             if self.isCapturing {
                 self.capturedTranscript = transcript
+                self.updateHeardBeyondTrigger(with: transcript)
                 await MainActor.run {
                     VoiceWakeOverlayController.shared.showPartial(transcript: transcript)
                 }
@@ -176,6 +178,7 @@ actor VoiceWakeRuntime {
         self.capturedTranscript = transcript
         self.captureStartedAt = Date()
         self.cooldownUntil = nil
+        self.heardBeyondTrigger = self.textHasBeyondTriggerContent(transcript)
 
         await MainActor.run {
             VoiceWakeOverlayController.shared.showPartial(transcript: transcript)
@@ -226,6 +229,8 @@ actor VoiceWakeRuntime {
         self.capturedTranscript = ""
         self.captureStartedAt = nil
         self.lastHeard = nil
+        let heardBeyondTrigger = self.heardBeyondTrigger
+        self.heardBeyondTrigger = false
 
         await MainActor.run { AppStateStore.shared.stopVoiceEars() }
 
@@ -237,8 +242,12 @@ actor VoiceWakeRuntime {
         }
 
         let forwardConfig = await MainActor.run { AppStateStore.shared.voiceWakeForwardConfig }
+        let delay: TimeInterval = heardBeyondTrigger ? 1.0 : 3.0
         await MainActor.run {
-            VoiceWakeOverlayController.shared.presentFinal(transcript: finalTranscript, forwardConfig: forwardConfig)
+            VoiceWakeOverlayController.shared.presentFinal(
+                transcript: finalTranscript,
+                forwardConfig: forwardConfig,
+                delay: delay)
         }
 
         self.cooldownUntil = Date().addingTimeInterval(self.debounceAfterSend)
@@ -251,6 +260,17 @@ actor VoiceWakeRuntime {
         self.stop()
         if let current {
             Task { await self.start(with: current) }
+        }
+    }
+
+    private func textHasBeyondTriggerContent(_ text: String) -> Bool {
+        let words = text.split(whereSeparator: { $0.isWhitespace })
+        return words.count > 1
+    }
+
+    private func updateHeardBeyondTrigger(with transcript: String) {
+        if !self.heardBeyondTrigger, self.textHasBeyondTriggerContent(transcript) {
+            self.heardBeyondTrigger = true
         }
     }
 
