@@ -330,14 +330,34 @@ private enum RemoteStatus: Equatable {
 
 extension GeneralSettings {
     private var healthRow: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(self.healthStore.state.tint)
-                .frame(width: 10, height: 10)
-            Text(self.healthStore.summaryLine)
-                .font(.callout)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(self.healthStore.state.tint)
+                    .frame(width: 10, height: 10)
+                Text(self.healthStore.summaryLine)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let detail = self.healthStore.detailLine {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                Button("Retry now") {
+                    Task { await HealthStore.shared.refresh(onDemand: true) }
+                }
+                .disabled(self.healthStore.isRefreshing)
+
+                Button("Open logs") { self.revealLogs() }
+                    .buttonStyle(.link)
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
         }
     }
 

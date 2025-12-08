@@ -149,6 +149,21 @@ final class HealthStore: ObservableObject {
         return "linked · auth \(auth) · socket ok"
     }
 
+    /// Short, human-friendly detail for the last failure, used in the UI.
+    var detailLine: String? {
+        if let error = self.lastError, !error.isEmpty {
+            let lower = error.lowercased()
+            if lower.contains("connection refused") {
+                return "The relay control port (127.0.0.1:18789) isn’t listening — restart Clawdis to bring it back."
+            }
+            if lower.contains("timeout") {
+                return "Timed out waiting for the control server; the relay may be crashed or still starting."
+            }
+            return error
+        }
+        return nil
+    }
+
     private func describeFailure(from snap: HealthSnapshot, fallback: String?) -> String {
         if !snap.web.linked {
             return "Not linked — run clawdis login"
