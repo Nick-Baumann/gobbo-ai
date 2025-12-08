@@ -319,18 +319,20 @@ enum CommandResolver {
         let userHost = parsed.user.map { "\($0)@\(parsed.host)" } ?? parsed.host
         args.append(userHost)
 
-        // Prefer the Node CLI ("clawdis") on the remote host; fall back to pnpm or the mac helper if present.
+        // Run the real clawdis CLI on the remote host; do not fall back to clawdis-mac.
         let exportedPath = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/steipete/Library/pnpm:$PATH"
         let cdPrefix = settings.projectRoot.isEmpty ? "" : "cd \(self.shellQuote(settings.projectRoot)) && "
+        let prjVar = settings.projectRoot.isEmpty ? "" : "PRJ=\(self.shellQuote(settings.projectRoot)); "
         let quotedArgs = ([subcommand] + extraArgs).map(self.shellQuote).joined(separator: " ")
         let scriptBody = """
         PATH=\(exportedPath);
+        \(prjVar)
         CLI="";
         if command -v clawdis >/dev/null 2>&1; then CLI="clawdis";
+        elif [ -n "${PRJ:-}" ] && [ -f "$PRJ/bin/clawdis.js" ] && command -v node >/dev/null 2>&1; then CLI="node $PRJ/bin/clawdis.js";
         elif command -v pnpm >/dev/null 2>&1; then CLI="pnpm --silent clawdis";
-        elif command -v clawdis-mac >/dev/null 2>&1; then CLI="clawdis-mac";
         fi;
-        if [ -z "$CLI" ]; then echo "clawdis missing on remote host"; exit 127; fi;
+        if [ -z "$CLI" ]; then echo "clawdis CLI missing on remote host"; exit 127; fi;
         \(cdPrefix)$CLI \(quotedArgs)
         """
         args.append(contentsOf: ["/bin/sh", "-c", scriptBody])
