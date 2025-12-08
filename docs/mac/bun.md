@@ -1,30 +1,27 @@
-# Bundled Bun runtime (mac app only)
+# Host Node/Bun runtime (mac app)
 
-Date: 2025-12-07 · Owner: steipete · Scope: packaged mac app runtime
+Date: 2025-12-08 · Owner: steipete · Scope: packaged mac app runtime
 
-## What we ship
-- The mac menu-bar app embeds an **arm64 Bun runtime** under `Contents/Resources/Relay/` only for the packaged app. Dev/CI keep using pnpm+node.
-- Payload: `bun` binary (defaults to `/opt/homebrew/bin/bun`, override with `BUN_PATH=/path/to/bun`), `dist/` output, production `node_modules/`, and the root `package.json`/`pnpm-lock.yaml` for provenance.
-- We prune dev/build tooling (vite, rolldown, biome, vitest, tsc/tsx, @types, etc.) and drop all non-macOS sharp vendors so only `sharp-darwin-arm64` + `sharp-libvips-darwin-arm64` remain.
+## What we require
+- The mac menu-bar app no longer ships an embedded runtime. We expect **Node ≥22.0.0 or Bun ≥1.3.0** to be present on the host.
+- The bundle still carries `dist/` output, production `node_modules/`, and the root `package.json`/`pnpm-lock.yaml` so we avoid on-device installs; we simply reuse the host runtime.
+- Launchd jobs export a PATH that includes `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/steipete/Library/pnpm` so Homebrew/PNPM installs are found even under the minimal launchd environment.
 
 ## Build/packaging flow
-- Run `scripts/package-mac-app.sh` (or `BUN_PATH=/custom/bun scripts/package-mac-app.sh`).
-  - Ensures deps via `pnpm install`, then `pnpm exec tsc`.
-  - Builds the Swift app and stages `dist/`, Bun, and production `node_modules` into `Contents/Resources/Relay/` using a temp deploy (hoisted layout, no dev deps).
-  - Prunes optional tooling + extra sharp vendors, then codesigns binaries and native addons.
-- Architecture: **arm64 only**. Ship a separate bundle if you need Rosetta/x64.
+- Run `scripts/package-mac-app.sh`.
+  - Ensures deps via `pnpm install`, builds JS with `pnpm exec tsc`, then builds the Swift app.
+  - Stages `dist/`, production `node_modules`, and metadata into `Contents/Resources/Relay/` (no bundled bun binary).
+  - Prunes optional tooling and non-macOS sharp vendors; only `sharp-darwin-arm64` + `sharp-libvips-darwin-arm64` remain for size/signing.
+- Architecture: **arm64 only**. Host runtime must also be arm64 or Rosetta-compatible.
 
 ## Runtime behavior
-- `CommandResolver` prefers the bundled `bun dist/index.js <subcommand>` when present; falls back to system `clawdis`/pnpm/node otherwise.
-- `RelayProcessManager` runs in the bundled cwd/PATH so native deps (sharp, undici) resolve without installing anything on the host.
+- `CommandResolver` picks the runtime via `CLAWDIS_RUNTIME` (`bun`/`node`) or defaults to Bun then Node; it enforces the version gates and prints a clear error (with PATH) if requirements are not met.
+- Relay processes run inside the bundled relay directory so native deps resolve, but the runtime itself comes from the host.
 
 ## Testing the bundle
-- After packaging: `cd dist/Clawdis.app/Contents/Resources/Relay && ./bun dist/index.js --help` should print the CLI help without missing-module errors.
+- After packaging: `cd dist/Clawdis.app/Contents/Resources/Relay && bun dist/index.js --help` **or** `node dist/index.js --help` should print CLI help. If you see a runtime error, install/upgrade Node or Bun on the host.
 - If sharp fails to load, confirm the remaining `@img/sharp-darwin-arm64` + `@img/sharp-libvips-darwin-arm64` directories exist and are codesigned.
 
 ## Notes / limits
-- Bundle is mac-app-only; keep using pnpm+node for dev/test.
-- Packaging stops early if Bun or `pnpm build` prerequisites are missing.
-
-## FAQ
-- **What does `--legacy` do?** When used with `pnpm deploy`, `--legacy` builds a classic flattened `node_modules` layout instead of pnpm's symlinked structure. We no longer need it in the current packaging flow because we create a self-contained hoisted install directly in the temp deploy dir.
+- Dev/CI continues to use pnpm + Node; the packaged app simply reuses the host runtime instead of embedding Bun.
+- Missing or too-old runtimes will surface as an immediate CLI error with install hints; update the host rather than rebuilding the app.

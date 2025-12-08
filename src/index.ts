@@ -9,6 +9,7 @@ import { createDefaultDeps } from "./cli/deps.js";
 import { promptYesNo } from "./cli/prompt.js";
 import { waitForever } from "./cli/wait.js";
 import { loadConfig } from "./config/config.js";
+import { assertSupportedRuntime } from "./infra/runtime-guard.js";
 import {
   deriveSessionKey,
   loadSessionStore,
@@ -32,6 +33,9 @@ dotenv.config({ quiet: true });
 
 // Capture all console output into structured logs while keeping stdout/stderr behavior.
 enableConsoleCapture();
+
+// Enforce the minimum supported runtime before doing any work.
+assertSupportedRuntime();
 
 import { buildProgram } from "./cli/program.js";
 
