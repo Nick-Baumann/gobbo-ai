@@ -228,50 +228,44 @@ struct VoiceWakeSettings: View {
     }
 
     private func chimeRow(title: String, selection: Binding<VoiceWakeChime>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(title)
-                    .font(.callout.weight(.semibold))
-                    .frame(width: self.fieldLabelWidth, alignment: .leading)
+        HStack(alignment: .center, spacing: 10) {
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .frame(width: self.fieldLabelWidth, alignment: .leading)
 
-                Menu {
-                    Button("No Sound") { selection.wrappedValue = .none }
-                    Divider()
-                    ForEach(VoiceWakeChimeCatalog.systemOptions, id: \.self) { option in
-                        Button(VoiceWakeChimeCatalog.displayName(for: option)) {
-                            selection.wrappedValue = .system(name: option)
-                        }
+            Menu {
+                Button("No Sound") { selection.wrappedValue = .none }
+                Divider()
+                ForEach(VoiceWakeChimeCatalog.systemOptions, id: \.self) { option in
+                    Button(VoiceWakeChimeCatalog.displayName(for: option)) {
+                        selection.wrappedValue = .system(name: option)
                     }
-                    Divider()
-                    Button("Choose file…") { self.chooseCustomChime(for: selection) }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(selection.wrappedValue.displayLabel)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(width: self.controlWidth, alignment: .leading)
-                    .padding(6)
-                    .background(Color(nsColor: .windowBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
-
-                Button("Play") {
-                    VoiceWakeChimePlayer.play(selection.wrappedValue)
+                Divider()
+                Button("Choose file…") { self.chooseCustomChime(for: selection) }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selection.wrappedValue.displayLabel)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .keyboardShortcut(.space, modifiers: [.command])
+                .padding(6)
+                .frame(minWidth: self.controlWidth, maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
-            if case let .custom(displayName, _) = selection.wrappedValue {
-                Text("Custom: \(displayName)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            Button("Play") {
+                VoiceWakeChimePlayer.play(selection.wrappedValue)
             }
+            .keyboardShortcut(.space, modifiers: [.command])
         }
     }
 
