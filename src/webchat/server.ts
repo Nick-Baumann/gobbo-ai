@@ -85,9 +85,26 @@ function readSessionMessages(sessionId: string, storePath: string): any[] {
   return messages;
 }
 
+function formatMessageWithAttachments(text: string, attachments: any[]): string {
+  if (!attachments || attachments.length === 0) return text;
+  const parts: string[] = [text];
+  let idx = 1;
+  for (const att of attachments) {
+    const label = att.fileName || att.mimeType || `attachment ${idx}`;
+    if (att.type === "image" && att.content && att.mimeType) {
+      parts.push(`\n\n[Image ${label}: data:${att.mimeType};base64,${att.content}]`);
+    } else {
+      parts.push(`\n\n[Attachment ${label}]`);
+    }
+    idx += 1;
+  }
+  return parts.join("");
+}
+
 async function handleRpc(body: any, sessionKey: string): Promise<{ ok: boolean; payloads?: any[]; error?: string }> {
   const text: string = (body?.text ?? "").toString();
   if (!text.trim()) return { ok: false, error: "empty text" };
+  const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
 
   const cfg = loadConfig();
   const replyCfg = cfg.inbound?.reply;
@@ -114,7 +131,7 @@ async function handleRpc(body: any, sessionKey: string): Promise<{ ok: boolean; 
   try {
     await agentCommand(
       {
-        message: text,
+        message: formatMessageWithAttachments(text, attachments),
         sessionId,
         thinking: body?.thinking,
         deliver: Boolean(body?.deliver),
@@ -156,7 +173,10 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
     }
 
     const url = new URL(req.url, "http://127.0.0.1");
-    if (url.pathname === "/webchat/info") {
+    const isInfo = url.pathname === "/webchat/info" || url.pathname === "/info";
+    const isRpc = url.pathname === "/webchat/rpc" || url.pathname === "/rpc";
+
+    if (isInfo) {
       const sessionKey = url.searchParams.get("session") ?? "main";
       const cfg = loadConfig();
       const sessionCfg = cfg.inbound?.reply?.session;
@@ -174,13 +194,13 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
           storePath,
           sessionId,
           initialMessages: messages,
-          basePath: "/webchat/",
+          basePath: "/",
         }),
       );
       return;
     }
 
-    if (url.pathname === "/webchat/rpc" && req.method === "POST") {
+    if (isRpc && req.method === "POST") {
       const bodyBuf = await readBody(req);
       let body: any = {};
       try {
@@ -214,6 +234,35 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
       res.setHeader("Content-Type", type);
       res.end(data);
       return;
+    }
+
+    if (url.pathname === "/") {
+      const filePath = path.join(root, "index.html");
+      const data = fs.readFileSync(filePath);
+      res.setHeader("Content-Type", "text/html");
+      res.end(data);
+      return;
+    }
+
+    // Static files from root (when served at /)
+    const relPath = url.pathname.replace(/^\//, "");
+    if (relPath) {
+      const filePath = path.join(root, relPath);
+      if (filePath.startsWith(root) && fs.existsSync(filePath)) {
+        const data = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const type =
+          ext === ".html"
+            ? "text/html"
+            : ext === ".js"
+              ? "application/javascript"
+              : ext === ".css"
+                ? "text/css"
+                : "application/octet-stream";
+        res.setHeader("Content-Type", type);
+        res.end(data);
+        return;
+      }
     }
 
     notFound(res);

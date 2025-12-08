@@ -40,6 +40,15 @@ class NativeTransport {
   }
 
   async *run(messages, userMessage, cfg, signal) {
+    const attachments = userMessage.attachments?.map((a) => ({
+      type: a.type,
+      mimeType: a.mimeType,
+      fileName: a.fileName,
+      content:
+        typeof a.content === "string"
+          ? a.content
+          : btoa(String.fromCharCode(...new Uint8Array(a.content))),
+    }));
     const rpcUrl = new URL("./rpc", window.location.href);
     const resultResp = await fetch(rpcUrl, {
       method: "POST",
@@ -47,6 +56,7 @@ class NativeTransport {
       body: JSON.stringify({
         text: userMessage.content?.[0]?.text ?? "",
         session: this.sessionKey,
+        attachments,
       }),
       signal,
     });
