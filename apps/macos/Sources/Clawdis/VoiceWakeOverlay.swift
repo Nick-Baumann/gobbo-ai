@@ -324,7 +324,7 @@ private struct VoiceWakeOverlayView: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onAppear { self.textFocused = false }
         .onChange(of: self.controller.model.text) { _, _ in
@@ -452,24 +452,38 @@ private struct VibrantLabelView: NSViewRepresentable {
         label.cell?.wraps = true
         label.cell?.isScrollable = false
         label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
         label.textColor = .labelColor
 
+        let effect = NSVisualEffectView()
+        effect.material = .hudWindow
+        effect.blendingMode = .withinWindow
+        effect.state = .active
+        effect.translatesAutoresizingMaskIntoConstraints = false
+        effect.addSubview(label)
+
         let container = ClickCatcher(onTap: onTap)
-        container.addSubview(label)
+        container.addSubview(effect)
+
         label.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            label.topAnchor.constraint(equalTo: container.topAnchor),
-            label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            effect.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            effect.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            effect.topAnchor.constraint(equalTo: container.topAnchor),
+            effect.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+
+            label.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
+            label.topAnchor.constraint(equalTo: effect.topAnchor),
+            label.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
         ])
         return container
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let container = nsView as? ClickCatcher,
-              let label = container.subviews.first as? NSTextField else { return }
+              let effect = container.subviews.first as? NSVisualEffectView,
+              let label = effect.subviews.first as? NSTextField else { return }
         label.attributedStringValue = self.attributed
     }
 
