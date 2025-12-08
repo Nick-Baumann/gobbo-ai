@@ -405,7 +405,7 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
         return;
       }
       const sessionKey = url.searchParams.get("session") ?? "main";
-      wss!.handleUpgrade(req, socket, head, (ws) => {
+      wss!.handleUpgrade(req, socket, head, (ws: WebSocket) => {
         ws.on("close", () => {
           const set = wsSessions.get(sessionKey);
           if (set) {
@@ -485,4 +485,3 @@ export async function ensureWebChatServerFromConfig() {
     throw err;
   }
 }
-*** End
