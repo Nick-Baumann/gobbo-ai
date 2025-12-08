@@ -38,7 +38,7 @@ export function buildProgram() {
 
   program
     .name("clawdis")
-    .description("Messaging relay CLI for WhatsApp Web and Telegram Bot API")
+    .description("")
     .version(PROGRAM_VERSION);
 
   const formatIntroLine = (version: string, rich = true) => {

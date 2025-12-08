@@ -136,6 +136,9 @@ final class HealthStore: ObservableObject {
     }
 
     var state: HealthState {
+        if let error = self.lastError, !error.isEmpty {
+            return .degraded(error)
+        }
         guard let snap = self.snapshot else { return .unknown }
         if !snap.web.linked { return .linkingNeeded }
         if let connect = snap.web.connect, !connect.ok {
