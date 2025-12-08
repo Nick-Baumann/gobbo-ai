@@ -26,18 +26,18 @@ enum LaunchAgentManager {
             .appendingPathComponent("Library/LaunchAgents/com.steipete.clawdis.plist")
     }
 
-    static func status() -> Bool {
+    static func status() async -> Bool {
         guard FileManager.default.fileExists(atPath: self.plistURL.path) else { return false }
-        let result = self.runLaunchctl(["print", "gui/\(getuid())/\(launchdLabel)"])
+        let result = await self.runLaunchctl(["print", "gui/\(getuid())/\(launchdLabel)"])
         return result == 0
     }
 
-    static func set(enabled: Bool, bundlePath: String) {
+    static func set(enabled: Bool, bundlePath: String) async {
         if enabled {
             self.writePlist(bundlePath: bundlePath)
-            _ = self.runLaunchctl(["bootout", "gui/\(getuid())/\(launchdLabel)"])
-            _ = self.runLaunchctl(["bootstrap", "gui/\(getuid())", self.plistURL.path])
-            _ = self.runLaunchctl(["kickstart", "-k", "gui/\(getuid())/\(launchdLabel)"])
+            _ = await self.runLaunchctl(["bootout", "gui/\(getuid())/\(launchdLabel)"])
+            _ = await self.runLaunchctl(["bootstrap", "gui/\(getuid())", self.plistURL.path])
+            _ = await self.runLaunchctl(["kickstart", "-k", "gui/\(getuid())/\(launchdLabel)"])
         } else {
             // Disable autostart going forward but leave the current app running.
             // bootout would terminate the launchd job immediately (and crash the app if launched via agent).
@@ -84,15 +84,21 @@ enum LaunchAgentManager {
     }
 
     @discardableResult
-    private static func runLaunchctl(_ args: [String]) -> Int32 {
-        let process = Process()
-        process.launchPath = "/bin/launchctl"
-        process.arguments = args
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        try? process.run()
-        process.waitUntilExit()
-        return process.terminationStatus
+    private static func runLaunchctl(_ args: [String]) async -> Int32 {
+        await Task.detached(priority: .utility) { () -> Int32 in
+            let process = Process()
+            process.launchPath = "/bin/launchctl"
+            process.arguments = args
+            process.standardOutput = Pipe()
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                process.waitUntilExit()
+                return process.terminationStatus
+            } catch {
+                return -1
+            }
+        }.value
     }
 }
 

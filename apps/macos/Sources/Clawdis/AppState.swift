@@ -138,7 +138,7 @@ final class AppState: ObservableObject {
 
     init() {
         self.isPaused = UserDefaults.standard.bool(forKey: pauseDefaultsKey)
-        self.launchAtLogin = LaunchAgentManager.status()
+        self.launchAtLogin = false
         self.onboardingSeen = UserDefaults.standard.bool(forKey: "clawdis.onboardingSeen")
         self.debugPaneEnabled = UserDefaults.standard.bool(forKey: "clawdis.debugPaneEnabled")
         let savedVoiceWake = UserDefaults.standard.bool(forKey: swabbleEnabledKey)
@@ -188,6 +188,11 @@ final class AppState: ObservableObject {
         self.webChatEnabled = UserDefaults.standard.object(forKey: webChatEnabledKey) as? Bool ?? true
         let storedPort = UserDefaults.standard.integer(forKey: webChatPortKey)
         self.webChatPort = storedPort > 0 ? storedPort : 18788
+
+        Task.detached(priority: .utility) { [weak self] in
+            let current = await LaunchAgentManager.status()
+            await MainActor.run { [weak self] in self?.launchAtLogin = current }
+        }
 
         if self.swabbleEnabled, !PermissionManager.voiceWakePermissionsGranted() {
             self.swabbleEnabled = false
@@ -248,7 +253,9 @@ enum AppStateStore {
     static var isPausedFlag: Bool { UserDefaults.standard.bool(forKey: pauseDefaultsKey) }
 
     static func updateLaunchAtLogin(enabled: Bool) {
-        LaunchAgentManager.set(enabled: enabled, bundlePath: Bundle.main.bundlePath)
+        Task.detached(priority: .utility) {
+            await LaunchAgentManager.set(enabled: enabled, bundlePath: Bundle.main.bundlePath)
+        }
     }
 
     static var webChatEnabled: Bool {

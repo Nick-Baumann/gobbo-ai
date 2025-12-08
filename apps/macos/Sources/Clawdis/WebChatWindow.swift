@@ -217,7 +217,7 @@ final class WebChatTunnel {
             throw NSError(domain: "WebChat", code: 3, userInfo: [NSLocalizedDescriptionKey: "remote not configured"])
         }
 
-        let localPort = try Self.findPort(preferred: preferredLocalPort)
+        let localPort = try await Self.findPort(preferred: preferredLocalPort)
         var args: [String] = [
             "-o", "BatchMode=yes",
             "-o", "IdentitiesOnly=yes",
@@ -250,19 +250,35 @@ final class WebChatTunnel {
         return WebChatTunnel(process: process, localPort: localPort)
     }
 
-    private static func findPort(preferred: UInt16?) throws -> UInt16 {
-        if let preferred {
-            if Self.portIsFree(preferred) { return preferred }
+    private static func findPort(preferred: UInt16?) async throws -> UInt16 {
+        if let preferred, Self.portIsFree(preferred) { return preferred }
+
+        return try await withCheckedThrowingContinuation { cont in
+            let queue = DispatchQueue(label: "com.steipete.clawdis.webchat.port", qos: .utility)
+            do {
+                let listener = try NWListener(using: .tcp, on: .any)
+                listener.newConnectionHandler = { connection in connection.cancel() }
+                listener.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        if let port = listener.port?.rawValue {
+                            listener.stateUpdateHandler = nil
+                            listener.cancel()
+                            cont.resume(returning: port)
+                        }
+                    case let .failed(error):
+                        listener.stateUpdateHandler = nil
+                        listener.cancel()
+                        cont.resume(throwing: error)
+                    default:
+                        break
+                    }
+                }
+                listener.start(queue: queue)
+            } catch {
+                cont.resume(throwing: error)
+            }
         }
-        let listener = try NWListener(using: .tcp, on: .any)
-        listener.start(queue: .main)
-        while listener.port == nil {
-            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
-        }
-        let port = listener.port?.rawValue
-        listener.cancel()
-        guard let port else { throw NSError(domain: "WebChat", code: 4, userInfo: [NSLocalizedDescriptionKey: "no port"])}
-        return port
     }
 
     private static func portIsFree(_ port: UInt16) -> Bool {
