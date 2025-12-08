@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { WebSocketServer, WebSocket } from "ws";
 
 import { agentCommand } from "../commands/agent.js";
 import { loadConfig } from "../config/config.js";
@@ -33,6 +34,8 @@ type AttachmentInput = {
 type RpcPayload = { role: string; content: string };
 
 let state: WebChatServerState | null = null;
+let wss: WebSocketServer | null = null;
+const wsSessions: Map<string, Set<WebSocket>> = new Map();
 
 function resolveWebRoot() {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -91,6 +94,19 @@ function readSessionMessages(sessionId: string, storePath: string): ChatMessage[
     }
   }
   return messages;
+}
+
+function broadcastSession(sessionKey: string, payload: any) {
+  const conns = wsSessions.get(sessionKey);
+  if (!conns || conns.size === 0) return;
+  const msg = JSON.stringify(payload);
+  for (const ws of conns) {
+    try {
+      ws.send(msg);
+    } catch {
+      // ignore and let close handler prune
+    }
+  }
 }
 
 async function persistAttachments(
@@ -225,6 +241,33 @@ async function handleRpc(
     return { ok: false, error: String(err) };
   }
 
+  // Push latest session state to any connected webchat clients for this sessionKey.
+  try {
+    const cfg = loadConfig();
+    const sessionCfg = cfg.inbound?.reply?.session;
+    const storePath = sessionCfg?.store
+      ? resolveStorePath(sessionCfg.store)
+      : resolveStorePath(undefined);
+    const store = loadSessionStore(storePath);
+    const persistedSessionId = pickSessionId(sessionKey, store) ?? sessionId;
+    const messages = persistedSessionId
+      ? readSessionMessages(persistedSessionId, storePath)
+      : [];
+    const sessionEntry = sessionKey ? store[sessionKey] : undefined;
+    const persistedThinking = sessionEntry?.thinkingLevel;
+    broadcastSession(sessionKey, {
+      type: "session",
+      sessionKey,
+      messages,
+      thinkingLevel:
+        typeof persistedThinking === "string"
+          ? persistedThinking
+          : cfg.inbound?.reply?.thinkingDefault ?? "off",
+    });
+  } catch {
+    // best-effort; ignore broadcast errors
+  }
+
   const jsonLine = logs.find((l) => l.trim().startsWith("{"));
   if (!jsonLine) return { ok: false, error: "no agent output" };
   try {
@@ -244,6 +287,14 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
   if (state) return state;
 
   const root = resolveWebRoot();
+  // Precompute session store root for file watching
+  const cfg = loadConfig();
+  const sessionCfg = cfg.inbound?.reply?.session;
+  const storePath = sessionCfg?.store
+    ? resolveStorePath(sessionCfg.store)
+    : resolveStorePath(undefined);
+  const storeDir = path.dirname(storePath);
+
   const server = http.createServer(async (req, res) => {
     if (!req.url) return notFound(res);
     if (req.socket.remoteAddress && !req.socket.remoteAddress.startsWith("127.")) {
@@ -258,11 +309,6 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
 
     if (isInfo) {
       const sessionKey = url.searchParams.get("session") ?? "main";
-      const cfg = loadConfig();
-      const sessionCfg = cfg.inbound?.reply?.session;
-      const storePath = sessionCfg?.store
-        ? resolveStorePath(sessionCfg.store)
-        : resolveStorePath(undefined);
       const store = loadSessionStore(storePath);
       const sessionId = pickSessionId(sessionKey, store);
       const messages = sessionId
@@ -344,6 +390,84 @@ export async function startWebChatServer(port = WEBCHAT_DEFAULT_PORT) {
     server.once("error", reject);
     server.listen(port, "127.0.0.1", () => resolve());
   });
+
+  // WebSocket setup for live session updates.
+  wss = new WebSocketServer({ noServer: true });
+  server.on("upgrade", (req, socket, head) => {
+    try {
+      const url = new URL(req.url ?? "", "http://127.0.0.1");
+      if (url.pathname !== "/webchat/socket" && url.pathname !== "/socket") {
+        socket.destroy();
+        return;
+      }
+      if (req.socket.remoteAddress && !req.socket.remoteAddress.startsWith("127.")) {
+        socket.destroy();
+        return;
+      }
+      const sessionKey = url.searchParams.get("session") ?? "main";
+      wss!.handleUpgrade(req, socket, head, (ws) => {
+        ws.on("close", () => {
+          const set = wsSessions.get(sessionKey);
+          if (set) {
+            set.delete(ws);
+            if (set.size === 0) wsSessions.delete(sessionKey);
+          }
+        });
+        wsSessions.set(sessionKey, (wsSessions.get(sessionKey) ?? new Set()).add(ws));
+        // Send initial snapshot
+        const store = loadSessionStore(storePath);
+        const sessionId = pickSessionId(sessionKey, store);
+        const sessionEntry = sessionKey ? store[sessionKey] : undefined;
+        const persistedThinking = sessionEntry?.thinkingLevel;
+        const messages = sessionId ? readSessionMessages(sessionId, storePath) : [];
+        ws.send(
+          JSON.stringify({
+            type: "session",
+            sessionKey,
+            messages,
+            thinkingLevel:
+              typeof persistedThinking === "string"
+                ? persistedThinking
+                : cfg.inbound?.reply?.thinkingDefault ?? "off",
+          }),
+        );
+      });
+    } catch (err) {
+      socket.destroy();
+    }
+  });
+
+  // Watch for session/message file changes and push updates.
+  try {
+    if (fs.existsSync(storeDir)) {
+      fs.watch(storeDir, { persistent: false }, (event, filename) => {
+        if (!filename) return;
+        // On any file change, refresh for active sessions.
+        for (const sessionKey of wsSessions.keys()) {
+          try {
+            const store = loadSessionStore(storePath);
+            const sessionId = pickSessionId(sessionKey, store);
+            const sessionEntry = sessionKey ? store[sessionKey] : undefined;
+            const persistedThinking = sessionEntry?.thinkingLevel;
+            const messages = sessionId ? readSessionMessages(sessionId, storePath) : [];
+            broadcastSession(sessionKey, {
+              type: "session",
+              sessionKey,
+              messages,
+              thinkingLevel:
+                typeof persistedThinking === "string"
+                  ? persistedThinking
+                  : cfg.inbound?.reply?.thinkingDefault ?? "off",
+            });
+          } catch {
+            // ignore
+          }
+        }
+      });
+    }
+  } catch {
+    // watcher is best-effort
+  }
 
   state = { server, port };
   logDebug(`webchat server listening on 127.0.0.1:${port}`);

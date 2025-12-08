@@ -198,42 +198,67 @@ const startChat = async () => {
   mount.appendChild(panel);
   logStatus("boot: ready");
 
-  // Periodically sync messages + thinking from the session store so webchat stays
-  // in lock-step with other transports (e.g., WhatsApp or CLI).
+  // Live sync via WebSocket so other transports (WhatsApp/CLI) appear instantly.
   let lastSyncedTs = latestTimestamp(initialMessages);
-  const syncIntervalMs = 3000;
-  async function syncFromSession() {
-    if (agent.state.isStreaming) return; // avoid stomping in-flight turns
-    try {
-      const infoUrl = new URL(`./info?session=${encodeURIComponent(sessionKey)}`, window.location.href);
-      const resp = await fetch(infoUrl, { credentials: "omit" });
-      if (!resp.ok) return;
-      const info = await resp.json();
-      const messages = Array.isArray(info.initialMessages) ? info.initialMessages : [];
-      const ts = latestTimestamp(messages);
-      const thinking = typeof info.thinkingLevel === "string" ? info.thinkingLevel : "off";
+  let ws;
+  let reconnectTimer;
 
-      if (ts && ts !== lastSyncedTs) {
-        agent.replaceMessages(messages);
-        lastSyncedTs = ts;
-      }
+  const applySnapshot = (info) => {
+    const messages = Array.isArray(info?.messages) ? info.messages : [];
+    const ts = latestTimestamp(messages);
+    const thinking = typeof info?.thinkingLevel === "string" ? info.thinkingLevel : "off";
 
-      if (thinking && thinking !== agent.state.thinkingLevel) {
-        agent.setThinkingLevel(thinking);
-        if (panel?.agentInterface) {
-          panel.agentInterface.sessionThinkingLevel = thinking;
-          panel.agentInterface.pendingThinkingLevel = null;
-          if (panel.agentInterface._messageEditor) {
-            panel.agentInterface._messageEditor.thinkingLevel = thinking;
-          }
+    if (!agent.state.isStreaming && ts && ts !== lastSyncedTs) {
+      agent.replaceMessages(messages);
+      lastSyncedTs = ts;
+    }
+
+    if (thinking && thinking !== agent.state.thinkingLevel) {
+      agent.setThinkingLevel(thinking);
+      if (panel?.agentInterface) {
+        panel.agentInterface.sessionThinkingLevel = thinking;
+        panel.agentInterface.pendingThinkingLevel = null;
+        if (panel.agentInterface._messageEditor) {
+          panel.agentInterface._messageEditor.thinkingLevel = thinking;
         }
       }
-    } catch (err) {
-      console.warn("session sync failed", err);
     }
-  }
+  };
 
-  setInterval(syncFromSession, syncIntervalMs);
+  const connectSocket = () => {
+    try {
+      const wsUrl = new URL(`./socket?session=${encodeURIComponent(sessionKey)}`, window.location.href);
+      wsUrl.protocol = wsUrl.protocol.replace("http", "ws");
+      ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data?.type === "session") applySnapshot(data);
+        } catch (err) {
+          console.warn("ws message parse failed", err);
+        }
+      };
+
+      ws.onclose = () => {
+        ws = null;
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connectSocket();
+          }, 2000);
+        }
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    } catch (err) {
+      console.warn("ws connect failed", err);
+    }
+  };
+
+  connectSocket();
 };
 
 startChat().catch((err) => {
