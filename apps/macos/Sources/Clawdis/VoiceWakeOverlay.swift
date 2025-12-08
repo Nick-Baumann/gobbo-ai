@@ -91,6 +91,8 @@ final class VoiceWakeOverlayController: ObservableObject {
 
     func sendNow(sendChime: VoiceWakeChime = .none) {
         self.autoSendTask?.cancel()
+        self.autoSendTask = nil
+        if self.model.isSending { return }
         self.model.isEditing = false
         guard let forwardConfig, forwardConfig.enabled else {
             self.dismiss(reason: .explicit)
@@ -268,6 +270,7 @@ final class VoiceWakeOverlayController: ObservableObject {
             await MainActor.run {
                 guard let self else { return }
                 self.sendNow(sendChime: sendChime)
+                self.autoSendTask = nil
             }
         }
     }
@@ -376,12 +379,9 @@ private struct VoiceWakeOverlayView: View {
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .onHover { self.isHovering = $0 }
 
-            if self.controller.model.isEditing || self.isHovering {
-                CloseHoverButton(onClose: {
-                    self.controller.cancelEditingAndDismiss()
-                })
-                .offset(x: -8, y: -8)
-                .transition(.opacity)
+            // Close button rendered above and outside the clipped bubble
+            CloseButtonOverlay(isVisible: self.controller.model.isEditing || self.isHovering) {
+                self.controller.cancelEditingAndDismiss()
             }
         }
         .onAppear { self.textFocused = false }
@@ -535,6 +535,8 @@ private struct VibrantLabelView: NSViewRepresentable {
         label.attributedStringValue = self.attributed.strippingForegroundColor()
     }
 
+}
+
 private final class ClickCatcher: NSView {
     let onTap: () -> Void
     init(onTap: @escaping () -> Void) {
@@ -568,6 +570,22 @@ private struct CloseHoverButton: View {
         .focusable(false)
         .contentShape(Circle())
         .padding(6)
+    }
+}
+
+private struct CloseButtonOverlay: View {
+    var isVisible: Bool
+    var onClose: () -> Void
+
+    var body: some View {
+        Group {
+            if isVisible {
+                CloseHoverButton(onClose: onClose)
+                    .offset(x: -12, y: -12)
+                    .transition(.opacity)
+            }
+        }
+        .allowsHitTesting(isVisible)
     }
 }
 }
