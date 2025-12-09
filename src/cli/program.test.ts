@@ -3,10 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const sendCommand = vi.fn();
 const statusCommand = vi.fn();
 const loginWeb = vi.fn();
-const monitorWebProvider = vi.fn();
-const logWebSelfId = vi.fn();
-const waitForever = vi.fn();
-const monitorTelegramProvider = vi.fn();
 const startWebChatServer = vi.fn(async () => ({ port: 18788 }));
 const ensureWebChatServerFromConfig = vi.fn(async () => ({ port: 18788 }));
 
@@ -23,10 +19,6 @@ vi.mock("../commands/status.js", () => ({ statusCommand }));
 vi.mock("../runtime.js", () => ({ defaultRuntime: runtime }));
 vi.mock("../provider-web.js", () => ({
   loginWeb,
-  monitorWebProvider,
-}));
-vi.mock("../telegram/monitor.js", () => ({
-  monitorTelegramProvider,
 }));
 vi.mock("../webchat/server.js", () => ({
   startWebChatServer,
@@ -34,8 +26,7 @@ vi.mock("../webchat/server.js", () => ({
   getWebChatServer: () => null,
 }));
 vi.mock("./deps.js", () => ({
-  createDefaultDeps: () => ({ waitForever }),
-  logWebSelfId,
+  createDefaultDeps: () => ({}),
 }));
 
 const { buildProgram } = await import("./program.js");
@@ -51,73 +42,6 @@ describe("cli program", () => {
       from: "user",
     });
     expect(sendCommand).toHaveBeenCalled();
-  });
-
-  it("starts relay with heartbeat tuning", async () => {
-    monitorWebProvider.mockResolvedValue(undefined);
-    const program = buildProgram();
-    await program.parseAsync(
-      [
-        "relay-legacy",
-        "--web-heartbeat",
-        "90",
-        "--heartbeat-now",
-        "--provider",
-        "web",
-      ],
-      {
-        from: "user",
-      },
-    );
-    expect(logWebSelfId).toHaveBeenCalled();
-    expect(monitorWebProvider).toHaveBeenCalledWith(
-      false,
-      undefined,
-      true,
-      undefined,
-      runtime,
-      expect.any(AbortSignal),
-      { heartbeatSeconds: 90, replyHeartbeatNow: true },
-    );
-    expect(monitorTelegramProvider).not.toHaveBeenCalled();
-  });
-
-  it("runs telegram relay when token set", async () => {
-    const program = buildProgram();
-    const prev = process.env.TELEGRAM_BOT_TOKEN;
-    process.env.TELEGRAM_BOT_TOKEN = "token123";
-    await program.parseAsync(["relay-legacy", "--provider", "telegram"], {
-      from: "user",
-    });
-    expect(monitorTelegramProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ token: "token123" }),
-    );
-    expect(monitorWebProvider).not.toHaveBeenCalled();
-    process.env.TELEGRAM_BOT_TOKEN = prev;
-  });
-
-  it("errors when telegram provider requested without token", async () => {
-    const program = buildProgram();
-    const prev = process.env.TELEGRAM_BOT_TOKEN;
-    process.env.TELEGRAM_BOT_TOKEN = "";
-    await expect(
-      program.parseAsync(["relay-legacy", "--provider", "telegram"], {
-        from: "user",
-      }),
-    ).rejects.toThrow();
-    expect(runtime.error).toHaveBeenCalled();
-    expect(runtime.exit).toHaveBeenCalled();
-    process.env.TELEGRAM_BOT_TOKEN = prev;
-  });
-
-  it("relay command is deprecated", async () => {
-    const program = buildProgram();
-    await expect(
-      program.parseAsync(["relay"], { from: "user" }),
-    ).rejects.toThrow("exit");
-    expect(runtime.error).toHaveBeenCalled();
-    expect(runtime.exit).toHaveBeenCalledWith(1);
-    expect(monitorWebProvider).not.toHaveBeenCalled();
   });
 
   it("runs status command", async () => {

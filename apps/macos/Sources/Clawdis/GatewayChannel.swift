@@ -182,7 +182,7 @@ actor GatewayChannel {
         self.inner = GatewayChannelActor(url: url, token: token)
     }
 
-    func request(method: String, params: [String: Any]?) async throws -> Data {
+    func request(method: String, params: [String: AnyCodable]?) async throws -> Data {
         guard let inner else {
             throw NSError(domain: "Gateway", code: 0, userInfo: [NSLocalizedDescriptionKey: "not configured"])
         }
