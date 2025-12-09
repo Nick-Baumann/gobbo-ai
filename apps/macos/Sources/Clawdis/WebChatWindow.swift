@@ -443,6 +443,7 @@ final class WebChatManager {
     private var windowController: WebChatWindowController?
     private var panelController: WebChatWindowController?
     var onPanelVisibilityChanged: ((Bool) -> Void)?
+    private var isPanelVisible = false
 
     func show(sessionKey: String) {
         self.closePanel()
@@ -461,6 +462,11 @@ final class WebChatManager {
     }
 
     func togglePanel(sessionKey: String, anchorProvider: @escaping () -> NSRect?) {
+        if self.isPanelVisible {
+            self.closePanel()
+            return
+        }
+
         if let controller = self.panelController {
             if controller.window?.isVisible == true {
                 controller.closePanel()
@@ -478,14 +484,19 @@ final class WebChatManager {
             self?.panelHidden()
         }
         controller.onVisibilityChanged = { [weak self] visible in
-            self?.onPanelVisibilityChanged?(visible)
+            guard let self else { return }
+            self.isPanelVisible = visible
+            self.onPanelVisibilityChanged?(visible)
         }
         controller.presentAnchoredPanel(anchorProvider: anchorProvider)
+        // visibility will be reported by the controller callback
     }
 
     func closePanel() {
         guard let controller = self.panelController else { return }
         controller.closePanel()
+        self.isPanelVisible = false
+        self.onPanelVisibilityChanged?(false)
     }
 
     func preferredSessionKey() -> String {
@@ -517,6 +528,7 @@ final class WebChatManager {
     }
 
     private func panelHidden() {
+        self.isPanelVisible = false
         self.onPanelVisibilityChanged?(false)
         self.panelController = nil
     }
