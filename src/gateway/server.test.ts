@@ -19,6 +19,8 @@ vi.mock("../commands/agent.js", () => ({
   agentCommand: vi.fn().mockResolvedValue(undefined),
 }));
 
+process.env.CLAWDIS_SKIP_PROVIDERS = "1";
+
 async function getFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
     const server = createServer();
