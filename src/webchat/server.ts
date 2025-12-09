@@ -58,7 +58,7 @@ export async function startWebChatServer(
 
     const url = new URL(req.url, "http://127.0.0.1");
 
-    if (url.pathname.startsWith("/webchat")) {
+    if (url.pathname === "/webchat" || url.pathname.startsWith("/webchat/")) {
       let rel = url.pathname.replace(/^\/webchat\/?/, "");
       if (!rel || rel.endsWith("/")) rel = `${rel}index.html`;
       const filePath = path.join(root, rel);
