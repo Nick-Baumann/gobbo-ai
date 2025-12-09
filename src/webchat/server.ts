@@ -40,16 +40,20 @@ const wsSessions: Map<string, Set<WebSocket>> = new Map();
 function resolveWebRoot() {
   const here = path.dirname(fileURLToPath(import.meta.url));
 
-  const packagedRoot = path.resolve(
-    path.dirname(process.execPath),
-    "../WebChat",
-  );
-  if (fs.existsSync(packagedRoot)) return packagedRoot;
+  const candidates = [
+    // Bundled inside Clawdis.app: .../Contents/Resources/WebChat
+    path.resolve(here, "../../../WebChat"),
+    // When running from repo without bundling
+    path.resolve(here, "../../WebChat"),
+    // Fallback to source tree location
+    path.resolve(here, "../../apps/macos/Sources/Clawdis/Resources/WebChat"),
+  ];
 
-  return path.resolve(
-    here,
-    "../../apps/macos/Sources/Clawdis/Resources/WebChat",
-  );
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  throw new Error(`webchat assets not found; tried: ${candidates.join(", ")}`);
 }
 
 function readBody(req: http.IncomingMessage): Promise<Buffer> {
