@@ -3,6 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DebugSettings: View {
+    private let isPreview = ProcessInfo.processInfo.isPreview
     @AppStorage(modelCatalogPathKey) private var modelCatalogPath: String = ModelCatalogLoader.defaultPath
     @AppStorage(modelCatalogReloadKey) private var modelCatalogReloadBump: Int = 0
     @AppStorage(iconOverrideKey) private var iconOverrideRaw: String = IconOverrideSelection.system.rawValue
@@ -44,9 +45,9 @@ struct DebugSettings: View {
                 }
                 LabeledContent("PID") { Text("\(ProcessInfo.processInfo.processIdentifier)") }
                 LabeledContent("Log file") {
-                    Button("Open pino log") { self.openLog() }
-                        .help(self.pinoLogPath)
-                    Text(self.pinoLogPath)
+                    Button("Open pino log") { DebugActions.openLog() }
+                        .help(DebugActions.pinoLogPath())
+                    Text(DebugActions.pinoLogPath())
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -205,6 +206,7 @@ struct DebugSettings: View {
             .padding(.vertical, 8)
         }
         .task {
+            guard !self.isPreview else { return }
             await self.reloadModels()
             self.loadSessionStorePath()
         }
@@ -256,9 +258,9 @@ struct DebugSettings: View {
             case let .success(message):
                 self.debugSendStatus = message
                 self.debugSendError = nil
-            case let .failure(message):
-                self.debugSendStatus = message
-                self.debugSendError = nil
+            case let .failure(error):
+                self.debugSendStatus = nil
+                self.debugSendError = error.localizedDescription
             }
         }
     }
@@ -348,3 +350,12 @@ struct DebugSettings: View {
             .appendingPathComponent("clawdis.json")
     }
 }
+
+#if DEBUG
+struct DebugSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        DebugSettings()
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

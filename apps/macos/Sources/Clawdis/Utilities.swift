@@ -1,6 +1,12 @@
 import AppKit
 import Foundation
 
+extension ProcessInfo {
+    var isPreview: Bool {
+        self.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
+}
+
 enum LaunchdManager {
     private static func runLaunchctl(_ args: [String]) {
         let process = Process()

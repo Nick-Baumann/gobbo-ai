@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct InstancesSettings: View {
-    @StateObject private var store = InstancesStore.shared
+    @ObservedObject var store: InstancesStore
+
+    init(store: InstancesStore = .shared) {
+        self.store = store
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -87,3 +91,12 @@ struct InstancesSettings: View {
         .font(.footnote)
     }
 }
+
+#if DEBUG
+struct InstancesSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        InstancesSettings(store: .preview())
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

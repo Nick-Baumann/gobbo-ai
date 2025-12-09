@@ -95,6 +95,49 @@ struct SessionDefaults {
     let contextTokens: Int
 }
 
+extension SessionRow {
+    static var previewRows: [SessionRow] {
+        [
+            SessionRow(
+                id: "direct-1",
+                key: "user@example.com",
+                kind: .direct,
+                updatedAt: Date().addingTimeInterval(-90),
+                sessionId: "sess-direct-1234",
+                thinkingLevel: "low",
+                verboseLevel: "info",
+                systemSent: false,
+                abortedLastRun: false,
+                tokens: SessionTokenStats(input: 320, output: 680, total: 1000, contextTokens: 200_000),
+                model: "claude-3.5-sonnet"),
+            SessionRow(
+                id: "group-1",
+                key: "group:engineering",
+                kind: .group,
+                updatedAt: Date().addingTimeInterval(-3600),
+                sessionId: "sess-group-4321",
+                thinkingLevel: "medium",
+                verboseLevel: nil,
+                systemSent: true,
+                abortedLastRun: true,
+                tokens: SessionTokenStats(input: 5000, output: 1200, total: 6200, contextTokens: 200_000),
+                model: "claude-opus-4-5"),
+            SessionRow(
+                id: "global",
+                key: "global",
+                kind: .global,
+                updatedAt: Date().addingTimeInterval(-86_400),
+                sessionId: nil,
+                thinkingLevel: nil,
+                verboseLevel: nil,
+                systemSent: false,
+                abortedLastRun: false,
+                tokens: SessionTokenStats(input: 150, output: 220, total: 370, contextTokens: 200_000),
+                model: "gpt-4.1-mini"),
+        ]
+    }
+}
+
 struct ModelChoice: Identifiable, Hashable {
     let id: String
     let name: String

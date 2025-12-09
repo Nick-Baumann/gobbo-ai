@@ -36,7 +36,7 @@ enum DebugActions {
         _ = await NotificationManager().send(title: "Clawdis", body: "Test notification", sound: nil)
     }
 
-    static func sendDebugVoice() async -> Result<String, String> {
+    static func sendDebugVoice() async -> Result<String, DebugActionError> {
         let message = """
         This is a debug test from the Mac app. Reply with "Debug test works (and a funny pun)" \
         if you received that.
@@ -51,7 +51,7 @@ enum DebugActions {
                 return .success("Forwarded. Await reply.")
             case let .failure(error):
                 let detail = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-                return .failure("Forward failed: \(detail)")
+                return .failure(.message("Forward failed: \(detail)"))
             }
         }
 
@@ -75,11 +75,11 @@ enum DebugActions {
                 let detail = (reason?.isEmpty == false)
                     ? reason!
                     : "No error returned. Check /tmp/clawdis.log or rpc output."
-                return .failure("Local send failed: \(detail)")
+                return .failure(.message("Local send failed: \(detail)"))
             }
         } catch {
             let detail = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-            return .failure("Local send failed: \(detail)")
+            return .failure(.message("Local send failed: \(detail)"))
         }
     }
 
@@ -91,7 +91,7 @@ enum DebugActions {
         }
     }
 
-    private static func pinoLogPath() -> String {
+    static func pinoLogPath() -> String {
         let df = DateFormatter()
         df.calendar = Calendar(identifier: .iso8601)
         df.locale = Locale(identifier: "en_US_POSIX")
@@ -100,5 +100,15 @@ enum DebugActions {
         let rolling = URL(fileURLWithPath: "/tmp/clawdis/clawdis-\(today).log").path
         if FileManager.default.fileExists(atPath: rolling) { return rolling }
         return "/tmp/clawdis.log"
+    }
+}
+
+enum DebugActionError: LocalizedError {
+    case message(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .message(text): text
+        }
     }
 }

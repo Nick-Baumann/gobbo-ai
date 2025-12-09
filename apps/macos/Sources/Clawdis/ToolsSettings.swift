@@ -386,3 +386,12 @@ private enum ToolInstaller {
         }
     }
 }
+
+#if DEBUG
+struct ToolsSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        ToolsSettings()
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

@@ -2,6 +2,7 @@ import SwiftUI
 
 @MainActor
 struct ConfigSettings: View {
+    private let isPreview = ProcessInfo.processInfo.isPreview
     @State private var configModel: String = ""
     @State private var customModel: String = ""
     @State private var configSaving = false
@@ -131,6 +132,7 @@ struct ConfigSettings: View {
         }
         .task {
             guard !self.hasLoaded else { return }
+            guard !self.isPreview else { return }
             self.hasLoaded = true
             self.loadConfig()
             await self.loadModels()
@@ -247,3 +249,12 @@ struct ConfigSettings: View {
         return "Context window: \(human) tokens"
     }
 }
+
+#if DEBUG
+struct ConfigSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        ConfigSettings()
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

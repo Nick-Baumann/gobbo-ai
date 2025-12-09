@@ -6,6 +6,13 @@ struct SettingsRootView: View {
     @State private var monitoringPermissions = false
     @State private var selectedTab: SettingsTab = .general
     let updater: UpdaterProviding?
+    private let isPreview = ProcessInfo.processInfo.isPreview
+
+    init(state: AppState, updater: UpdaterProviding?, initialTab: SettingsTab? = nil) {
+        self.state = state
+        self.updater = updater
+        self._selectedTab = State(initialValue: initialTab ?? .general)
+    }
 
     var body: some View {
         TabView(selection: self.$selectedTab) {
@@ -76,7 +83,10 @@ struct SettingsRootView: View {
             self.updatePermissionMonitoring(for: newValue)
         }
         .onDisappear { self.stopPermissionMonitoring() }
-        .task { await self.refreshPerms() }
+        .task {
+            guard !self.isPreview else { return }
+            await self.refreshPerms()
+        }
     }
 
     private func validTab(for requested: SettingsTab) -> SettingsTab {
@@ -86,10 +96,12 @@ struct SettingsRootView: View {
 
     @MainActor
     private func refreshPerms() async {
+        guard !self.isPreview else { return }
         await self.permissionMonitor.refreshNow()
     }
 
     private func updatePermissionMonitoring(for tab: SettingsTab) {
+        guard !self.isPreview else { return }
         let shouldMonitor = tab == .permissions
         if shouldMonitor, !self.monitoringPermissions {
             self.monitoringPermissions = true
@@ -143,3 +155,15 @@ enum SettingsTabRouter {
 extension Notification.Name {
     static let clawdisSelectSettingsTab = Notification.Name("clawdisSelectSettingsTab")
 }
+
+#if DEBUG
+struct SettingsRootView_Previews: PreviewProvider {
+    static var previews: some View {
+        ForEach(SettingsTab.allCases, id: \.self) { tab in
+            SettingsRootView(state: .preview, updater: DisabledUpdaterController(), initialTab: tab)
+                .previewDisplayName(tab.title)
+                .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+        }
+    }
+}
+#endif

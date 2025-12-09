@@ -118,3 +118,23 @@ struct PermissionRow: View {
         }
     }
 }
+
+#if DEBUG
+struct PermissionsSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        PermissionsSettings(
+            status: [
+                .appleScript: true,
+                .notifications: true,
+                .accessibility: false,
+                .screenRecording: false,
+                .microphone: true,
+                .speechRecognition: false,
+            ],
+            refresh: {},
+            showOnboarding: {}
+        )
+        .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

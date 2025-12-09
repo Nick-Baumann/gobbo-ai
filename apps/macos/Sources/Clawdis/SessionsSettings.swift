@@ -3,12 +3,22 @@ import SwiftUI
 
 @MainActor
 struct SessionsSettings: View {
-    @State private var rows: [SessionRow] = []
+    private let isPreview: Bool
+    @State private var rows: [SessionRow]
     @State private var storePath: String = SessionLoader.defaultStorePath
     @State private var lastLoaded: Date?
     @State private var errorMessage: String?
     @State private var loading = false
     @State private var hasLoaded = false
+
+    init(rows: [SessionRow]? = nil, isPreview: Bool = ProcessInfo.processInfo.isPreview) {
+        self._rows = State(initialValue: rows ?? [])
+        self.isPreview = isPreview
+        if isPreview {
+            self._lastLoaded = State(initialValue: Date())
+            self._hasLoaded = State(initialValue: true)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -22,6 +32,7 @@ struct SessionsSettings: View {
         .padding(.horizontal, 12)
         .task {
             guard !self.hasLoaded else { return }
+            guard !self.isPreview else { return }
             self.hasLoaded = true
             await self.refresh()
         }
@@ -149,6 +160,7 @@ struct SessionsSettings: View {
 
     private func refresh() async {
         guard !self.loading else { return }
+        guard !self.isPreview else { return }
         self.loading = true
         self.errorMessage = nil
 
@@ -209,3 +221,12 @@ private struct Badge: View {
             .clipShape(Capsule())
     }
 }
+
+#if DEBUG
+struct SessionsSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        SessionsSettings(rows: SessionRow.previewRows, isPreview: true)
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

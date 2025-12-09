@@ -13,6 +13,7 @@ struct GeneralSettings: View {
     @State private var relayInstalling = false
     @State private var remoteStatus: RemoteStatus = .idle
     @State private var showRemoteAdvanced = false
+    private let isPreview = ProcessInfo.processInfo.isPreview
 
     var body: some View {
         ScrollView(.vertical) {
@@ -65,6 +66,7 @@ struct GeneralSettings: View {
             .padding(.bottom, 16)
         }
         .onAppear {
+            guard !self.isPreview else { return }
             self.refreshCLIStatus()
             self.refreshRelayStatus()
         }
@@ -527,3 +529,12 @@ private func healthAgeString(_ ms: Double?) -> String {
     guard let ms else { return "unknown" }
     return msToAge(ms)
 }
+
+#if DEBUG
+struct GeneralSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        GeneralSettings(state: .preview)
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

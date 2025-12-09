@@ -28,6 +28,7 @@ struct InstanceInfo: Identifiable, Codable {
 @MainActor
 final class InstancesStore: ObservableObject {
     static let shared = InstancesStore()
+    let isPreview: Bool
 
     @Published var instances: [InstanceInfo] = []
     @Published var lastError: String?
@@ -39,7 +40,12 @@ final class InstancesStore: ObservableObject {
     private let interval: TimeInterval = 30
     private var observers: [NSObjectProtocol] = []
 
+    init(isPreview: Bool = false) {
+        self.isPreview = isPreview
+    }
+
     func start() {
+        guard !self.isPreview else { return }
         guard self.task == nil else { return }
         self.observeGatewayEvents()
         self.task = Task.detached { [weak self] in
@@ -293,5 +299,35 @@ final class InstancesStore: ObservableObject {
             self.logger.error("presence decode from event failed: \(error.localizedDescription, privacy: .public)")
             self.lastError = error.localizedDescription
         }
+    }
+}
+
+extension InstancesStore {
+    static func preview(instances: [InstanceInfo] = [
+        InstanceInfo(
+            id: "local",
+            host: "steipete-mac",
+            ip: "10.0.0.12",
+            version: "1.2.3",
+            lastInputSeconds: 12,
+            mode: "local",
+            reason: "preview",
+            text: "Local node: steipete-mac (10.0.0.12) · app 1.2.3",
+            ts: Date().timeIntervalSince1970 * 1000),
+        InstanceInfo(
+            id: "relay",
+            host: "relay",
+            ip: "100.64.0.2",
+            version: "1.2.3",
+            lastInputSeconds: 45,
+            mode: "remote",
+            reason: "preview",
+            text: "Relay node · tunnel ok",
+            ts: Date().timeIntervalSince1970 * 1000 - 45_000),
+    ]) -> InstancesStore {
+        let store = InstancesStore(isPreview: true)
+        store.instances = instances
+        store.statusMessage = "Preview data"
+        return store
     }
 }

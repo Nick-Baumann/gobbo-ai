@@ -17,6 +17,7 @@ struct VoiceWakeSettings: View {
     @State private var availableLocales: [Locale] = []
     private let fieldLabelWidth: CGFloat = 120
     private let controlWidth: CGFloat = 240
+    private let isPreview = ProcessInfo.processInfo.isPreview
 
     private struct AudioInputDevice: Identifiable, Equatable {
         let uid: String
@@ -83,13 +84,24 @@ struct VoiceWakeSettings: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
         }
-        .task { await self.loadMicsIfNeeded() }
-        .task { await self.loadLocalesIfNeeded() }
-        .task { await self.restartMeter() }
+        .task {
+            guard !self.isPreview else { return }
+            await self.loadMicsIfNeeded()
+        }
+        .task {
+            guard !self.isPreview else { return }
+            await self.loadLocalesIfNeeded()
+        }
+        .task {
+            guard !self.isPreview else { return }
+            await self.restartMeter()
+        }
         .onChange(of: self.state.voiceWakeMicID) { _, _ in
+            guard !self.isPreview else { return }
             Task { await self.restartMeter() }
         }
         .onDisappear {
+            guard !self.isPreview else { return }
             Task { await self.meter.stop() }
         }
     }
@@ -489,3 +501,12 @@ struct VoiceWakeSettings: View {
         }
     }
 }
+
+#if DEBUG
+struct VoiceWakeSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        VoiceWakeSettings(state: .preview)
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

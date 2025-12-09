@@ -177,3 +177,13 @@ private struct AboutMetaRow: View {
         }
     }
 }
+
+#if DEBUG
+struct AboutSettings_Previews: PreviewProvider {
+    private static let updater = DisabledUpdaterController()
+    static var previews: some View {
+        AboutSettings(updater: updater)
+            .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
+    }
+}
+#endif

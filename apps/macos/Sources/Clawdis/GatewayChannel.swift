@@ -238,7 +238,7 @@ private actor GatewayChannelActor {
         if let urlError = error as? URLError {
             let desc = urlError.localizedDescription.isEmpty ? "cancelled" : urlError.localizedDescription
             return NSError(
-                domain: urlError.errorDomain,
+                domain: URLError.errorDomain,
                 code: urlError.errorCode,
                 userInfo: [NSLocalizedDescriptionKey: "\(context): \(desc)"])
         }
