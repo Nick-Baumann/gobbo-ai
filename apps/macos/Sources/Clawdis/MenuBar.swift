@@ -59,6 +59,10 @@ struct ClawdisApp: App {
         guard let button = item.button else { return }
         if button.subviews.contains(where: { $0 is StatusItemMouseHandlerView }) { return }
 
+        WebChatManager.shared.onPanelVisibilityChanged = { [self] visible in
+            self.statusItem?.button?.highlight(visible)
+        }
+
         let handler = StatusItemMouseHandlerView()
         handler.translatesAutoresizingMaskIntoConstraints = false
         handler.onLeftClick = { [self] in self.toggleWebChatPanel() }

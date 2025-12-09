@@ -26,6 +26,8 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
     private var reachabilityTask: Task<Void, Never>?
     private var tunnelRestartEnabled = false
     let presentation: WebChatPresentation
+    var onPanelClosed: (() -> Void)?
+    private var panelCloseNotified = false
 
     init(sessionKey: String, presentation: WebChatPresentation = .window) {
         webChatLogger.debug("init WebChatWindowController sessionKey=\(sessionKey, privacy: .public)")
@@ -217,6 +219,7 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     func presentAnchoredPanel(anchorProvider: @escaping () -> NSRect?) {
         guard case .panel = self.presentation, let window else { return }
+        self.panelCloseNotified = false
         self.repositionPanel(using: anchorProvider)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -226,6 +229,7 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
     func closePanel() {
         guard case .panel = self.presentation else { return }
         self.window?.orderOut(nil)
+        self.notifyPanelClosedOnce()
     }
 
     private func repositionPanel(using anchorProvider: () -> NSRect?) {
@@ -268,6 +272,13 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
     func windowDidResignKey(_ notification: Notification) {
         guard case .panel = self.presentation else { return }
         self.closePanel()
+        self.notifyPanelClosedOnce()
+    }
+
+    private func notifyPanelClosedOnce() {
+        guard !self.panelCloseNotified else { return }
+        self.panelCloseNotified = true
+        self.onPanelClosed?()
     }
 }
 
@@ -310,11 +321,13 @@ extension WebChatWindowController {
 final class WebChatManager {
     static let shared = WebChatManager()
     private var controller: WebChatWindowController?
+    var onPanelVisibilityChanged: ((Bool) -> Void)?
 
     func show(sessionKey: String) {
         if self.controller == nil {
             self.controller = WebChatWindowController(sessionKey: sessionKey)
         }
+        self.onPanelVisibilityChanged?(false)
         self.controller?.showWindow(nil)
         self.controller?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -334,7 +347,11 @@ final class WebChatManager {
 
         let controller = WebChatWindowController(sessionKey: sessionKey, presentation: .panel(anchorProvider: anchorProvider))
         self.controller = controller
+        controller.onPanelClosed = { [weak self] in
+            self?.panelClosed()
+        }
         controller.presentAnchoredPanel(anchorProvider: anchorProvider)
+        self.onPanelVisibilityChanged?(true)
     }
 
     func closePanel() {
@@ -342,6 +359,7 @@ final class WebChatManager {
         controller.shutdown()
         controller.closePanel()
         self.controller = nil
+        self.onPanelVisibilityChanged?(false)
     }
 
     func preferredSessionKey() -> String {
@@ -365,6 +383,11 @@ final class WebChatManager {
     func close() {
         self.controller?.shutdown()
         self.controller?.close()
+        self.controller = nil
+    }
+
+    private func panelClosed() {
+        self.onPanelVisibilityChanged?(false)
         self.controller = nil
     }
 }
