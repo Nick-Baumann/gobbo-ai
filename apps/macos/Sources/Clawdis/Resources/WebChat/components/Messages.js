@@ -9,6 +9,7 @@ import { customElement, property } from "lit/decorators.js";
 import { renderTool } from "../tools/index.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
+import { formatClock, renderSurfaceChip } from "../utils/message-meta.js";
 import "./ThinkingBlock.js";
 let UserMessage = class UserMessage extends LitElement {
     createRenderRoot() {
@@ -23,6 +24,10 @@ let UserMessage = class UserMessage extends LitElement {
             ? this.message.content
             : this.message.content.find((c) => c.type === "text")?.text || "";
         return html `
+			<div class="px-4 mb-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+				${renderSurfaceChip(this.message.surface, this.message.senderHost, this.message.senderIp)}
+				<span class="opacity-70">${formatClock(this.message.timestamp)}</span>
+			</div>
 			<div class="flex justify-start mx-4">
 				<div class="user-message-container py-2 px-4 rounded-xl">
 					<markdown-block .content=${content}></markdown-block>
