@@ -538,4 +538,47 @@ describe("gateway server", () => {
     ws2.close();
     await server.close();
   });
+
+  test("presence includes client fingerprint", async () => {
+    const { server, ws } = await startServerWithClient();
+    ws.send(
+      JSON.stringify({
+        type: "hello",
+        minProtocol: 1,
+        maxProtocol: 1,
+        client: {
+          name: "fingerprint",
+          version: "9.9.9",
+          platform: "test",
+          mode: "ui",
+          instanceId: "abc",
+        },
+        caps: [],
+      }),
+    );
+    await onceMessage(ws, (o) => o.type === "hello-ok");
+
+    const presenceP = onceMessage(
+      ws,
+      (o) => o.type === "res" && o.id === "fingerprint",
+      4000,
+    );
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "fingerprint",
+        method: "system-presence",
+      }),
+    );
+
+    const presenceRes = await presenceP;
+    const entries = presenceRes.payload as Array<Record<string, unknown>>;
+    const clientEntry = entries.find((e) => e.instanceId === "abc");
+    expect(clientEntry?.host).toBe("fingerprint");
+    expect(clientEntry?.version).toBe("9.9.9");
+    expect(clientEntry?.mode).toBe("ui");
+
+    ws.close();
+    await server.close();
+  });
 });
