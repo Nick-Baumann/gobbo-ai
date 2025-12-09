@@ -119,12 +119,12 @@ First Clawdis release post rebrand. This is a semver-major because we dropped le
 - Heartbeat alerts now honor `responsePrefix`.
 - Command failures return user-friendly messages.
 - Test session isolation to avoid touching real `sessions.json`.
-- IPC reuse for `clawdis send/heartbeat` prevents Signal/WhatsApp session corruption.
+- (Removed in 2.0.0) IPC reuse for `clawdis send/heartbeat` prevents Signal/WhatsApp session corruption.
 - Web send respects media kind (image/audio/video/document) with correct limits.
 
 ### Changes
-- IPC gateway socket at `~/.clawdis/ipc/gateway.sock` with automatic CLI fallback.
-- Batched inbound messages with timestamps; typing indicator after IPC sends.
+- (Removed in 2.0.0) IPC gateway socket at `~/.clawdis/ipc/gateway.sock` with automatic CLI fallback.
+- Batched inbound messages with timestamps; typing indicator after sends.
 - Watchdog restarts WhatsApp after long inactivity; heartbeat logging includes minutes since last message.
 - Early `allowFrom` filtering before decryption.
 - Same-phone mode with echo detection and optional `inbound.samePhoneMarker`.

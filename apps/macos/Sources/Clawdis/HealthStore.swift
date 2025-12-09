@@ -4,11 +4,6 @@ import OSLog
 import SwiftUI
 
 struct HealthSnapshot: Codable, Sendable {
-    struct Ipc: Codable, Sendable {
-        let exists: Bool?
-        let path: String?
-    }
-
     struct Web: Codable, Sendable {
         struct Connect: Codable, Sendable {
             let ok: Bool
@@ -37,7 +32,6 @@ struct HealthSnapshot: Codable, Sendable {
     let ts: Double
     let durationMs: Double
     let web: Web
-    let ipc: Ipc?
     let heartbeatSeconds: Int?
     let sessions: Sessions
 }

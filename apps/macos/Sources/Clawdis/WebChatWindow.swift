@@ -244,6 +244,10 @@ final class WebChatManager {
     static let shared = WebChatManager()
     private var controller: WebChatWindowController?
 
+    func preferredSessionKey() -> String {
+        WorkActivityStore.shared.current?.sessionKey ?? "main"
+    }
+
     func show(sessionKey: String) {
         if self.controller == nil {
             self.controller = WebChatWindowController(sessionKey: sessionKey)

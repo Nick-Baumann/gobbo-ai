@@ -14,7 +14,6 @@ import Testing
 
         #expect(snap?.web.linked == true)
         #expect(snap?.sessions.count == 1)
-        #expect(snap?.ipc.exists == true)
     }
 
     @Test func decodesWithLeadingNoise() async throws {

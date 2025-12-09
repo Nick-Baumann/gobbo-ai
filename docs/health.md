@@ -17,7 +17,6 @@ Short guide to verify the WhatsApp Web / Baileys stack without guessing.
 ## Deep diagnostics
 - Creds on disk: `ls -l ~/.clawdis/credentials/creds.json` (mtime should be recent).
 - Session store: `ls -l ~/.clawdis/sessions.json` (path can be overridden in config). Count and recent recipients are surfaced via `status`.
-- IPC socket (if gateway is running): `ls -l ~/.clawdis/clawdis.sock`.
 - Relink flow: `pnpm clawdis logout && pnpm clawdis login --provider web --verbose` when status codes 409–515 or `loggedOut` appear in logs.
 
 ## When something fails
@@ -26,4 +25,4 @@ Short guide to verify the WhatsApp Web / Baileys stack without guessing.
 - No inbound messages → confirm linked phone is online and sender is allowed; use `pnpm clawdis heartbeat --all --verbose` to test each known recipient.
 
 ## Dedicated "health" command
-`pnpm clawdis health --json` runs a connect-only probe (no sends) and reports: linked creds, auth age, Baileys connect result/status code, session-store summary, IPC presence, and a probe duration. It exits non-zero if not linked or if the connect fails/timeouts. Use `--timeout <ms>` to override the 10s default.
+`pnpm clawdis health --json` runs a connect-only probe (no sends) and reports: linked creds, auth age, Baileys connect result/status code, session-store summary, and a probe duration. It exits non-zero if not linked or if the connect fails/timeouts. Use `--timeout <ms>` to override the 10s default.

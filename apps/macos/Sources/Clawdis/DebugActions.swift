@@ -128,17 +128,17 @@ enum DebugActions {
         await HealthStore.shared.refresh(onDemand: true)
     }
 
-    static func sendTestHeartbeat() async -> Result<ControlHeartbeatEvent?, String> {
+    static func sendTestHeartbeat() async -> Result<ControlHeartbeatEvent?, Error> {
         do {
             _ = await AgentRPC.shared.setHeartbeatsEnabled(true)
-            try await ControlChannel.shared.configure()
+            await ControlChannel.shared.configure()
             let data = try await ControlChannel.shared.request(method: "last-heartbeat")
             if let evt = try? JSONDecoder().decode(ControlHeartbeatEvent.self, from: data) {
                 return .success(evt)
             }
             return .success(nil)
         } catch {
-            return .failure(error.localizedDescription)
+            return .failure(error)
         }
     }
 
@@ -149,7 +149,7 @@ enum DebugActions {
     static func toggleVerboseLoggingMain() async -> Bool {
         let newValue = !self.verboseLoggingEnabledMain
         UserDefaults.standard.set(newValue, forKey: self.verboseDefaultsKey)
-        try? await ControlChannel.shared.request(
+        _ = try? await ControlChannel.shared.request(
             method: "system-event",
             params: ["text": AnyHashable("verbose-main:\(newValue ? "on" : "off")")])
         return newValue

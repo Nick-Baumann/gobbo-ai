@@ -261,7 +261,7 @@ final class InstancesStore: ObservableObject {
                 lastInputSeconds: nil,
                 mode: "health",
                 reason: "health probe",
-                text: "Health ok · linked=\(snap.web.linked) · ipc.exists=\(snap.ipc.exists)",
+                text: "Health ok · linked=\(snap.web.linked)",
                 ts: snap.ts)
             if !self.instances.contains(where: { $0.id == entry.id }) {
                 self.instances.insert(entry, at: 0)

@@ -15,5 +15,5 @@ Goal: make replies deterministic per channel while keeping one shared context fo
 - **WebChat:** Always attaches to `main`, loads the full Tau transcript so desktop reflects cross-surface history, and writes new turns back to the same session.
 - **Implementation hints:**
   - Set `Surface` in each ingress (WhatsApp gateway, WebChat bridge, future Telegram). 
-  - Keep routing deterministic: originate → same surface. Use IPC/web senders accordingly.
+  - Keep routing deterministic: originate → same surface. Use the gateway WebSocket for sends; avoid side channels.
   - Do not let the agent emit “send to X” decisions; keep that policy in the host code.
