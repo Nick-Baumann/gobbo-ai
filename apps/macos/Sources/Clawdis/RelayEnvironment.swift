@@ -73,6 +73,8 @@ enum RelayEnvironment {
 
     static func check() -> RelayEnvironmentStatus {
         let expected = self.expectedRelayVersion()
+        let projectRoot = CommandResolver.projectRoot()
+        let projectEntrypoint = CommandResolver.relayEntrypoint(in: projectRoot)
 
         switch RuntimeLocator.resolve(searchPaths: CommandResolver.preferredPaths()) {
         case let .failure(err):
@@ -83,7 +85,9 @@ enum RelayEnvironment {
                 requiredRelay: expected?.description,
                 message: RuntimeLocator.describeFailure(err))
         case let .success(runtime):
-            guard let relayBin = CommandResolver.clawdisExecutable() else {
+            let relayBin = CommandResolver.clawdisExecutable()
+
+            if relayBin == nil, projectEntrypoint == nil {
                 return RelayEnvironmentStatus(
                     kind: .missingRelay,
                     nodeVersion: runtime.version.description,
@@ -92,7 +96,9 @@ enum RelayEnvironment {
                     message: "clawdis CLI not found in PATH; install the global package.")
             }
 
-            let installedRelay = self.readRelayVersion(binary: relayBin)
+            let installedRelay = relayBin.flatMap { self.readRelayVersion(binary: $0) }
+                ?? self.readLocalRelayVersion(projectRoot: projectRoot)
+
             if let expected, let installed = installedRelay, !installed.compatible(with: expected) {
                 return RelayEnvironmentStatus(
                     kind: .incompatible(found: installed.description, required: expected.description),
@@ -102,24 +108,42 @@ enum RelayEnvironment {
                     message: "Relay version \(installed.description) is incompatible with app \(expected.description); install/update the global package.")
             }
 
+            let relayLabel = relayBin != nil ? "global" : "local"
+            let relayVersionText = installedRelay?.description ?? "unknown"
             return RelayEnvironmentStatus(
                 kind: .ok,
                 nodeVersion: runtime.version.description,
-                relayVersion: installedRelay?.description,
+                relayVersion: relayVersionText,
                 requiredRelay: expected?.description,
-                message: "Node \(runtime.version.description); relay \(installedRelay?.description ?? "unknown")")
+                message: "Node \(runtime.version.description); relay \(relayVersionText) (\(relayLabel))")
         }
     }
 
     static func resolveGatewayCommand() -> RelayCommandResolution {
+        let projectRoot = CommandResolver.projectRoot()
+        let projectEntrypoint = CommandResolver.relayEntrypoint(in: projectRoot)
         let status = self.check()
-        guard case .ok = status.kind, let relayBin = CommandResolver.clawdisExecutable() else {
+        let relayBin = CommandResolver.clawdisExecutable()
+        let runtime = RuntimeLocator.resolve(searchPaths: CommandResolver.preferredPaths())
+
+        guard case .ok = status.kind else {
             return RelayCommandResolution(status: status, command: nil)
         }
 
         let port = self.gatewayPort()
-        let cmd = [relayBin, "gateway", "--port", "\(port)"]
-        return RelayCommandResolution(status: status, command: cmd)
+        if let relayBin {
+            let cmd = [relayBin, "gateway", "--port", "\(port)"]
+            return RelayCommandResolution(status: status, command: cmd)
+        }
+
+        if let entry = projectEntrypoint,
+           case let .success(resolvedRuntime) = runtime
+        {
+            let cmd = [resolvedRuntime.path, entry, "gateway", "--port", "\(port)"]
+            return RelayCommandResolution(status: status, command: cmd)
+        }
+
+        return RelayCommandResolution(status: status, command: nil)
     }
 
     static func installGlobal(version: Semver?, statusHandler: @escaping @Sendable (String) -> Void) async {
@@ -158,5 +182,15 @@ enum RelayEnvironment {
         } catch {
             return nil
         }
+    }
+
+    private static func readLocalRelayVersion(projectRoot: URL) -> Semver? {
+        let pkg = projectRoot.appendingPathComponent("package.json")
+        guard let data = try? Data(contentsOf: pkg) else { return nil }
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let version = json["version"] as? String
+        else { return nil }
+        return Semver.parse(version)
     }
 }
