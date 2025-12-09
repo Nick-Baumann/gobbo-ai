@@ -172,7 +172,9 @@ export async function startControlChannel(
           break;
         }
         case "system-presence": {
-          respond(listSystemPresence());
+          const pres = listSystemPresence();
+          logDebug?.(`control: system-presence count=${pres.length}`);
+          respond(pres);
           break;
         }
         default:
