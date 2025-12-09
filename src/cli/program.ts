@@ -1,10 +1,10 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { agentCommand } from "../commands/agent.js";
-import { healthCommand } from "../commands/health.js";
+import { getHealthSnapshot, healthCommand, type HealthSummary } from "../commands/health.js";
 import { sendCommand } from "../commands/send.js";
 import { sessionsCommand } from "../commands/sessions.js";
-import { statusCommand } from "../commands/status.js";
+import { getStatusSummary, statusCommand, type StatusSummary } from "../commands/status.js";
 import { loadConfig } from "../config/config.js";
 import { danger, info, setVerbose } from "../globals.js";
 import { startControlChannel } from "../infra/control-channel.js";
@@ -12,6 +12,7 @@ import {
   getLastHeartbeatEvent,
   onHeartbeatEvent,
 } from "../infra/heartbeat-events.js";
+import { onAgentEvent } from "../infra/agent-events.js";
 import { getResolvedLoggerSettings } from "../logging.js";
 import {
   loginWeb,
@@ -33,6 +34,12 @@ import {
   startWebChatServer,
 } from "../webchat/server.js";
 import { createDefaultDeps, logWebSelfId } from "./deps.js";
+import { onAgentEvent } from "../infra/agent-events.js";
+import {
+  enqueueSystemEvent,
+  listSystemPresence,
+  updateSystemPresence,
+} from "../infra/system-presence.js";
 
 export function buildProgram() {
   const program = new Command();
@@ -249,10 +256,14 @@ Examples:
       const forwardHeartbeat = (payload: unknown) => {
         respond({ type: "event", event: "heartbeat", payload });
       };
+      const forwardAgent = (payload: unknown) => {
+        respond({ type: "event", event: "agent", payload });
+      };
 
       const latest = getLastHeartbeatEvent();
       if (latest) forwardHeartbeat(latest);
       const stopBus = onHeartbeatEvent(forwardHeartbeat);
+      const stopAgentBus = onAgentEvent(forwardAgent);
 
       rl.on("line", async (line: string) => {
         if (!line.trim()) return;
@@ -265,6 +276,52 @@ Examples:
           if (cmd.type === "set-heartbeats") {
             setHeartbeatsEnabled(Boolean(cmd.enabled));
             respond({ type: "result", ok: true });
+            return;
+          }
+          if (cmd.type === "control-request" && cmd.id && cmd.method) {
+            const id = String(cmd.id);
+            const method = String(cmd.method);
+            const params = (cmd.params ?? {}) as Record<string, unknown>;
+            const controlRespond = (ok: boolean, payload?: unknown, error?: string) =>
+              respond({ type: "control-response", id, ok, payload, error });
+            try {
+              if (method === "health") {
+                const timeoutMs = typeof params.timeoutMs === "number" ? params.timeoutMs : undefined;
+                const payload = await getHealthSnapshot(timeoutMs);
+                controlRespond(true, payload satisfies HealthSummary);
+                return;
+              }
+              if (method === "status") {
+                const payload = await getStatusSummary();
+                controlRespond(true, payload satisfies StatusSummary);
+                return;
+              }
+              if (method === "last-heartbeat") {
+                controlRespond(true, getLastHeartbeatEvent());
+                return;
+              }
+              if (method === "set-heartbeats") {
+                setHeartbeatsEnabled(Boolean(params.enabled));
+                controlRespond(true, { ok: true });
+                return;
+              }
+              if (method === "system-event") {
+                const text = String(params.text ?? "").trim();
+                if (text) {
+                  enqueueSystemEvent(text);
+                  updateSystemPresence(text);
+                }
+                controlRespond(true, { ok: true });
+                return;
+              }
+              if (method === "system-presence") {
+                controlRespond(true, listSystemPresence());
+                return;
+              }
+              controlRespond(false, undefined, `unknown control method: ${method}`);
+            } catch (err) {
+              controlRespond(false, undefined, String(err));
+            }
             return;
           }
           if (cmd.type !== "send" || !cmd.text) {
@@ -326,6 +383,7 @@ Examples:
       await new Promise(() => {});
 
       stopBus();
+      stopAgentBus();
     });
 
   program
