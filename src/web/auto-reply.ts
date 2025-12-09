@@ -30,7 +30,7 @@ import {
   resolveReconnectPolicy,
   sleepWithAbort,
 } from "./reconnect.js";
-import { getWebAuthAgeMs, readWebSelfId } from "./session.js";
+import { formatError, getWebAuthAgeMs, readWebSelfId } from "./session.js";
 
 const WEB_TEXT_LIMIT = 4000;
 const DEFAULT_GROUP_HISTORY_LIMIT = 50;
@@ -1384,12 +1384,15 @@ export async function monitorWebProvider(
       "isLoggedOut" in reason &&
       (reason as { isLoggedOut?: boolean }).isLoggedOut;
 
+    const errorStr = formatError(reason);
+
     reconnectLogger.info(
       {
         connectionId,
         status,
         loggedOut,
         reconnectAttempts,
+        error: errorStr,
       },
       "web reconnect: connection closed",
     );
@@ -1442,11 +1445,11 @@ export async function monitorWebProvider(
       },
       "web reconnect: scheduling retry",
     );
-    runtime.error(
-      danger(
-        `WhatsApp Web connection closed (status ${status}). Retry ${reconnectAttempts}/${reconnectPolicy.maxAttempts || "∞"} in ${formatDuration(delay)}…`,
-      ),
-    );
+      runtime.error(
+        danger(
+          `WhatsApp Web connection closed (status ${status}). Retry ${reconnectAttempts}/${reconnectPolicy.maxAttempts || "∞"} in ${formatDuration(delay)}… (${errorStr})`,
+        ),
+      );
     await closeListener();
     try {
       await sleep(delay, abortSignal);
