@@ -680,8 +680,8 @@ describe("web auto-reply", () => {
 
     expect(resolver).toHaveBeenCalledTimes(1);
     const args = resolver.mock.calls[0][0];
-    expect(args.Body).toContain("[Jan 1 00:00] [clawdis] first");
-    expect(args.Body).toContain("[Jan 1 01:00] [clawdis] second");
+    expect(args.Body).toContain("[WhatsApp +1 2025-01-01 00:00] [clawdis] first");
+    expect(args.Body).toContain("[WhatsApp +1 2025-01-01 01:00] [clawdis] second");
 
     // Max listeners bumped to avoid warnings in multi-instance test runs
     expect(process.getMaxListeners?.()).toBeGreaterThanOrEqual(50);
@@ -1292,7 +1292,8 @@ describe("web auto-reply", () => {
     // The resolver should receive a prefixed body with the configured marker
     const callArg = resolver.mock.calls[0]?.[0] as { Body?: string };
     expect(callArg?.Body).toBeDefined();
-    expect(callArg?.Body).toBe("[same-phone] hello");
+    expect(callArg?.Body).toContain("[WhatsApp +1555");
+    expect(callArg?.Body).toContain("[same-phone] hello");
     resetLoadConfigMock();
   });
 
@@ -1324,9 +1325,10 @@ describe("web auto-reply", () => {
       sendMedia: vi.fn(),
     });
 
-    // Body should NOT be prefixed
+    // Body should include envelope but not the same-phone prefix
     const callArg = resolver.mock.calls[0]?.[0] as { Body?: string };
-    expect(callArg?.Body).toBe("hello");
+    expect(callArg?.Body).toContain("[WhatsApp +1555");
+    expect(callArg?.Body).toContain("hello");
   });
 
   it("applies responsePrefix to regular replies", async () => {

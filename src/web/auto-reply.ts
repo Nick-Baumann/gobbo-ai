@@ -31,6 +31,8 @@ import {
   sleepWithAbort,
 } from "./reconnect.js";
 import { formatError, getWebAuthAgeMs, readWebSelfId } from "./session.js";
+import { formatAgentEnvelope } from "../auto-reply/envelope.js";
+import { formatAgentEnvelope } from "../auto-reply/envelope.js";
 
 const WEB_TEXT_LIMIT = 4000;
 const DEFAULT_GROUP_HISTORY_LIMIT = 50;
@@ -759,19 +761,6 @@ export async function monitorWebProvider(
     type PendingBatch = { messages: WebInboundMsg[]; timer?: NodeJS.Timeout };
     const pendingBatches = new Map<string, PendingBatch>();
 
-    const formatTimestamp = (ts?: number) => {
-      const tsCfg = cfg.inbound?.timestampPrefix;
-      const tsEnabled = tsCfg !== false; // default true
-      if (!tsEnabled) return "";
-      const tz = typeof tsCfg === "string" ? tsCfg : "UTC";
-      const date = ts ? new Date(ts) : new Date();
-      try {
-        return `[${date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: tz })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz })}] `;
-      } catch {
-        return `[${date.toISOString().slice(5, 16).replace("T", " ")}] `;
-      }
-    };
-
     const buildLine = (msg: WebInboundMsg) => {
       // Build message prefix: explicit config > default based on allowFrom
       let messagePrefix = cfg.inbound?.messagePrefix;
@@ -784,7 +773,18 @@ export async function monitorWebProvider(
         msg.chatType === "group"
           ? `${msg.senderName ?? msg.senderE164 ?? "Someone"}: `
           : "";
-      return `${formatTimestamp(msg.timestamp)}${prefixStr}${senderLabel}${msg.body}`;
+      const baseLine = `${prefixStr}${senderLabel}${msg.body}`;
+
+      // Wrap with standardized envelope for the agent.
+      return formatAgentEnvelope({
+        surface: "WhatsApp",
+        from:
+          msg.chatType === "group"
+            ? msg.from
+            : msg.from?.replace(/^whatsapp:/, ""),
+        timestamp: msg.timestamp,
+        body: baseLine,
+      });
     };
 
     const processBatch = async (conversationId: string) => {
@@ -806,9 +806,13 @@ export async function monitorWebProvider(
           history.length > 0 ? history.slice(0, -1) : [];
         if (historyWithoutCurrent.length > 0) {
           const historyText = historyWithoutCurrent
-            .map(
-              (m) =>
-                `${m.sender}: ${m.body}${m.timestamp ? ` [${new Date(m.timestamp).toISOString()}]` : ""}`,
+            .map((m) =>
+              formatAgentEnvelope({
+                surface: "WhatsApp",
+                from: conversationId,
+                timestamp: m.timestamp,
+                body: `${m.sender}: ${m.body}`,
+              }),
             )
             .join("\\n");
           combinedBody = `[Chat messages since your last reply - for context]\\n${historyText}\\n\\n[Current message - respond to this]\\n${buildLine(latest)}`;

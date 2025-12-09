@@ -7,6 +7,7 @@ import { Bot, InputFile, webhookCallback } from "grammy";
 import { chunkText } from "../auto-reply/chunk.js";
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
+import { formatAgentEnvelope } from "../auto-reply/envelope.js";
 import { loadConfig } from "../config/config.js";
 import { danger, logVerbose } from "../globals.js";
 import { getChildLogger } from "../logging.js";
@@ -98,8 +99,15 @@ export function createTelegramBot(opts: TelegramBotOptions) {
       }
 
       const media = await resolveMedia(ctx, mediaMaxBytes);
-      const body = (msg.text ?? msg.caption ?? media?.placeholder ?? "").trim();
-      if (!body) return;
+      const rawBody = (msg.text ?? msg.caption ?? media?.placeholder ?? "").trim();
+      if (!rawBody) return;
+
+      const body = formatAgentEnvelope({
+        surface: "Telegram",
+        from: isGroup ? `group:${chatId}` : `telegram:${chatId}`,
+        timestamp: msg.date ? msg.date * 1000 : undefined,
+        body: rawBody,
+      });
 
       const ctxPayload = {
         Body: body,

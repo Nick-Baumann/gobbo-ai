@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type WebSocket, WebSocketServer } from "ws";
 import { loadConfig } from "../config/config.js";
+import { formatAgentEnvelope } from "../auto-reply/envelope.js";
 import {
   loadSessionStore,
   resolveStorePath,
@@ -139,6 +140,7 @@ function broadcastAll(payload: unknown) {
 
 async function handleRpc(
   body: unknown,
+  meta?: { remoteAddress?: string | null; senderHost?: string },
 ): Promise<{ ok: boolean; payloads?: RpcPayload[]; error?: string }> {
   const payload = body as {
     text?: unknown;
@@ -148,8 +150,8 @@ async function handleRpc(
     timeout?: unknown;
   };
 
-  const text: string = (payload.text ?? "").toString();
-  if (!text.trim()) return { ok: false, error: "empty text" };
+  const textRaw: string = (payload.text ?? "").toString();
+  if (!textRaw.trim()) return { ok: false, error: "empty text" };
   if (!gateway || !gatewayReady) {
     return { ok: false, error: "gateway unavailable" };
   }
@@ -163,11 +165,20 @@ async function handleRpc(
 
   const idempotencyKey = randomUUID();
   try {
+    // Wrap user text with surface + host/IP envelope
+    const message = formatAgentEnvelope({
+      surface: "WebChat",
+      from: meta?.senderHost ?? os.hostname(),
+      ip: meta?.remoteAddress ?? undefined,
+      timestamp: Date.now(),
+      body: textRaw.trim(),
+    });
+
     // Send agent request; wait for final res (status ok/error)
     const res = (await gateway.request(
       "agent",
       {
-        message: text,
+        message,
         thinking,
         deliver,
         to,
@@ -254,7 +265,13 @@ export async function startWebChatServer(
       } catch {
         // ignore
       }
-      const result = await handleRpc(body);
+      const forwarded =
+        (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
+        req.socket.remoteAddress;
+      const result = await handleRpc(body, {
+        remoteAddress: forwarded,
+        senderHost: os.hostname(),
+      });
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(result));
       return;
