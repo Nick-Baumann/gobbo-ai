@@ -38,7 +38,9 @@ private actor GatewayChannelActor {
     init(url: URL, token: String?) {
         self.url = url
         self.token = token
-        self.startWatchdog()
+        Task { [weak self] in
+            await self?.startWatchdog()
+        }
     }
 
     private func startWatchdog() {

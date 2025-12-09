@@ -243,7 +243,7 @@ enum CritterIconRenderer {
         NSGraphicsContext.saveGraphicsState()
         if let context = NSGraphicsContext(bitmapImageRep: rep) {
             NSGraphicsContext.current = context
-            context.interpolationQuality = .none
+            context.imageInterpolation = .none
             context.cgContext.setShouldAntialias(false)
             defer { NSGraphicsContext.restoreGraphicsState() }
 
