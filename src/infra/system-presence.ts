@@ -50,6 +50,15 @@ function initSelfPresence() {
   entries.set(key, selfEntry);
 }
 
+function ensureSelfPresence() {
+  // If the map was somehow cleared (e.g., hot reload or a new worker spawn that
+  // skipped module evaluation), re-seed with a local entry so UIs always show
+  // at least the current relay.
+  if (entries.size === 0) {
+    initSelfPresence();
+  }
+}
+
 initSelfPresence();
 
 function parsePresence(text: string): SystemPresence {
@@ -78,6 +87,7 @@ function parsePresence(text: string): SystemPresence {
 }
 
 export function updateSystemPresence(text: string) {
+  ensureSelfPresence();
   const parsed = parsePresence(text);
   const key =
     parsed.host?.toLowerCase() || parsed.ip || parsed.text.slice(0, 64);
@@ -85,5 +95,6 @@ export function updateSystemPresence(text: string) {
 }
 
 export function listSystemPresence(): SystemPresence[] {
+  ensureSelfPresence();
   return [...entries.values()].sort((a, b) => b.ts - a.ts);
 }
