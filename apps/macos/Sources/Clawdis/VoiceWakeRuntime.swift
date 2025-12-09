@@ -359,7 +359,7 @@ actor VoiceWakeRuntime {
         self.overlayToken = nil
 
         self.cooldownUntil = Date().addingTimeInterval(self.debounceAfterSend)
-        self.restartRecognizer()
+        self.scheduleRestartRecognizer()
     }
 
     // MARK: - Audio level handling
@@ -403,6 +403,18 @@ actor VoiceWakeRuntime {
         self.stop(dismissOverlay: false)
         if let current {
             Task { await self.start(with: current) }
+        }
+    }
+
+    private func scheduleRestartRecognizer(delay: TimeInterval = 0.7) {
+        Task { [weak self] in
+            let nanos = UInt64(max(0, delay) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanos)
+            guard let self else { return }
+            if self.isCapturing { return }
+            let overlayVisible = await MainActor.run { VoiceWakeOverlayController.shared.isVisible }
+            if overlayVisible { return }
+            self.restartRecognizer()
         }
     }
 
