@@ -8,6 +8,7 @@ import { statusCommand } from "../commands/status.js";
 import { loadConfig } from "../config/config.js";
 import { danger, info, setVerbose } from "../globals.js";
 import { startControlChannel } from "../infra/control-channel.js";
+import { acquireRelayLock, RelayLockError } from "../infra/relay-lock.js";
 import { getResolvedLoggerSettings } from "../logging.js";
 import {
   loginWeb,
@@ -383,6 +384,18 @@ Examples:
       const { file: logFile, level: logLevel } = getResolvedLoggerSettings();
       defaultRuntime.log(info(`logs: ${logFile} (level ${logLevel})`));
 
+      let releaseRelayLock: (() => Promise<void>) | null = null;
+      try {
+        releaseRelayLock = await acquireRelayLock();
+      } catch (err) {
+        if (err instanceof RelayLockError) {
+          defaultRuntime.error(danger(`Relay already running: ${err.message}`));
+          defaultRuntime.exit(1);
+          return;
+        }
+        throw err;
+      }
+
       const providerOpt = (opts.provider ?? "auto").toLowerCase();
       const cfg = loadConfig();
       const telegramToken =
@@ -589,6 +602,7 @@ Examples:
         defaultRuntime.error(danger(`Relay failed: ${String(err)}`));
         defaultRuntime.exit(1);
       } finally {
+        if (releaseRelayLock) await releaseRelayLock();
         if (control) await control.close();
       }
     });
