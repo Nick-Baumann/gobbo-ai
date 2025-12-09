@@ -13,6 +13,7 @@ final class VoiceWakeOverlayController: ObservableObject {
     enum Source: String { case wakeWord, pushToTalk }
 
     @Published private(set) var model = Model()
+    var isVisible: Bool { self.model.isVisible }
 
     struct Model {
         var text: String = ""
@@ -51,6 +52,10 @@ final class VoiceWakeOverlayController: ObservableObject {
         forwardEnabled: Bool = false,
         isFinal: Bool = false) -> UUID
     {
+        if self.model.isSending {
+            self.logger.log(level: .info, "overlay drop session_start while sending")
+            return self.activeToken ?? UUID()
+        }
         let token = UUID()
         let message = """
         overlay session_start source=\(source.rawValue) \
