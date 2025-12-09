@@ -45,7 +45,6 @@ struct VoiceWakeChimeCatalog {
             "Morse",
             "Purr",
             "Sosumi",
-            "Mail Sent",
         ]
 
         // Keep Glass first, then present the rest alphabetically without duplicates.
