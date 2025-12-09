@@ -25,6 +25,7 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
     private let remotePort: Int
     private var reachabilityTask: Task<Void, Never>?
     private var tunnelRestartEnabled = false
+    private var bootWatchTask: Task<Void, Never>?
     let presentation: WebChatPresentation
     var onPanelClosed: (() -> Void)?
     private var panelCloseNotified = false
@@ -56,10 +57,12 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     @MainActor deinit {
         self.reachabilityTask?.cancel()
+        self.bootWatchTask?.cancel()
         self.stopTunnel(allowRestart: false)
     }
 
     private static func makeWindow(for presentation: WebChatPresentation, contentView: NSView) -> NSWindow {
+        let wrappedContent = Self.makeRoundedContainer(containing: contentView)
         switch presentation {
         case .window:
             let window = NSWindow(
@@ -68,7 +71,7 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
                 backing: .buffered,
                 defer: false)
             window.title = "Clawd Web Chat"
-            window.contentView = contentView
+            window.contentView = wrappedContent
             return window
         case .panel:
             let panel = NSPanel(
@@ -83,12 +86,30 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.titleVisibility = .hidden
             panel.titlebarAppearsTransparent = true
-            panel.backgroundColor = .windowBackgroundColor
+            panel.backgroundColor = .clear
             panel.isOpaque = false
-            panel.contentView = contentView
+            panel.contentView = wrappedContent
             panel.becomesKeyOnlyIfNeeded = true
             return panel
         }
+    }
+
+    private static func makeRoundedContainer(containing contentView: NSView) -> NSView {
+        let container = NSView(frame: .zero)
+        container.wantsLayer = true
+        container.layer?.cornerRadius = 12
+        container.layer?.masksToBounds = true
+        container.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(contentView)
+        NSLayoutConstraint.activate([
+            contentView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            contentView.topAnchor.constraint(equalTo: container.topAnchor),
+            contentView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        return container
     }
 
     private func loadPlaceholder() {
@@ -100,6 +121,7 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func loadPage(baseURL: URL) {
         self.webView.load(URLRequest(url: baseURL))
+        self.startBootWatch()
         webChatLogger.debug("loadPage url=\(baseURL.absoluteString, privacy: .public)")
     }
 
@@ -134,9 +156,9 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func prepareEndpoint(remotePort: Int) async throws -> URL {
         if CommandResolver.connectionModeIsRemote() {
-            try await self.startOrRestartTunnel()
+            return try await self.startOrRestartTunnel()
         } else {
-            URL(string: "http://127.0.0.1:\(remotePort)/")!
+            return URL(string: "http://127.0.0.1:\(remotePort)/")!
         }
     }
 
@@ -155,6 +177,29 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
             return
         }
         self.loadPage(baseURL: url)
+    }
+
+    private func startBootWatch() {
+        self.bootWatchTask?.cancel()
+        self.bootWatchTask = Task { [weak self] in
+            guard let self else { return }
+            for _ in 0..<12 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                if await self.isWebChatBooted() { return }
+            }
+            await MainActor.run {
+                self.showError("web chat did not finish booting. Check that the gateway is running and try reopening.")
+            }
+        }
+    }
+
+    private func isWebChatBooted() async -> Bool {
+        await withCheckedContinuation { cont in
+            self.webView.evaluateJavaScript("document.getElementById('app')?.dataset.booted === '1' || document.body.dataset.webchatError === '1'") { result, _ in
+                cont.resume(returning: result as? Bool ?? false)
+            }
+        }
     }
 
     private func verifyReachable(endpoint: URL) async throws {
@@ -238,11 +283,12 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
         var frame = panel.frame
         frame.origin.x = round(anchor.midX - frame.width / 2)
-        frame.origin.y = anchor.minY - frame.height - 6
+        frame.origin.y = anchor.minY - frame.height
         panel.setFrame(frame, display: false)
     }
 
     private func showError(_ text: String) {
+        self.bootWatchTask?.cancel()
         let html = """
         <html><body style='font-family:-apple-system;padding:24px;color:#c00'>Web chat failed to connect.<br><br>\(
             text)</body></html>
@@ -252,6 +298,7 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     func shutdown() {
         self.reachabilityTask?.cancel()
+        self.bootWatchTask?.cancel()
         self.stopTunnel(allowRestart: false)
     }
 

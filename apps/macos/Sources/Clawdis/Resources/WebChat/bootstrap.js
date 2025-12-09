@@ -264,6 +264,7 @@ const startChat = async () => {
 startChat().catch((err) => {
   const msg = err?.stack || err?.message || String(err);
   logStatus(`boot failed: ${msg}`);
+  document.body.dataset.webchatError = "1";
   document.body.style.color = "#e06666";
   document.body.style.fontFamily = "monospace";
   document.body.style.padding = "16px";
