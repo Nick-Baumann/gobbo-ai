@@ -164,7 +164,7 @@ final class HealthStore: ObservableObject {
         return nil
     }
 
-    private func describeFailure(from snap: HealthSnapshot, fallback: String?) -> String {
+    func describeFailure(from snap: HealthSnapshot, fallback: String?) -> String {
         if !snap.web.linked {
             return "Not linked — run clawdis login"
         }
@@ -184,6 +184,16 @@ final class HealthStore: ObservableObject {
             return fallback
         }
         return "health probe failed"
+    }
+
+    var degradedSummary: String? {
+        guard case let .degraded(reason) = self.state else { return nil }
+        if reason == "[object Object]" || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let snap = self.snapshot
+        {
+            return self.describeFailure(from: snap, fallback: reason)
+        }
+        return reason
     }
 }
 

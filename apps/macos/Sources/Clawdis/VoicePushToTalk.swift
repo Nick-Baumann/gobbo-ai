@@ -8,7 +8,8 @@ import Speech
 final class VoicePushToTalkHotkey {
     static let shared = VoicePushToTalkHotkey()
 
-    private var monitor: Any?
+    private var globalMonitor: Any?
+    private var localMonitor: Any?
     private var optionDown = false // right option only
     private var active = false
 
@@ -21,18 +22,27 @@ final class VoicePushToTalkHotkey {
     }
 
     private func startMonitoring() {
-        guard self.monitor == nil else { return }
+        guard self.globalMonitor == nil, self.localMonitor == nil else { return }
         // Listen-only global monitor; we rely on Input Monitoring permission to receive events.
-        self.monitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+        self.globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             guard let self else { return }
             self.updateModifierState(from: event)
+        }
+        // Also listen locally so we still catch events when the app is active/focused.
+        self.localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.updateModifierState(from: event)
+            return event
         }
     }
 
     private func stopMonitoring() {
-        if let monitor {
-            NSEvent.removeMonitor(monitor)
-            self.monitor = nil
+        if let globalMonitor {
+            NSEvent.removeMonitor(globalMonitor)
+            self.globalMonitor = nil
+        }
+        if let localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            self.localMonitor = nil
         }
         self.optionDown = false
         self.active = false
@@ -48,11 +58,15 @@ final class VoicePushToTalkHotkey {
         if chordActive && !self.active {
             self.active = true
             Task {
+                Logger(subsystem: "com.steipete.clawdis", category: "voicewake.ptt")
+                    .info("ptt hotkey down")
                 await VoicePushToTalk.shared.begin()
             }
         } else if !chordActive && self.active {
             self.active = false
             Task {
+                Logger(subsystem: "com.steipete.clawdis", category: "voicewake.ptt")
+                    .info("ptt hotkey up")
                 await VoicePushToTalk.shared.end()
             }
         }
