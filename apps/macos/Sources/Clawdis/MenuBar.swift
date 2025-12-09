@@ -15,6 +15,11 @@ struct ClawdisApp: App {
     @State private var statusItem: NSStatusItem?
     @State private var isMenuPresented = false
     @State private var isPanelVisible = false
+    
+    @MainActor
+    private func updateStatusHighlight() {
+        self.statusItem?.button?.highlight(self.isPanelVisible)
+    }
 
     init() {
         _state = StateObject(wrappedValue: AppStateStore.shared)
@@ -49,6 +54,9 @@ struct ClawdisApp: App {
         }
         .defaultSize(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
         .windowResizability(.contentSize)
+        .onChange(of: self.isMenuPresented) { _, _ in
+            self.updateStatusHighlight()
+        }
     }
 
     private func applyStatusItemAppearance(paused: Bool) {
@@ -62,7 +70,7 @@ struct ClawdisApp: App {
 
         WebChatManager.shared.onPanelVisibilityChanged = { [self] visible in
             self.isPanelVisible = visible
-            self.statusItem?.button?.highlight(visible)
+            self.updateStatusHighlight()
         }
 
         let handler = StatusItemMouseHandlerView()
@@ -70,8 +78,8 @@ struct ClawdisApp: App {
         handler.onLeftClick = { [self] in self.toggleWebChatPanel() }
         handler.onRightClick = { [self] in
             WebChatManager.shared.closePanel()
-            self.statusItem?.button?.highlight(false)
             self.isMenuPresented = true
+            self.updateStatusHighlight()
         }
 
         button.addSubview(handler)

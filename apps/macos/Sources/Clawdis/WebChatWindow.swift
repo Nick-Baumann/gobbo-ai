@@ -353,14 +353,16 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func installDismissMonitor() {
         guard self.localDismissMonitor == nil, let panel = self.window else { return }
-        self.localDismissMonitor = NSEvent.addLocalMonitorForEvents(
+        self.localDismissMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] event in
-            guard let self else { return event }
-            if event.window !== panel {
-                self.closePanel()
+        ) { [weak self] _ in
+            guard let self else { return }
+            let pt = NSEvent.mouseLocation // screen coordinates
+            if !panel.frame.contains(pt) {
+                Task { @MainActor in
+                    self.closePanel()
+                }
             }
-            return event
         }
     }
 
