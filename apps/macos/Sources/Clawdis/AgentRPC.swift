@@ -1,6 +1,10 @@
 import Foundation
 import OSLog
 
+struct ControlRequestParams: @unchecked Sendable {
+    let raw: [String: AnyHashable]
+}
+
 actor AgentRPC {
     static let shared = AgentRPC()
 
@@ -173,13 +177,13 @@ actor AgentRPC {
         }
     }
 
-    func controlRequest(method: String, params: [String: Any]? = nil) async throws -> Data {
+    func controlRequest(method: String, params: ControlRequestParams? = nil) async throws -> Data {
         if self.process?.isRunning != true {
             try await self.start()
         }
         let id = UUID().uuidString
         var frame: [String: Any] = ["type": "control-request", "id": id, "method": method]
-        if let params { frame["params"] = params }
+        if let params { frame["params"] = params.raw }
         let data = try JSONSerialization.data(withJSONObject: frame)
         guard let stdinHandle else { throw RpcError(message: "stdin missing") }
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in

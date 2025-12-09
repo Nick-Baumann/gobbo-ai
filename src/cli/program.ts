@@ -12,7 +12,6 @@ import {
   getLastHeartbeatEvent,
   onHeartbeatEvent,
 } from "../infra/heartbeat-events.js";
-import { onAgentEvent } from "../infra/agent-events.js";
 import { getResolvedLoggerSettings } from "../logging.js";
 import {
   loginWeb,
@@ -35,8 +34,8 @@ import {
 } from "../webchat/server.js";
 import { createDefaultDeps, logWebSelfId } from "./deps.js";
 import { onAgentEvent } from "../infra/agent-events.js";
+import { enqueueSystemEvent } from "../infra/system-events.js";
 import {
-  enqueueSystemEvent,
   listSystemPresence,
   updateSystemPresence,
 } from "../infra/system-presence.js";

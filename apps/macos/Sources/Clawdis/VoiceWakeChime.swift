@@ -79,14 +79,14 @@ struct VoiceWakeChimeCatalog {
 
     private static let discoveredSoundMap: [String: URL] = {
         var map: [String: URL] = [:]
-        for root in self.searchRoots {
+        for root in Self.searchRoots {
             guard let contents = try? FileManager.default.contentsOfDirectory(
                 at: root,
                 includingPropertiesForKeys: nil,
                 options: [.skipsHiddenFiles])
             else { continue }
 
-            for url in contents where self.allowedExtensions.contains(url.pathExtension.lowercased()) {
+            for url in contents where Self.allowedExtensions.contains(url.pathExtension.lowercased()) {
                 let name = url.deletingPathExtension().lastPathComponent
                 // Preserve the first match in priority order.
                 if map[name] == nil {

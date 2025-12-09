@@ -71,6 +71,7 @@ final class ControlChannel: ObservableObject {
 
     enum ConnectionState: Equatable {
         case disconnected
+        case connecting
         case connected
         case degraded(String)
     }
@@ -87,6 +88,7 @@ final class ControlChannel: ObservableObject {
 
     func configure() async {
         do {
+            self.state = .connecting
             try await AgentRPC.shared.start()
             self.state = .connected
         } catch {
@@ -96,11 +98,11 @@ final class ControlChannel: ObservableObject {
 
     func configure(mode: Mode) async throws {
         // Mode is retained for API compatibility; transport is always stdio now.
-        try await self.configure()
+        await self.configure()
     }
 
     func health(timeout: TimeInterval? = nil) async throws -> Data {
-        let params = timeout.map { ["timeoutMs": Int($0 * 1000)] }
+        let params = timeout.map { ControlRequestParams(raw: ["timeoutMs": AnyHashable(Int($0 * 1000))]) }
         do {
             let start = Date()
             let payload = try await AgentRPC.shared.controlRequest(method: "health", params: params)
@@ -120,7 +122,7 @@ final class ControlChannel: ObservableObject {
         return try? JSONDecoder().decode(ControlHeartbeatEvent.self, from: data)
     }
 
-    func request(method: String, params: [String: Any]? = nil) async throws -> Data {
+    func request(method: String, params: ControlRequestParams? = nil) async throws -> Data {
         do {
             let data = try await AgentRPC.shared.controlRequest(method: method, params: params)
             self.state = .connected
@@ -132,7 +134,9 @@ final class ControlChannel: ObservableObject {
     }
 
     func sendSystemEvent(_ text: String) async throws {
-        _ = try await self.request(method: "system-event", params: ["text": text])
+        _ = try await self.request(
+            method: "system-event",
+            params: ControlRequestParams(raw: ["text": AnyHashable(text)]))
     }
 }
 
