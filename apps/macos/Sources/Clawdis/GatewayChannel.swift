@@ -54,50 +54,55 @@ private actor GatewayChannelActor {
     }
 
     private func sendHello() async throws {
-        let hello: [String: Any] = [
-            "type": "hello",
-            "minProtocol": GATEWAY_PROTOCOL_VERSION,
-            "maxProtocol": GATEWAY_PROTOCOL_VERSION,
-            "client": [
-                "name": "clawdis-mac",
-                "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev",
-                "platform": "macos",
-                "mode": "app",
-                "instanceId": Host.current().localizedName ?? UUID().uuidString,
+        let hello = Hello(
+            type: "hello",
+            minprotocol: GATEWAY_PROTOCOL_VERSION,
+            maxprotocol: GATEWAY_PROTOCOL_VERSION,
+            client: [
+                "name": ClawdisProtocol.AnyCodable("clawdis-mac"),
+                "version": ClawdisProtocol.AnyCodable(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"),
+                "platform": ClawdisProtocol.AnyCodable("macos"),
+                "mode": ClawdisProtocol.AnyCodable("app"),
+                "instanceId": ClawdisProtocol.AnyCodable(Host.current().localizedName ?? UUID().uuidString),
             ],
-            "caps": [],
-            "auth": self.token != nil ? ["token": self.token!] : [:],
-        ]
-        let data = try JSONSerialization.data(withJSONObject: hello)
+            caps: [],
+            auth: self.token.map { ["token": ClawdisProtocol.AnyCodable($0)] },
+            locale: nil,
+            useragent: nil)
+        let data = try JSONEncoder().encode(hello)
         try await self.task?.send(.data(data))
-        // wait for hello-ok
-        if let msg = try await task?.receive() {
-            if try await self.handleHelloResponse(msg) { return }
+        guard let msg = try await task?.receive() else {
+            throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed (no response)"])
         }
-        throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed"])
+        try await self.handleHelloResponse(msg)
     }
 
-    private func handleHelloResponse(_ msg: URLSessionWebSocketTask.Message) async throws -> Bool {
+    private func handleHelloResponse(_ msg: URLSessionWebSocketTask.Message) async throws {
         let data: Data? = switch msg {
         case let .data(d): d
         case let .string(s): s.data(using: .utf8)
         @unknown default: nil
         }
-        guard let data else { return false }
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = obj["type"] as? String else { return false }
-        if type == "hello-ok" {
-            if let policy = obj["policy"] as? [String: Any],
-               let tick = policy["tickIntervalMs"] as? Double
-            {
+        guard let data else {
+            throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed (empty response)"])
+        }
+        let decoder = JSONDecoder()
+        if let ok = try? decoder.decode(HelloOk.self, from: data) {
+            if let tick = ok.policy["tickIntervalMs"]?.value as? Double {
                 self.tickIntervalMs = tick
+            } else if let tick = ok.policy["tickIntervalMs"]?.value as? Int {
+                self.tickIntervalMs = Double(tick)
             }
             self.lastTick = Date()
             Task { await self.watchTicks() }
-            NotificationCenter.default.post(name: .gatewaySnapshot, object: nil, userInfo: obj)
-            return true
+            let frame = GatewayFrame.helloOk(ok)
+            NotificationCenter.default.post(name: .gatewaySnapshot, object: frame)
+            return
         }
-        return false
+        if let err = try? decoder.decode(HelloError.self, from: data) {
+            throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello-error: \(err.reason)"])
+        }
+        throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed (unexpected response)"])
     }
 
     private func listen() {
