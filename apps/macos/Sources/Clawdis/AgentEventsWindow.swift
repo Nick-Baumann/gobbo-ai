@@ -97,7 +97,8 @@ struct AgentEventsWindow_Previews: PreviewProvider {
             seq: 1,
             stream: "tool",
             ts: Date().timeIntervalSince1970 * 1000,
-            data: ["phase": AnyCodable("start"), "name": AnyCodable("bash")])
+            data: ["phase": AnyCodable("start"), "name": AnyCodable("bash")],
+            summary: nil)
         AgentEventStore.shared.append(sample)
         return AgentEventsWindow()
     }
