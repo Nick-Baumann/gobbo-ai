@@ -1,5 +1,7 @@
 # Control channel API (newline-delimited JSON)
 
+**Deprecated:** superseded by the WebSocket Gateway protocol (`clawdis gateway`, see `docs/architecture.md` and `docs/gateway.md`). Use only for legacy builds predating the Gateway rollout.
+
 Endpoint: `127.0.0.1:18789` (TCP, localhost only). Clients reach it via SSH port forward in remote mode.
 
 ## Frame format

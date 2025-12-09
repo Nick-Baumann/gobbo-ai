@@ -72,6 +72,10 @@ jobs:
         if: matrix.runtime == 'node'
         run: pnpm build
 
+      - name: Protocol check (node)
+        if: matrix.runtime == 'node'
+        run: pnpm protocol:check
+
       - name: Lint (bun)
         if: matrix.runtime == 'bun'
         run: bunx biome check src
