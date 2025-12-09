@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 import chalk from "chalk";
 import { Command } from "commander";
 import { agentCommand } from "../commands/agent.js";
@@ -14,6 +16,58 @@ import { defaultRuntime } from "../runtime.js";
 import { VERSION } from "../version.js";
 import { startWebChatServer } from "../webchat/server.js";
 import { createDefaultDeps } from "./deps.js";
+
+type PortProcess = { pid: number; command?: string };
+
+function parseLsofOutput(output: string): PortProcess[] {
+  const lines = output.split(/\r?\n/).filter(Boolean);
+  const results: PortProcess[] = [];
+  let current: Partial<PortProcess> = {};
+  for (const line of lines) {
+    if (line.startsWith("p")) {
+      if (current.pid) results.push(current as PortProcess);
+      current = { pid: Number.parseInt(line.slice(1), 10) };
+    } else if (line.startsWith("c")) {
+      current.command = line.slice(1);
+    }
+  }
+  if (current.pid) results.push(current as PortProcess);
+  return results;
+}
+
+function listPortListeners(port: number): PortProcess[] {
+  try {
+    const out = execFileSync(
+      "lsof",
+      ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-FpFc"],
+      { encoding: "utf-8" },
+    );
+    return parseLsofOutput(out);
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status;
+    const code = (err as { code?: string }).code;
+    if (code === "ENOENT") {
+      throw new Error("lsof not found; required for --force");
+    }
+    // lsof returns exit status 1 when no processes match
+    if (status === 1) return [];
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
+function forceFreePort(port: number): PortProcess[] {
+  const listeners = listPortListeners(port);
+  for (const proc of listeners) {
+    try {
+      process.kill(proc.pid, "SIGTERM");
+    } catch (err) {
+      throw new Error(
+        `failed to kill pid ${proc.pid}${proc.command ? ` (${proc.command})` : ""}: ${String(err)}`,
+      );
+    }
+  }
+  return listeners;
+}
 
 export function buildProgram() {
   const program = new Command();
@@ -62,7 +116,14 @@ export function buildProgram() {
       'clawdis send --to +15555550123 --message "Hi" --json',
       "Send via your web session and print JSON result.",
     ],
-    ["clawdis gateway --port 18789", "Run the WebSocket Gateway locally."],
+    [
+      "clawdis gateway --port 18789",
+      "Run the WebSocket Gateway locally.",
+    ],
+    [
+      "clawdis gateway --force",
+      "Kill anything bound to the default gateway port, then start it.",
+    ],
     ["clawdis gw:status", "Fetch Gateway status over WS."],
     [
       'clawdis agent --to +15555550123 --message "Run summary" --deliver',
@@ -227,6 +288,11 @@ Examples:
       "--token <token>",
       "Shared token required in hello.auth.token (default: CLAWDIS_GATEWAY_TOKEN env if set)",
     )
+    .option(
+      "--force",
+      "Kill any existing listener on the target port before starting",
+      false,
+    )
     .option("--verbose", "Verbose logging to stdout/stderr", false)
     .action(async (opts) => {
       setVerbose(Boolean(opts.verbose));
@@ -234,6 +300,27 @@ Examples:
       if (Number.isNaN(port) || port <= 0) {
         defaultRuntime.error("Invalid port");
         defaultRuntime.exit(1);
+      }
+      if (opts.force) {
+        try {
+          const killed = forceFreePort(port);
+          if (killed.length === 0) {
+            defaultRuntime.log(info(`Force: no listeners on port ${port}`));
+          } else {
+            for (const proc of killed) {
+              defaultRuntime.log(
+                info(
+                  `Force: killed pid ${proc.pid}${proc.command ? ` (${proc.command})` : ""} on port ${port}`,
+                ),
+              );
+            }
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          }
+        } catch (err) {
+          defaultRuntime.error(`Force: ${String(err)}`);
+          defaultRuntime.exit(1);
+          return;
+        }
       }
       if (opts.token) {
         process.env.CLAWDIS_GATEWAY_TOKEN = String(opts.token);

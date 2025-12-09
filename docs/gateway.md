@@ -12,10 +12,13 @@ Last updated: 2025-12-09
 pnpm clawdis gateway --port 18789
 # for full debug/trace logs in stdio:
 pnpm clawdis gateway --port 18789 --verbose
+# if the port is busy, terminate listeners then start:
+pnpm clawdis gateway --force
 ```
 - Binds WebSocket control plane to `127.0.0.1:<port>` (default 18789).
 - Logs to stdout; use launchd/systemd to keep it alive and rotate logs.
 - Pass `--verbose` to mirror debug logging from the log file into stdio when troubleshooting.
+- `--force` uses `lsof` to find listeners on the chosen port, sends SIGTERM, logs what it killed, then starts the gateway (fails fast if `lsof` is missing).
 - Optional shared secret: pass `--token <value>` or set `CLAWDIS_GATEWAY_TOKEN` to require clients to send `hello.auth.token`.
 
 ## Remote access

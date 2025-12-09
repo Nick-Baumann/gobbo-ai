@@ -63,8 +63,11 @@ clawdis send --to +1234567890 --message "Hello from the CLAWDIS!"
 # Talk directly to the agent (no WhatsApp send)
 clawdis agent --to +1234567890 --message "Ship checklist" --thinking high
 
-# Start the relay
-clawdis relay --verbose
+# Start the gateway (WebSocket control plane)
+clawdis gateway --port 18789 --verbose
+
+# If the port is busy, force-kill listeners then start
+clawdis gateway --force
 ```
 
 ## macOS Companion App (Clawdis.app)

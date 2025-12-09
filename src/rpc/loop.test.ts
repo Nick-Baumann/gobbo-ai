@@ -12,7 +12,7 @@ vi.mock("../commands/status.js", () => ({
   getStatusSummary: vi.fn(async () => ({
     web: { linked: true, authAgeMs: 0 },
     heartbeatSeconds: 60,
-    providerSummary: "ok",
+    providerSummary: ["ok"],
     queuedSystemEvents: [],
     sessions: {
       path: "/tmp/sessions.json",

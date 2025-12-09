@@ -10,41 +10,41 @@ const DEFAULT_WEBCHAT_PORT = 18788;
 
 export async function buildProviderSummary(
   cfg?: WarelayConfig,
-): Promise<string> {
+): Promise<string[]> {
   const effective = cfg ?? loadConfig();
-  const parts: string[] = [];
+  const lines: string[] = [];
 
   const webLinked = await webAuthExists();
   const authAgeMs = getWebAuthAgeMs();
   const authAge = authAgeMs === null ? "unknown" : formatAge(authAgeMs);
   const { e164 } = readWebSelfId();
-  parts.push(
+  lines.push(
     webLinked
-      ? `WhatsApp web linked${e164 ? ` as ${e164}` : ""} (auth ${authAge})`
-      : "WhatsApp web not linked",
+      ? `WhatsApp: linked${e164 ? ` as ${e164}` : ""} (auth ${authAge})`
+      : "WhatsApp: not linked",
   );
 
   const telegramToken =
     process.env.TELEGRAM_BOT_TOKEN ?? effective.telegram?.botToken;
-  parts.push(
-    telegramToken ? "Telegram bot configured" : "Telegram bot not configured",
+  lines.push(
+    telegramToken ? "Telegram: configured" : "Telegram: not configured",
   );
 
   if (effective.webchat?.enabled === false) {
-    parts.push("WebChat disabled");
+    lines.push("WebChat: disabled");
   } else {
     const port = effective.webchat?.port ?? DEFAULT_WEBCHAT_PORT;
-    parts.push(`WebChat enabled (port ${port})`);
+    lines.push(`WebChat: enabled (port ${port})`);
   }
 
   const allowFrom = effective.inbound?.allowFrom?.length
     ? effective.inbound.allowFrom.map(normalizeE164).filter(Boolean)
     : [];
   if (allowFrom.length) {
-    parts.push(`AllowFrom: ${allowFrom.join(", ")}`);
+    lines.push(`AllowFrom: ${allowFrom.join(", ")}`);
   }
 
-  return `System status: ${parts.join("; ")}`;
+  return lines;
 }
 
 export function formatAge(ms: number): string {

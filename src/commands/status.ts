@@ -42,7 +42,7 @@ export type SessionStatus = {
 export type StatusSummary = {
   web: { linked: boolean; authAgeMs: number | null };
   heartbeatSeconds: number;
-  providerSummary: string;
+  providerSummary: string[];
   queuedSystemEvents: string[];
   sessions: {
     path: string;
@@ -209,7 +209,10 @@ export async function statusCommand(
   if (summary.web.linked) {
     logWebSelfId(runtime, true);
   }
-  runtime.log(info(`System: ${summary.providerSummary}`));
+  runtime.log(info("System:"));
+  for (const line of summary.providerSummary) {
+    runtime.log(info(`  ${line}`));
+  }
   if (health) {
     const waLine = health.web.connect
       ? health.web.connect.ok
