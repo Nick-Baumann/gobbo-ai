@@ -1,4 +1,5 @@
 import type { CliDeps } from "../cli/deps.js";
+import { listPortListeners } from "../cli/ports.js";
 import { info, success } from "../globals.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { callGateway, randomIdempotencyKey } from "../gateway/call.js";
@@ -78,8 +79,15 @@ export async function sendCommand(
     result = await sendViaGateway();
   } catch (err) {
     if (!opts.spawnGateway) throw err;
-    await startGatewayServer(18789);
-    result = await sendViaGateway();
+    // Only spawn when nothing is listening.
+    try {
+      const listeners = listPortListeners(18789);
+      if (listeners.length > 0) throw err;
+      await startGatewayServer(18789);
+      result = await sendViaGateway();
+    } catch {
+      throw err;
+    }
   }
 
   runtime.log(

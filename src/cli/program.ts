@@ -1,5 +1,3 @@
-import { execFileSync } from "node:child_process";
-
 import chalk from "chalk";
 import { Command } from "commander";
 import { agentCommand } from "../commands/agent.js";
@@ -17,58 +15,12 @@ import { defaultRuntime } from "../runtime.js";
 import { VERSION } from "../version.js";
 import { startWebChatServer } from "../webchat/server.js";
 import { createDefaultDeps } from "./deps.js";
-
-export type PortProcess = { pid: number; command?: string };
-
-export function parseLsofOutput(output: string): PortProcess[] {
-  const lines = output.split(/\r?\n/).filter(Boolean);
-  const results: PortProcess[] = [];
-  let current: Partial<PortProcess> = {};
-  for (const line of lines) {
-    if (line.startsWith("p")) {
-      if (current.pid) results.push(current as PortProcess);
-      current = { pid: Number.parseInt(line.slice(1), 10) };
-    } else if (line.startsWith("c")) {
-      current.command = line.slice(1);
-    }
-  }
-  if (current.pid) results.push(current as PortProcess);
-  return results;
-}
-
-export function listPortListeners(port: number): PortProcess[] {
-  try {
-    const out = execFileSync(
-      "lsof",
-      ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-FpFc"],
-      { encoding: "utf-8" },
-    );
-    return parseLsofOutput(out);
-  } catch (err: unknown) {
-    const status = (err as { status?: number }).status;
-    const code = (err as { code?: string }).code;
-    if (code === "ENOENT") {
-      throw new Error("lsof not found; required for --force");
-    }
-    // lsof returns exit status 1 when no processes match
-    if (status === 1) return [];
-    throw err instanceof Error ? err : new Error(String(err));
-  }
-}
-
-export function forceFreePort(port: number): PortProcess[] {
-  const listeners = listPortListeners(port);
-  for (const proc of listeners) {
-    try {
-      process.kill(proc.pid, "SIGTERM");
-    } catch (err) {
-      throw new Error(
-        `failed to kill pid ${proc.pid}${proc.command ? ` (${proc.command})` : ""}: ${String(err)}`,
-      );
-    }
-  }
-  return listeners;
-}
+import {
+  forceFreePort,
+  listPortListeners,
+  PortProcess,
+  parseLsofOutput,
+} from "./ports.js";
 
 export function buildProgram() {
   const program = new Command();
@@ -386,6 +338,8 @@ Examples:
       // Only spawn if there is clearly no listener.
       const url = new URL(opts.url ?? "ws://127.0.0.1:18789");
       const port = Number(url.port || 18789);
+      const listeners = listPortListeners(port);
+      if (listeners.length > 0) throw err;
       await startGatewayServer(port);
       return await attempt();
     }
@@ -554,6 +508,11 @@ Examples:
     .option("--json", "Output JSON instead of text", false)
     .option("--timeout <ms>", "Connection timeout in milliseconds", "10000")
     .option("--verbose", "Verbose logging", false)
+    .option(
+      "--probe",
+      "Also attempt a live Baileys connect (can conflict if gateway is already connected)",
+      false,
+    )
     .action(async (opts) => {
       setVerbose(Boolean(opts.verbose));
       const timeout = opts.timeout
@@ -568,7 +527,11 @@ Examples:
       }
       try {
         await healthCommand(
-          { json: Boolean(opts.json), timeoutMs: timeout },
+          {
+            json: Boolean(opts.json),
+            timeoutMs: timeout,
+            probe: Boolean(opts.probe),
+          },
           defaultRuntime,
         );
       } catch (err) {

@@ -404,7 +404,7 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
           presenceVersion += 1;
           const snapshot = buildSnapshot();
           // Fill health asynchronously for snapshot
-          const health = await getHealthSnapshot();
+          const health = await getHealthSnapshot(undefined, { probe: false });
           snapshot.health = health;
           snapshot.stateVersion.health = ++healthVersion;
           const helloOk = {

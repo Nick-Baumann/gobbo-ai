@@ -191,6 +191,7 @@ async function probeTelegram(
 
 export async function getHealthSnapshot(
   timeoutMs?: number,
+  opts?: { probe?: boolean },
 ): Promise<HealthSummary> {
   const cfg = loadConfig();
   const linked = await webAuthExists();
@@ -210,7 +211,8 @@ export async function getHealthSnapshot(
 
   const start = Date.now();
   const cappedTimeout = Math.max(1000, timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const connect = linked ? await probeWebConnect(cappedTimeout) : undefined;
+  const connect =
+    linked && opts?.probe ? await probeWebConnect(cappedTimeout) : undefined;
 
   const telegramToken =
     process.env.TELEGRAM_BOT_TOKEN ?? cfg.telegram?.botToken ?? "";
@@ -237,10 +239,12 @@ export async function getHealthSnapshot(
 }
 
 export async function healthCommand(
-  opts: { json?: boolean; timeoutMs?: number },
+  opts: { json?: boolean; timeoutMs?: number; probe?: boolean },
   runtime: RuntimeEnv,
 ) {
-  const summary = await getHealthSnapshot(opts.timeoutMs);
+  const summary = await getHealthSnapshot(opts.timeoutMs, {
+    probe: opts.probe,
+  });
   const fatal =
     !summary.web.linked ||
     (summary.web.connect && !summary.web.connect.ok) ||
