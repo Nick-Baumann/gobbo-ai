@@ -201,7 +201,9 @@ final class VoiceWakeOverlayController: ObservableObject {
             await VoiceWakeForwarder.forward(transcript: payload, config: forwardConfig)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            self.logger.log(level: .info, "overlay sendNow dismiss ticking token=\(self.activeToken?.uuidString ?? "nil")")
+            self.logger.log(
+                level: .info,
+                "overlay sendNow dismiss ticking token=\(self.activeToken?.uuidString ?? "nil")")
             self.dismiss(token: token, reason: .explicit, outcome: .sent)
         }
     }
@@ -262,7 +264,13 @@ final class VoiceWakeOverlayController: ObservableObject {
             return false
         }
         if let token, token != active {
-            self.logger.log(level: .info, "overlay drop \(context, privacy: .public) token_mismatch active=\(active.uuidString, privacy: .public) got=\(token.uuidString, privacy: .public)")
+            self.logger.log(
+                level: .info,
+                """
+                overlay drop \(context, privacy: .public) token_mismatch \
+                active=\(active.uuidString, privacy: .public) \
+                got=\(token.uuidString, privacy: .public)
+                """)
             return false
         }
         return true

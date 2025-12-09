@@ -5,13 +5,14 @@ import {
   type EventFrame,
   type Hello,
   type HelloOk,
+  PROTOCOL_VERSION,
   type RequestFrame,
   validateRequestFrame,
 } from "./protocol/index.js";
 
 type Pending = {
   resolve: (value: any) => void;
-  reject: (err: Error) => void;
+  reject: (err: any) => void;
   expectFinal: boolean;
 };
 
@@ -73,8 +74,8 @@ export class GatewayClient {
   private sendHello() {
     const hello: Hello = {
       type: "hello",
-      minProtocol: this.opts.minProtocol ?? 1,
-      maxProtocol: this.opts.maxProtocol ?? 1,
+      minProtocol: this.opts.minProtocol ?? PROTOCOL_VERSION,
+      maxProtocol: this.opts.maxProtocol ?? PROTOCOL_VERSION,
       client: {
         name: this.opts.clientName ?? "webchat-backend",
         version: this.opts.clientVersion ?? "dev",
@@ -123,7 +124,8 @@ export class GatewayClient {
         }
         this.pending.delete(parsed.id);
         if (parsed.ok) pending.resolve(parsed.payload);
-        else pending.reject(new Error(parsed.error?.message ?? "unknown error"));
+        else
+          pending.reject(new Error(parsed.error?.message ?? "unknown error"));
       }
     } catch (err) {
       logDebug(`gateway client parse error: ${String(err)}`);

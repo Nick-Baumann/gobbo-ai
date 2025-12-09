@@ -32,15 +32,15 @@ private actor GatewayChannelActor {
     }
 
     func connect() async throws {
-        if connected, task?.state == .running { return }
-        task?.cancel(with: .goingAway, reason: nil)
-        task = session.webSocketTask(with: url)
-        task?.resume()
-        try await sendHello()
-        listen()
-        connected = true
-        backoffMs = 500
-        lastSeq = nil
+        if self.connected, self.task?.state == .running { return }
+        self.task?.cancel(with: .goingAway, reason: nil)
+        self.task = self.session.webSocketTask(with: self.url)
+        self.task?.resume()
+        try await self.sendHello()
+        self.listen()
+        self.connected = true
+        self.backoffMs = 500
+        self.lastSeq = nil
     }
 
     private func sendHello() async throws {
@@ -56,23 +56,22 @@ private actor GatewayChannelActor {
                 "instanceId": Host.current().localizedName ?? UUID().uuidString,
             ],
             "caps": [],
-            "auth": token != nil ? ["token": token!] : [:],
+            "auth": self.token != nil ? ["token": self.token!] : [:],
         ]
         let data = try JSONSerialization.data(withJSONObject: hello)
-        try await task?.send(.data(data))
+        try await self.task?.send(.data(data))
         // wait for hello-ok
         if let msg = try await task?.receive() {
-            if try await handleHelloResponse(msg) { return }
+            if try await self.handleHelloResponse(msg) { return }
         }
         throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed"])
     }
 
     private func handleHelloResponse(_ msg: URLSessionWebSocketTask.Message) async throws -> Bool {
-        let data: Data?
-        switch msg {
-        case .data(let d): data = d
-        case .string(let s): data = s.data(using: .utf8)
-        @unknown default: data = nil
+        let data: Data? = switch msg {
+        case let .data(d): d
+        case let .string(s): s.data(using: .utf8)
+        @unknown default: nil
         }
         guard let data else { return false }
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -85,26 +84,29 @@ private actor GatewayChannelActor {
     }
 
     private func listen() {
-        task?.receive { [weak self] result in
+        self.task?.receive { [weak self] result in
             guard let self else { return }
             switch result {
-            case .failure(let err):
-                self.logger.error("gateway ws receive failed \(err.localizedDescription, privacy: .public)")
-                self.connected = false
-                self.scheduleReconnect()
-            case .success(let msg):
+            case let .failure(err):
+                Task { await self.handleReceiveFailure(err) }
+            case let .success(msg):
                 Task { await self.handle(msg) }
                 self.listen()
             }
         }
     }
 
+    private func handleReceiveFailure(_ err: Error) async {
+        self.logger.error("gateway ws receive failed \(err.localizedDescription, privacy: .public)")
+        self.connected = false
+        await self.scheduleReconnect()
+    }
+
     private func handle(_ msg: URLSessionWebSocketTask.Message) async {
-        let data: Data?
-        switch msg {
-        case .data(let d): data = d
-        case .string(let s): data = s.data(using: .utf8)
-        @unknown default: data = nil
+        let data: Data? = switch msg {
+        case let .data(d): d
+        case let .string(s): s.data(using: .utf8)
+        @unknown default: nil
         }
         guard let data else { return }
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -120,10 +122,9 @@ private actor GatewayChannelActor {
                     NotificationCenter.default.post(
                         name: .gatewaySeqGap,
                         object: nil,
-                        userInfo: ["expected": last + 1, "received": seq]
-                    )
+                        userInfo: ["expected": last + 1, "received": seq])
                 }
-                lastSeq = seq
+                self.lastSeq = seq
             }
             NotificationCenter.default.post(name: .gatewayEvent, object: nil, userInfo: obj)
         case "hello-ok":
@@ -133,39 +134,39 @@ private actor GatewayChannelActor {
         }
     }
 
-    private func scheduleReconnect() {
-        guard shouldReconnect else { return }
-        let delay = backoffMs / 1000
-        backoffMs = min(backoffMs * 2, 30_000)
-        Task.detached { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            guard let self else { return }
-            do {
-                try await self.connect()
-            } catch {
-                self.logger.error("gateway reconnect failed \(error.localizedDescription, privacy: .public)")
-                self.scheduleReconnect()
-            }
+    private func scheduleReconnect() async {
+        guard self.shouldReconnect else { return }
+        let delay = self.backoffMs / 1000
+        self.backoffMs = min(self.backoffMs * 2, 30000)
+        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        do {
+            try await self.connect()
+        } catch {
+            self.logger.error("gateway reconnect failed \(error.localizedDescription, privacy: .public)")
+            await self.scheduleReconnect()
         }
     }
 
-    func request(method: String, params: [String: Any]?) async throws -> Data {
-        try await connect()
+    func request(method: String, params: [String: AnyCodable]?) async throws -> Data {
+        try await self.connect()
         let id = UUID().uuidString
+        let paramsObject = params?.reduce(into: [String: Any]()) { dict, entry in
+            dict[entry.key] = entry.value.value
+        } ?? [:]
         let frame: [String: Any] = [
             "type": "req",
             "id": id,
             "method": method,
-            "params": params ?? [:],
+            "params": paramsObject,
         ]
         let data = try JSONSerialization.data(withJSONObject: frame)
         let response = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
-            pending[id] = cont
+            self.pending[id] = cont
             Task {
                 do {
-                    try await task?.send(.data(data))
+                    try await self.task?.send(.data(data))
                 } catch {
-                    pending.removeValue(forKey: id)
+                    self.pending.removeValue(forKey: id)
                     cont.resume(throwing: error)
                 }
             }
@@ -178,7 +179,7 @@ actor GatewayChannel {
     private var inner: GatewayChannelActor?
 
     func configure(url: URL, token: String?) {
-        inner = GatewayChannelActor(url: url, token: token)
+        self.inner = GatewayChannelActor(url: url, token: token)
     }
 
     func request(method: String, params: [String: Any]?) async throws -> Data {
@@ -186,36 +187,5 @@ actor GatewayChannel {
             throw NSError(domain: "Gateway", code: 0, userInfo: [NSLocalizedDescriptionKey: "not configured"])
         }
         return try await inner.request(method: method, params: params)
-    }
-}
-
-struct AnyCodable: Codable {
-    let value: Any
-    init(_ value: Any) { self.value = value }
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intVal = try? container.decode(Int.self) { self.value = intVal; return }
-        if let doubleVal = try? container.decode(Double.self) { self.value = doubleVal; return }
-        if let boolVal = try? container.decode(Bool.self) { self.value = boolVal; return }
-        if let stringVal = try? container.decode(String.self) { self.value = stringVal; return }
-        if container.decodeNil() { self.value = NSNull(); return }
-        if let dict = try? container.decode([String: AnyCodable].self) { self.value = dict; return }
-        if let array = try? container.decode([AnyCodable].self) { self.value = array; return }
-        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported type")
-    }
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self.value {
-        case let intVal as Int: try container.encode(intVal)
-        case let doubleVal as Double: try container.encode(doubleVal)
-        case let boolVal as Bool: try container.encode(boolVal)
-        case let stringVal as String: try container.encode(stringVal)
-        case is NSNull: try container.encodeNil()
-        case let dict as [String: AnyCodable]: try container.encode(dict)
-        case let array as [AnyCodable]: try container.encode(array)
-        default:
-            let ctx = EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Unsupported type")
-            throw EncodingError.invalidValue(self.value, ctx)
-        }
     }
 }

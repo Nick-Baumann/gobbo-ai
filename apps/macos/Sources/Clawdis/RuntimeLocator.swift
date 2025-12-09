@@ -86,19 +86,19 @@ enum RuntimeLocator {
     static func describeFailure(_ error: RuntimeResolutionError) -> String {
         switch error {
         case let .notFound(searchPaths):
-            return [
+            [
                 "clawdis needs Node >=22.0.0 but found no runtime.",
                 "PATH searched: \(searchPaths.joined(separator: ":"))",
                 "Install Node: https://nodejs.org/en/download",
             ].joined(separator: "\n")
         case let .unsupported(kind, found, required, path, searchPaths):
-            return [
+            [
                 "Found \(kind.rawValue) \(found) at \(path) but need >= \(required).",
                 "PATH searched: \(searchPaths.joined(separator: ":"))",
                 "Upgrade Node and rerun clawdis.",
             ].joined(separator: "\n")
         case let .versionParse(kind, raw, path, searchPaths):
-            return [
+            [
                 "Could not parse \(kind.rawValue) version output \"\(raw)\" from \(path).",
                 "PATH searched: \(searchPaths.joined(separator: ":"))",
                 "Try reinstalling or pinning a supported version (Node >=22.0.0).",

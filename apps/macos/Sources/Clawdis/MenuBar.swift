@@ -89,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSXPCListenerDelegate 
             RelayProcessManager.shared.setActive(!state.isPaused)
         }
         Task {
-            try? await ControlChannel.shared.configure()
+            await ControlChannel.shared.configure()
             PresenceReporter.shared.start()
         }
         Task { await HealthStore.shared.refresh(onDemand: true) }

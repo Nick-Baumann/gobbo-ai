@@ -1,19 +1,18 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type WebSocket, WebSocketServer } from "ws";
-
 import { loadConfig } from "../config/config.js";
 import {
   loadSessionStore,
   resolveStorePath,
   type SessionEntry,
 } from "../config/sessions.js";
-import { logDebug, logError } from "../logger.js";
 import { GatewayClient } from "../gateway/client.js";
-import { randomUUID } from "node:crypto";
+import { logDebug, logError } from "../logger.js";
 
 const WEBCHAT_DEFAULT_PORT = 18788;
 
@@ -338,10 +337,20 @@ export async function startWebChatServer(
         gatewayReady = true;
         latestSnapshot = hello.snapshot as Record<string, unknown>;
         latestPolicy = hello.policy as Record<string, unknown>;
-        broadcastAll({ type: "gateway-snapshot", snapshot: hello.snapshot, policy: hello.policy });
+        broadcastAll({
+          type: "gateway-snapshot",
+          snapshot: hello.snapshot,
+          policy: hello.policy,
+        });
       },
       onEvent: (evt) => {
-        broadcastAll({ type: "gateway-event", event: evt.event, payload: evt.payload, seq: evt.seq, stateVersion: evt.stateVersion });
+        broadcastAll({
+          type: "gateway-event",
+          event: evt.event,
+          payload: evt.payload,
+          seq: evt.seq,
+          stateVersion: evt.stateVersion,
+        });
       },
       onClose: () => {
         gatewayReady = false;
@@ -517,10 +526,17 @@ export function __forceWebChatSnapshotForTests(
   latestSnapshot = snapshot;
   latestPolicy = policy ?? null;
   gatewayReady = true;
-  broadcastAll({ type: "gateway-snapshot", snapshot: latestSnapshot, policy: latestPolicy });
+  broadcastAll({
+    type: "gateway-snapshot",
+    snapshot: latestSnapshot,
+    policy: latestPolicy,
+  });
 }
 
-export function __broadcastGatewayEventForTests(event: string, payload: unknown) {
+export function __broadcastGatewayEventForTests(
+  event: string,
+  payload: unknown,
+) {
   broadcastAll({ type: "gateway-event", event, payload });
 }
 

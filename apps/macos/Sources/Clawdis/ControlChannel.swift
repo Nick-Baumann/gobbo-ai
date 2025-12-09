@@ -20,40 +20,6 @@ struct ControlAgentEvent: Codable, Sendable {
     let data: [String: AnyCodable]
 }
 
-struct AnyCodable: Codable, @unchecked Sendable {
-    let value: Any
-
-    init(_ value: Any) { self.value = value }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intVal = try? container.decode(Int.self) { self.value = intVal; return }
-        if let doubleVal = try? container.decode(Double.self) { self.value = doubleVal; return }
-        if let boolVal = try? container.decode(Bool.self) { self.value = boolVal; return }
-        if let stringVal = try? container.decode(String.self) { self.value = stringVal; return }
-        if container.decodeNil() { self.value = NSNull(); return }
-        if let dict = try? container.decode([String: AnyCodable].self) { self.value = dict; return }
-        if let array = try? container.decode([AnyCodable].self) { self.value = array; return }
-        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported type")
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self.value {
-        case let intVal as Int: try container.encode(intVal)
-        case let doubleVal as Double: try container.encode(doubleVal)
-        case let boolVal as Bool: try container.encode(boolVal)
-        case let stringVal as String: try container.encode(stringVal)
-        case is NSNull: try container.encodeNil()
-        case let dict as [String: AnyCodable]: try container.encode(dict)
-        case let array as [AnyCodable]: try container.encode(array)
-        default:
-            let context = EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Unsupported type")
-            throw EncodingError.invalidValue(self.value, context)
-        }
-    }
-}
-
 enum ControlChannelError: Error, LocalizedError {
     case disconnected
     case badResponse(String)
@@ -69,6 +35,11 @@ enum ControlChannelError: Error, LocalizedError {
 @MainActor
 final class ControlChannel: ObservableObject {
     static let shared = ControlChannel()
+
+    enum Mode {
+        case local
+        case remote(target: String, identity: String)
+    }
 
     enum ConnectionState: Equatable {
         case disconnected
@@ -87,29 +58,36 @@ final class ControlChannel: ObservableObject {
         let effectivePort = port > 0 ? port : 18789
         return URL(string: "ws://127.0.0.1:\(effectivePort)")!
     }
+
     private var gatewayToken: String? {
         ProcessInfo.processInfo.environment["CLAWDIS_GATEWAY_TOKEN"]
     }
+
     private var eventTokens: [NSObjectProtocol] = []
 
     func configure() async {
-        do {
-            self.state = .connecting
-            await gateway.configure(url: gatewayURL, token: gatewayToken)
-            self.startEventStream()
-            self.state = .connected
-            PresenceReporter.shared.sendImmediate(reason: "connect")
-        } catch {
-            self.state = .degraded(error.localizedDescription)
-        }
+        self.state = .connecting
+        await self.gateway.configure(url: self.gatewayURL, token: self.gatewayToken)
+        self.startEventStream()
+        self.state = .connected
+        PresenceReporter.shared.sendImmediate(reason: "connect")
     }
 
-    func configure(mode _: Any? = nil) async throws { await self.configure() }
+    func configure(mode: Mode = .local) async throws {
+        switch mode {
+        case .local:
+            await self.configure()
+        case let .remote(target, identity):
+            // Remote mode assumed to have an existing tunnel; placeholders retained for future use.
+            _ = (target, identity)
+            await self.configure()
+        }
+    }
 
     func health(timeout: TimeInterval? = nil) async throws -> Data {
         do {
             let start = Date()
-            var params: [String: AnyHashable]? = nil
+            var params: [String: AnyHashable]?
             if let timeout {
                 params = ["timeout": AnyHashable(Int(timeout * 1000))]
             }
@@ -126,13 +104,13 @@ final class ControlChannel: ObservableObject {
 
     func lastHeartbeat() async throws -> ControlHeartbeatEvent? {
         // Heartbeat removed in new protocol
-        return nil
+        nil
     }
 
     func request(method: String, params: [String: AnyHashable]? = nil) async throws -> Data {
         do {
-            let rawParams = params?.reduce(into: [String: Any]()) { $0[$1.key] = $1.value }
-            let data = try await gateway.request(method: method, params: rawParams)
+            let rawParams = params?.reduce(into: [String: AnyCodable]()) { $0[$1.key] = AnyCodable($1.value) }
+            let data = try await self.gateway.request(method: method, params: rawParams)
             self.state = .connected
             return data
         } catch {
@@ -146,14 +124,17 @@ final class ControlChannel: ObservableObject {
     }
 
     private func startEventStream() {
-        for tok in eventTokens { NotificationCenter.default.removeObserver(tok) }
-        eventTokens.removeAll()
+        for tok in self.eventTokens {
+            NotificationCenter.default.removeObserver(tok)
+        }
+        self.eventTokens.removeAll()
         let ev = NotificationCenter.default.addObserver(
             forName: .gatewayEvent,
             object: nil,
-            queue: .main
-        ) { note in
-            guard let obj = note.userInfo as? [String: Any],
+            queue: .main)
+        { [weak self] @MainActor note in
+            guard let self,
+                  let obj = note.userInfo as? [String: Any],
                   let event = obj["event"] as? String else { return }
             switch event {
             case "agent":
@@ -165,7 +146,12 @@ final class ControlChannel: ObservableObject {
                    let dataDict = payload["data"] as? [String: Any]
                 {
                     let wrapped = dataDict.mapValues { AnyCodable($0) }
-                    AgentEventStore.shared.append(ControlAgentEvent(runId: runId, seq: seq, stream: stream, ts: ts, data: wrapped))
+                    AgentEventStore.shared.append(ControlAgentEvent(
+                        runId: runId,
+                        seq: seq,
+                        stream: stream,
+                        ts: ts,
+                        data: wrapped))
                 }
             case "presence":
                 // InstancesStore listens separately via notification
@@ -179,11 +165,11 @@ final class ControlChannel: ObservableObject {
         let tick = NotificationCenter.default.addObserver(
             forName: .gatewaySnapshot,
             object: nil,
-            queue: .main
-        ) { _ in
-            self.state = .connected
+            queue: .main)
+        { [weak self] @MainActor _ in
+            self?.state = .connected
         }
-        eventTokens = [ev, tick]
+        self.eventTokens = [ev, tick]
     }
 }
 

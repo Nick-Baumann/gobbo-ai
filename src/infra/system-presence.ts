@@ -108,10 +108,7 @@ export function updateSystemPresence(text: string) {
   entries.set(key, parsed);
 }
 
-export function upsertPresence(
-  key: string,
-  presence: Partial<SystemPresence>,
-) {
+export function upsertPresence(key: string, presence: Partial<SystemPresence>) {
   ensureSelfPresence();
   const existing = entries.get(key) ?? ({} as SystemPresence);
   const merged: SystemPresence = {

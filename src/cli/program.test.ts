@@ -58,7 +58,7 @@ describe("cli program", () => {
     const program = buildProgram();
     await program.parseAsync(
       [
-        "relay",
+        "relay-legacy",
         "--web-heartbeat",
         "90",
         "--heartbeat-now",
@@ -86,7 +86,7 @@ describe("cli program", () => {
     const program = buildProgram();
     const prev = process.env.TELEGRAM_BOT_TOKEN;
     process.env.TELEGRAM_BOT_TOKEN = "token123";
-    await program.parseAsync(["relay", "--provider", "telegram"], {
+    await program.parseAsync(["relay-legacy", "--provider", "telegram"], {
       from: "user",
     });
     expect(monitorTelegramProvider).toHaveBeenCalledWith(
@@ -101,13 +101,23 @@ describe("cli program", () => {
     const prev = process.env.TELEGRAM_BOT_TOKEN;
     process.env.TELEGRAM_BOT_TOKEN = "";
     await expect(
-      program.parseAsync(["relay", "--provider", "telegram"], {
+      program.parseAsync(["relay-legacy", "--provider", "telegram"], {
         from: "user",
       }),
     ).rejects.toThrow();
     expect(runtime.error).toHaveBeenCalled();
     expect(runtime.exit).toHaveBeenCalled();
     process.env.TELEGRAM_BOT_TOKEN = prev;
+  });
+
+  it("relay command is deprecated", async () => {
+    const program = buildProgram();
+    await expect(
+      program.parseAsync(["relay"], { from: "user" }),
+    ).rejects.toThrow("exit");
+    expect(runtime.error).toHaveBeenCalled();
+    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(monitorWebProvider).not.toHaveBeenCalled();
   });
 
   it("runs status command", async () => {

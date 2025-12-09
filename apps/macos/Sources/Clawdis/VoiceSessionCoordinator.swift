@@ -29,8 +29,8 @@ final class VoiceSessionCoordinator: ObservableObject {
         source: Source,
         text: String,
         attributed: NSAttributedString? = nil,
-        forwardEnabled: Bool = false
-    ) -> UUID {
+        forwardEnabled: Bool = false) -> UUID
+    {
         // If a send is in-flight, ignore new sessions to avoid token churn.
         if VoiceWakeOverlayController.shared.model.isSending {
             self.logger.info("coordinator drop start while sending")
@@ -73,7 +73,9 @@ final class VoiceSessionCoordinator: ObservableObject {
         autoSendAfter: TimeInterval?)
     {
         guard let session, session.token == token else { return }
-        self.logger.info("coordinator finalize token=\(token.uuidString) len=\(text.count) autoSendAfter=\(autoSendAfter ?? -1)")
+        self.logger
+            .info(
+                "coordinator finalize token=\(token.uuidString) len=\(text.count) autoSendAfter=\(autoSendAfter ?? -1)")
         self.autoSendTask?.cancel(); self.autoSendTask = nil
         self.session?.text = text
         self.session?.isFinal = true
@@ -108,11 +110,17 @@ final class VoiceSessionCoordinator: ObservableObject {
         }
         VoiceWakeOverlayController.shared.sendNow(token: token, sendChime: session.sendChime)
         Task.detached {
-            _ = await VoiceWakeForwarder.forward(transcript: VoiceWakeForwarder.prefixedTranscript(text), config: forward)
+            _ = await VoiceWakeForwarder.forward(
+                transcript: VoiceWakeForwarder.prefixedTranscript(text),
+                config: forward)
         }
     }
 
-    func dismiss(token: UUID, reason: VoiceWakeOverlayController.DismissReason, outcome: VoiceWakeOverlayController.SendOutcome) {
+    func dismiss(
+        token: UUID,
+        reason: VoiceWakeOverlayController.DismissReason,
+        outcome: VoiceWakeOverlayController.SendOutcome)
+    {
         guard let session, session.token == token else { return }
         VoiceWakeOverlayController.shared.dismiss(token: token, reason: reason, outcome: outcome)
         self.clearSession()

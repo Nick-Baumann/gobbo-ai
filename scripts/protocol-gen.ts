@@ -31,6 +31,17 @@ async function writeJsonSchema() {
       { $ref: "#/definitions/ResponseFrame" },
       { $ref: "#/definitions/EventFrame" },
     ],
+    discriminator: {
+      propertyName: "type",
+      mapping: {
+        hello: "#/definitions/Hello",
+        "hello-ok": "#/definitions/HelloOk",
+        "hello-error": "#/definitions/HelloError",
+        req: "#/definitions/RequestFrame",
+        res: "#/definitions/ResponseFrame",
+        event: "#/definitions/EventFrame",
+      },
+    },
     definitions,
   };
 

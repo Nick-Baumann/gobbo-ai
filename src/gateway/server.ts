@@ -1,30 +1,33 @@
-import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { WebSocketServer, type WebSocket } from "ws";
-
+import os from "node:os";
+import { type WebSocket, WebSocketServer } from "ws";
+import { createDefaultDeps } from "../cli/deps.js";
+import { agentCommand } from "../commands/agent.js";
 import { getHealthSnapshot } from "../commands/health.js";
 import { getStatusSummary } from "../commands/status.js";
+import { onAgentEvent } from "../infra/agent-events.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
-import { listSystemPresence, upsertPresence } from "../infra/system-presence.js";
+import {
+  listSystemPresence,
+  upsertPresence,
+} from "../infra/system-presence.js";
 import { logError } from "../logger.js";
 import { defaultRuntime } from "../runtime.js";
+import { sendMessageWhatsApp } from "../web/outbound.js";
 import {
   ErrorCodes,
   type ErrorShape,
-  type Hello,
-  type RequestFrame,
-  type Snapshot,
   errorShape,
   formatValidationErrors,
+  type Hello,
+  PROTOCOL_VERSION,
+  type RequestFrame,
+  type Snapshot,
   validateAgentParams,
   validateHello,
   validateRequestFrame,
   validateSendParams,
 } from "./protocol/index.js";
-import { sendMessageWhatsApp } from "../web/outbound.js";
-import { createDefaultDeps } from "../cli/deps.js";
-import { agentCommand } from "../commands/agent.js";
-import { onAgentEvent } from "../infra/agent-events.js";
 
 type Client = {
   socket: WebSocket;
@@ -71,21 +74,32 @@ const HANDSHAKE_TIMEOUT_MS = 3000;
 const TICK_INTERVAL_MS = 30_000;
 const DEDUPE_TTL_MS = 5 * 60_000;
 const DEDUPE_MAX = 1000;
-const SERVER_PROTO = 1;
 
-type DedupeEntry = { ts: number; ok: boolean; payload?: unknown; error?: ErrorShape };
+type DedupeEntry = {
+  ts: number;
+  ok: boolean;
+  payload?: unknown;
+  error?: ErrorShape;
+};
 const dedupe = new Map<string, DedupeEntry>();
 
 const getGatewayToken = () => process.env.CLAWDIS_GATEWAY_TOKEN;
 
 export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
-  const wss = new WebSocketServer({ port, host: "127.0.0.1", maxPayload: MAX_PAYLOAD_BYTES });
+  const wss = new WebSocketServer({
+    port,
+    host: "127.0.0.1",
+    maxPayload: MAX_PAYLOAD_BYTES,
+  });
   const clients = new Set<Client>();
 
   const broadcast = (
     event: string,
     payload: unknown,
-    opts?: { dropIfSlow?: boolean; stateVersion?: { presence?: number; health?: number } },
+    opts?: {
+      dropIfSlow?: boolean;
+      stateVersion?: { presence?: number; health?: number };
+    },
   ) => {
     const frame = JSON.stringify({
       type: "event",
@@ -206,11 +220,14 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
           const hello = parsed as Hello;
           // protocol negotiation
           const { minProtocol, maxProtocol } = hello;
-          if (maxProtocol < SERVER_PROTO || minProtocol > SERVER_PROTO) {
+          if (
+            maxProtocol < PROTOCOL_VERSION ||
+            minProtocol > PROTOCOL_VERSION
+          ) {
             send({
               type: "hello-error",
               reason: "protocol mismatch",
-              expectedProtocol: SERVER_PROTO,
+              expectedProtocol: PROTOCOL_VERSION,
             });
             socket.close(1002, "protocol mismatch");
             close();
@@ -250,9 +267,12 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
           snapshot.stateVersion.health = ++healthVersion;
           const helloOk = {
             type: "hello-ok",
-            protocol: SERVER_PROTO,
+            protocol: PROTOCOL_VERSION,
             server: {
-              version: process.env.CLAWDIS_VERSION ?? process.env.npm_package_version ?? "dev",
+              version:
+                process.env.CLAWDIS_VERSION ??
+                process.env.npm_package_version ??
+                "dev",
               commit: process.env.GIT_COMMIT,
               host: os.hostname(),
               connId,
@@ -284,11 +304,8 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
           return;
         }
         const req = parsed as RequestFrame;
-        const respond = (
-          ok: boolean,
-          payload?: unknown,
-          error?: ErrorShape,
-        ) => send({ type: "res", id: req.id, ok, payload, error });
+        const respond = (ok: boolean, payload?: unknown, error?: ErrorShape) =>
+          send({ type: "res", id: req.id, ok, payload, error });
 
         switch (req.method) {
           case "health": {
@@ -308,9 +325,15 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
             break;
           }
           case "system-event": {
-            const text = String((req.params as { text?: unknown } | undefined)?.text ?? "").trim();
+            const text = String(
+              (req.params as { text?: unknown } | undefined)?.text ?? "",
+            ).trim();
             if (!text) {
-              respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "text required"));
+              respond(
+                false,
+                undefined,
+                errorShape(ErrorCodes.INVALID_REQUEST, "text required"),
+              );
               break;
             }
             enqueueSystemEvent(text);
@@ -320,7 +343,10 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
               { presence: listSystemPresence() },
               {
                 dropIfSlow: true,
-                stateVersion: { presence: presenceVersion, health: healthVersion },
+                stateVersion: {
+                  presence: presenceVersion,
+                  health: healthVersion,
+                },
               },
             );
             respond(true, { ok: true }, undefined);
@@ -407,9 +433,14 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
             }
             const message = params.message.trim();
             const runId = params.sessionId || randomUUID();
-            const ackPayload = { runId, status: "accepted" as const };
-            dedupe.set(`agent:${idem}`, { ts: Date.now(), ok: true, payload: ackPayload });
-            respond(true, ackPayload, undefined); // ack quickly
+            // Acknowledge via event to avoid double res frames
+            const ackEvent = {
+              type: "event",
+              event: "agent",
+              payload: { runId, status: "accepted" as const },
+              seq: ++seq,
+            };
+            socket.send(JSON.stringify(ackEvent));
             try {
               await agentCommand(
                 {
@@ -423,19 +454,43 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
                 defaultRuntime,
                 deps,
               );
-              const payload = { runId, status: "ok" as const, summary: "completed" };
-              dedupe.set(`agent:${idem}`, { ts: Date.now(), ok: true, payload });
+              const payload = {
+                runId,
+                status: "ok" as const,
+                summary: "completed",
+              };
+              dedupe.set(`agent:${idem}`, {
+                ts: Date.now(),
+                ok: true,
+                payload,
+              });
               respond(true, payload, undefined);
             } catch (err) {
               const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
-              const payload = { runId, status: "error" as const, summary: String(err) };
-              dedupe.set(`agent:${idem}`, { ts: Date.now(), ok: false, payload, error });
+              const payload = {
+                runId,
+                status: "error" as const,
+                summary: String(err),
+              };
+              dedupe.set(`agent:${idem}`, {
+                ts: Date.now(),
+                ok: false,
+                payload,
+                error,
+              });
               respond(false, payload, error);
             }
             break;
           }
           default: {
-            respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, `unknown method: ${req.method}`));
+            respond(
+              false,
+              undefined,
+              errorShape(
+                ErrorCodes.INVALID_REQUEST,
+                `unknown method: ${req.method}`,
+              ),
+            );
             break;
           }
         }
@@ -455,7 +510,10 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
 
   return {
     close: async () => {
-      broadcast("shutdown", { reason: "gateway stopping", restartExpectedMs: null });
+      broadcast("shutdown", {
+        reason: "gateway stopping",
+        restartExpectedMs: null,
+      });
       clearInterval(tickInterval);
       clearInterval(dedupeCleanup);
       if (agentUnsub) {

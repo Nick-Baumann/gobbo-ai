@@ -17,7 +17,9 @@ export type CallGatewayOptions = {
   maxProtocol?: number;
 };
 
-export async function callGateway<T = unknown>(opts: CallGatewayOptions): Promise<T> {
+export async function callGateway<T = unknown>(
+  opts: CallGatewayOptions,
+): Promise<T> {
   const timeoutMs = opts.timeoutMs ?? 10_000;
   return await new Promise<T>((resolve, reject) => {
     let settled = false;

@@ -5,8 +5,8 @@
 
 import Foundation
 
-/// Handshake, request/response, and event frames for the Gateway WebSocket.
 // MARK: - ClawdisGateway
+/// Handshake, request/response, and event frames for the Gateway WebSocket.
 struct ClawdisGateway: Codable {
     let auth: Auth?
     let caps: [String]?
@@ -33,7 +33,8 @@ struct ClawdisGateway: Codable {
     enum CodingKeys: String, CodingKey {
         case auth, caps, client, locale, maxProtocol, minProtocol, type, userAgent, features, policy
         case clawdisGatewayProtocol = "protocol"
-        case server, snapshot, expectedProtocol, minClient, reason, id, method, params, error, ok, payload, event, seq, stateVersion
+        case server, snapshot, expectedProtocol, minClient, reason, id, method, params, error, ok, payload, event, seq,
+             stateVersion
     }
 }
 
@@ -657,25 +658,29 @@ func newJSONEncoder() -> JSONEncoder {
 class JSONNull: Codable, Hashable {
 
     public static func == (lhs: JSONNull, rhs: JSONNull) -> Bool {
-            return true
+        true
     }
 
-    public var hashValue: Int {
-            return 0
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(0)
     }
 
     public init() {}
 
     public required init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            if !container.decodeNil() {
-                    throw DecodingError.typeMismatch(JSONNull.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for JSONNull"))
-            }
+        let container = try decoder.singleValueContainer()
+        if !container.decodeNil() {
+            throw DecodingError.typeMismatch(
+                JSONNull.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Wrong type for JSONNull"))
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            try container.encodeNil()
+        var container = encoder.singleValueContainer()
+        try container.encodeNil()
     }
 }
 
@@ -759,7 +764,9 @@ class JSONAny: Codable {
             throw decodingError(forCodingPath: container.codingPath)
     }
 
-    static func decode(from container: inout KeyedDecodingContainer<JSONCodingKey>, forKey key: JSONCodingKey) throws -> Any {
+    static func decode(
+        from container: inout KeyedDecodingContainer<JSONCodingKey>,
+        forKey key: JSONCodingKey) throws -> Any {
             if let value = try? container.decode(Bool.self, forKey: key) {
                     return value
             }

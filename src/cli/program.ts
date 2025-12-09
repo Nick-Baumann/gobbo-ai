@@ -5,9 +5,9 @@ import { healthCommand } from "../commands/health.js";
 import { sendCommand } from "../commands/send.js";
 import { sessionsCommand } from "../commands/sessions.js";
 import { statusCommand } from "../commands/status.js";
-import { startGatewayServer } from "../gateway/server.js";
-import { callGateway, randomIdempotencyKey } from "../gateway/call.js";
 import { loadConfig } from "../config/config.js";
+import { callGateway, randomIdempotencyKey } from "../gateway/call.js";
+import { startGatewayServer } from "../gateway/server.js";
 import { danger, info, setVerbose } from "../globals.js";
 import { acquireRelayLock, RelayLockError } from "../infra/relay-lock.js";
 import { getResolvedLoggerSettings } from "../logging.js";
@@ -17,7 +17,6 @@ import {
   monitorWebProvider,
   resolveHeartbeatRecipients,
   runWebHeartbeatOnce,
-  setHeartbeatsEnabled,
   type WebMonitorTuning,
 } from "../provider-web.js";
 import { runRpcLoop } from "../rpc/loop.js";
@@ -364,13 +363,16 @@ Examples:
       .option("--url <url>", "Gateway WebSocket URL", "ws://127.0.0.1:18789")
       .option("--token <token>", "Gateway token (if required)")
       .option("--timeout <ms>", "Timeout in ms", "10000")
-      .option("--expect-final", "Wait for final response (agent)" , false);
+      .option("--expect-final", "Wait for final response (agent)", false);
 
   gatewayCallOpts(
     program
       .command("gw:call")
       .description("Call a Gateway method over WS and print JSON")
-      .argument("<method>", "Method name (health/status/system-presence/send/agent)")
+      .argument(
+        "<method>",
+        "Method name (health/status/system-presence/send/agent)",
+      )
       .option("--params <json>", "JSON object string for params", "{}")
       .action(async (method, opts) => {
         try {
@@ -560,6 +562,69 @@ Examples:
   clawdis relay --heartbeat-now     # send immediate agent heartbeat on start (web)
   clawdis relay --web-heartbeat 60  # override WhatsApp heartbeat interval
   # Troubleshooting: docs/refactor/web-relay-troubleshooting.md
+`,
+    )
+    .action(async (_opts) => {
+      defaultRuntime.error(
+        danger(
+          "`clawdis relay` is deprecated. Use the WebSocket Gateway (`clawdis gateway`) plus gw:* commands or WebChat/mac app clients.",
+        ),
+      );
+      defaultRuntime.exit(1);
+    });
+
+  // relay is deprecated; gateway is the single entry point.
+
+  program
+    .command("relay-legacy")
+    .description(
+      "(Deprecated) legacy relay for web/telegram; use `gateway` instead",
+    )
+    .option(
+      "--provider <auto|web|telegram|all>",
+      "Which providers to start: auto (default), web, telegram, or all",
+    )
+    .option(
+      "--web-heartbeat <seconds>",
+      "Heartbeat interval for web relay health logs (seconds)",
+    )
+    .option(
+      "--web-retries <count>",
+      "Max consecutive web reconnect attempts before exit (0 = unlimited)",
+    )
+    .option(
+      "--web-retry-initial <ms>",
+      "Initial reconnect backoff for web relay (ms)",
+    )
+    .option("--web-retry-max <ms>", "Max reconnect backoff for web relay (ms)")
+    .option(
+      "--heartbeat-now",
+      "Run a heartbeat immediately when relay starts",
+      false,
+    )
+    .option(
+      "--webhook",
+      "Run Telegram webhook server instead of long-poll",
+      false,
+    )
+    .option(
+      "--webhook-path <path>",
+      "Telegram webhook path (default /telegram-webhook when webhook enabled)",
+    )
+    .option(
+      "--webhook-secret <secret>",
+      "Secret token to verify Telegram webhook requests",
+    )
+    .option("--port <port>", "Port for Telegram webhook server (default 8787)")
+    .option(
+      "--webhook-url <url>",
+      "Public Telegram webhook URL to register (overrides localhost autodetect)",
+    )
+    .option("--verbose", "Verbose logging", false)
+    .addHelpText(
+      "after",
+      `
+This command is legacy and will be removed. Prefer the Gateway.
 `,
     )
     .action(async (opts) => {

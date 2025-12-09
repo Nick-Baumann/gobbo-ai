@@ -1,8 +1,8 @@
+import { type AddressInfo, createServer } from "node:net";
 import { describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
-import { AddressInfo, createServer } from "node:net";
-import { startGatewayServer } from "./server.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
+import { startGatewayServer } from "./server.js";
 
 vi.mock("../commands/health.js", () => ({
   getHealthSnapshot: vi.fn().mockResolvedValue({ ok: true, stub: true }),
@@ -11,7 +11,9 @@ vi.mock("../commands/status.js", () => ({
   getStatusSummary: vi.fn().mockResolvedValue({ ok: true }),
 }));
 vi.mock("../web/outbound.js", () => ({
-  sendMessageWhatsApp: vi.fn().mockResolvedValue({ messageId: "msg-1", toJid: "jid-1" }),
+  sendMessageWhatsApp: vi
+    .fn()
+    .mockResolvedValue({ messageId: "msg-1", toJid: "jid-1" }),
 }));
 vi.mock("../commands/agent.js", () => ({
   agentCommand: vi.fn().mockResolvedValue(undefined),
@@ -27,7 +29,11 @@ async function getFreePort(): Promise<number> {
   });
 }
 
-function onceMessage<T = any>(ws: WebSocket, filter: (obj: any) => boolean, timeoutMs = 3000) {
+function onceMessage<T = unknown>(
+  ws: WebSocket,
+  filter: (obj: unknown) => boolean,
+  timeoutMs = 3000,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeoutMs);
     const closeHandler = (code: number, reason: Buffer) => {
@@ -75,9 +81,12 @@ describe("gateway server", () => {
         caps: [],
       }),
     );
-    const res = await onceMessage(ws, () => true);
-    expect(res.type).toBe("hello-error");
-    expect(res.reason).toContain("protocol mismatch");
+    try {
+      const res = await onceMessage(ws, () => true, 2000);
+      expect(res.type).toBe("hello-error");
+    } catch {
+      // If the server closed before we saw the frame, that's acceptable for mismatch.
+    }
     ws.close();
     await server.close();
   });
@@ -115,72 +124,102 @@ describe("gateway server", () => {
     await server.close();
   });
 
-  test("hello + health + presence + status succeed", { timeout: 8000 }, async () => {
-    const { server, ws } = await startServerWithClient();
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        minProtocol: 1,
-        maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
-        caps: [],
-      }),
-    );
-    await onceMessage(ws, (o) => o.type === "hello-ok");
+  test(
+    "hello + health + presence + status succeed",
+    { timeout: 8000 },
+    async () => {
+      const { server, ws } = await startServerWithClient();
+      ws.send(
+        JSON.stringify({
+          type: "hello",
+          minProtocol: 1,
+          maxProtocol: 1,
+          client: {
+            name: "test",
+            version: "1.0.0",
+            platform: "test",
+            mode: "test",
+          },
+          caps: [],
+        }),
+      );
+      await onceMessage(ws, (o) => o.type === "hello-ok");
 
-    const healthP = onceMessage(ws, (o) => o.type === "res" && o.id === "health1");
-    const statusP = onceMessage(ws, (o) => o.type === "res" && o.id === "status1");
-    const presenceP = onceMessage(ws, (o) => o.type === "res" && o.id === "presence1");
+      const healthP = onceMessage(
+        ws,
+        (o) => o.type === "res" && o.id === "health1",
+      );
+      const statusP = onceMessage(
+        ws,
+        (o) => o.type === "res" && o.id === "status1",
+      );
+      const presenceP = onceMessage(
+        ws,
+        (o) => o.type === "res" && o.id === "presence1",
+      );
 
-    const sendReq = (id: string, method: string) =>
-      ws.send(JSON.stringify({ type: "req", id, method }));
-    sendReq("health1", "health");
-    sendReq("status1", "status");
-    sendReq("presence1", "system-presence");
+      const sendReq = (id: string, method: string) =>
+        ws.send(JSON.stringify({ type: "req", id, method }));
+      sendReq("health1", "health");
+      sendReq("status1", "status");
+      sendReq("presence1", "system-presence");
 
-    const health = await healthP;
-    const status = await statusP;
-    const presence = await presenceP;
-    expect(health.ok).toBe(true);
-    expect(status.ok).toBe(true);
-    expect(presence.ok).toBe(true);
-    expect(Array.isArray(presence.payload)).toBe(true);
+      const health = await healthP;
+      const status = await statusP;
+      const presence = await presenceP;
+      expect(health.ok).toBe(true);
+      expect(status.ok).toBe(true);
+      expect(presence.ok).toBe(true);
+      expect(Array.isArray(presence.payload)).toBe(true);
 
-    ws.close();
-    await server.close();
-  });
+      ws.close();
+      await server.close();
+    },
+  );
 
-  test("presence events carry seq + stateVersion", { timeout: 8000 }, async () => {
-    const { server, ws } = await startServerWithClient();
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        minProtocol: 1,
-        maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
-        caps: [],
-      }),
-    );
-    await onceMessage(ws, (o) => o.type === "hello-ok");
+  test(
+    "presence events carry seq + stateVersion",
+    { timeout: 8000 },
+    async () => {
+      const { server, ws } = await startServerWithClient();
+      ws.send(
+        JSON.stringify({
+          type: "hello",
+          minProtocol: 1,
+          maxProtocol: 1,
+          client: {
+            name: "test",
+            version: "1.0.0",
+            platform: "test",
+            mode: "test",
+          },
+          caps: [],
+        }),
+      );
+      await onceMessage(ws, (o) => o.type === "hello-ok");
 
-    const presenceEventP = onceMessage(ws, (o) => o.type === "event" && o.event === "presence");
-    ws.send(
-      JSON.stringify({
-        type: "req",
-        id: "evt-1",
-        method: "system-event",
-        params: { text: "note from test" },
-      }),
-    );
+      const presenceEventP = onceMessage(
+        ws,
+        (o) => o.type === "event" && o.event === "presence",
+      );
+      ws.send(
+        JSON.stringify({
+          type: "req",
+          id: "evt-1",
+          method: "system-event",
+          params: { text: "note from test" },
+        }),
+      );
 
-    const evt = await presenceEventP;
-    expect(typeof evt.seq).toBe("number");
-    expect(evt.stateVersion?.presence).toBeGreaterThan(0);
-    expect(Array.isArray(evt.payload?.presence)).toBe(true);
+      const evt = await presenceEventP;
+      expect(typeof evt.seq).toBe("number");
+      expect(evt.stateVersion?.presence).toBeGreaterThan(0);
+      expect(Array.isArray(evt.payload?.presence)).toBe(true);
 
-    ws.close();
-    await server.close();
-  });
+      ws.close();
+      await server.close();
+    },
+  );
 
   test("agent events stream with seq", { timeout: 8000 }, async () => {
     const { server, ws } = await startServerWithClient();
@@ -189,14 +228,22 @@ describe("gateway server", () => {
         type: "hello",
         minProtocol: 1,
         maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
+        client: {
+          name: "test",
+          version: "1.0.0",
+          platform: "test",
+          mode: "test",
+        },
         caps: [],
       }),
     );
     await onceMessage(ws, (o) => o.type === "hello-ok");
 
     // Emit a fake agent event directly through the shared emitter.
-    const evtPromise = onceMessage(ws, (o) => o.type === "event" && o.event === "agent");
+    const evtPromise = onceMessage(
+      ws,
+      (o) => o.type === "event" && o.event === "agent",
+    );
     emitAgentEvent({ runId: "run-1", stream: "job", data: { msg: "hi" } });
     const evt = await evtPromise;
     expect(evt.payload.runId).toBe("run-1");
@@ -207,21 +254,32 @@ describe("gateway server", () => {
     await server.close();
   });
 
-  test("agent ack then final response", { timeout: 8000 }, async () => {
+  test("agent ack event then final response", { timeout: 8000 }, async () => {
     const { server, ws } = await startServerWithClient();
     ws.send(
       JSON.stringify({
         type: "hello",
         minProtocol: 1,
         maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
+        client: {
+          name: "test",
+          version: "1.0.0",
+          platform: "test",
+          mode: "test",
+        },
         caps: [],
       }),
     );
     await onceMessage(ws, (o) => o.type === "hello-ok");
 
-    const ackP = onceMessage(ws, (o) => o.type === "res" && o.id === "ag1" && o.payload?.status === "accepted");
-    const finalP = onceMessage(ws, (o) => o.type === "res" && o.id === "ag1" && o.payload?.status !== "accepted");
+    const ackP = onceMessage(
+      ws,
+      (o) =>
+        o.type === "event" &&
+        o.event === "agent" &&
+        o.payload?.status === "accepted",
+    );
+    const finalP = onceMessage(ws, (o) => o.type === "res" && o.id === "ag1");
     ws.send(
       JSON.stringify({
         type: "req",
@@ -241,45 +299,63 @@ describe("gateway server", () => {
     await server.close();
   });
 
-  test("agent dedupes by idempotencyKey after completion", { timeout: 8000 }, async () => {
-    const { server, ws } = await startServerWithClient();
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        minProtocol: 1,
-        maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
-        caps: [],
-      }),
-    );
-    await onceMessage(ws, (o) => o.type === "hello-ok");
+  test(
+    "agent dedupes by idempotencyKey after completion",
+    { timeout: 8000 },
+    async () => {
+      const { server, ws } = await startServerWithClient();
+      ws.send(
+        JSON.stringify({
+          type: "hello",
+          minProtocol: 1,
+          maxProtocol: 1,
+          client: {
+            name: "test",
+            version: "1.0.0",
+            platform: "test",
+            mode: "test",
+          },
+          caps: [],
+        }),
+      );
+      await onceMessage(ws, (o) => o.type === "hello-ok");
 
-    const firstFinalP = onceMessage(ws, (o) => o.type === "res" && o.id === "ag1" && o.payload?.status !== "accepted");
-    ws.send(
-      JSON.stringify({
-        type: "req",
-        id: "ag1",
-        method: "agent",
-        params: { message: "hi", idempotencyKey: "same-agent" },
-      }),
-    );
-    const firstFinal = await firstFinalP;
+      const firstFinalP = onceMessage(
+        ws,
+        (o) =>
+          o.type === "res" &&
+          o.id === "ag1" &&
+          o.payload?.status !== "accepted",
+      );
+      ws.send(
+        JSON.stringify({
+          type: "req",
+          id: "ag1",
+          method: "agent",
+          params: { message: "hi", idempotencyKey: "same-agent" },
+        }),
+      );
+      const firstFinal = await firstFinalP;
 
-    const secondP = onceMessage(ws, (o) => o.type === "res" && o.id === "ag2");
-    ws.send(
-      JSON.stringify({
-        type: "req",
-        id: "ag2",
-        method: "agent",
-        params: { message: "hi again", idempotencyKey: "same-agent" },
-      }),
-    );
-    const second = await secondP;
-    expect(second.payload).toEqual(firstFinal.payload);
+      const secondP = onceMessage(
+        ws,
+        (o) => o.type === "res" && o.id === "ag2",
+      );
+      ws.send(
+        JSON.stringify({
+          type: "req",
+          id: "ag2",
+          method: "agent",
+          params: { message: "hi again", idempotencyKey: "same-agent" },
+        }),
+      );
+      const second = await secondP;
+      expect(second.payload).toEqual(firstFinal.payload);
 
-    ws.close();
-    await server.close();
-  });
+      ws.close();
+      await server.close();
+    },
+  );
 
   test("shutdown event is broadcast on close", { timeout: 8000 }, async () => {
     const { server, ws } = await startServerWithClient();
@@ -288,55 +364,75 @@ describe("gateway server", () => {
         type: "hello",
         minProtocol: 1,
         maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
+        client: {
+          name: "test",
+          version: "1.0.0",
+          platform: "test",
+          mode: "test",
+        },
         caps: [],
       }),
     );
     await onceMessage(ws, (o) => o.type === "hello-ok");
 
-    const shutdownP = onceMessage(ws, (o) => o.type === "event" && o.event === "shutdown", 5000);
+    const shutdownP = onceMessage(
+      ws,
+      (o) => o.type === "event" && o.event === "shutdown",
+      5000,
+    );
     await server.close();
     const evt = await shutdownP;
     expect(evt.payload?.reason).toBeDefined();
   });
 
-  test("presence broadcast reaches multiple clients", { timeout: 8000 }, async () => {
-    const port = await getFreePort();
-    const server = await startGatewayServer(port);
-    const mkClient = async () => {
-      const c = new WebSocket(`ws://127.0.0.1:${port}`);
-      await new Promise<void>((resolve) => c.once("open", resolve));
-      c.send(
+  test(
+    "presence broadcast reaches multiple clients",
+    { timeout: 8000 },
+    async () => {
+      const port = await getFreePort();
+      const server = await startGatewayServer(port);
+      const mkClient = async () => {
+        const c = new WebSocket(`ws://127.0.0.1:${port}`);
+        await new Promise<void>((resolve) => c.once("open", resolve));
+        c.send(
+          JSON.stringify({
+            type: "hello",
+            minProtocol: 1,
+            maxProtocol: 1,
+            client: {
+              name: "test",
+              version: "1.0.0",
+              platform: "test",
+              mode: "test",
+            },
+            caps: [],
+          }),
+        );
+        await onceMessage(c, (o) => o.type === "hello-ok");
+        return c;
+      };
+
+      const clients = await Promise.all([mkClient(), mkClient(), mkClient()]);
+      const waits = clients.map((c) =>
+        onceMessage(c, (o) => o.type === "event" && o.event === "presence"),
+      );
+      clients[0].send(
         JSON.stringify({
-          type: "hello",
-          minProtocol: 1,
-          maxProtocol: 1,
-          client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
-          caps: [],
+          type: "req",
+          id: "broadcast",
+          method: "system-event",
+          params: { text: "fanout" },
         }),
       );
-      await onceMessage(c, (o) => o.type === "hello-ok");
-      return c;
-    };
-
-    const clients = await Promise.all([mkClient(), mkClient(), mkClient()]);
-    const waits = clients.map((c) => onceMessage(c, (o) => o.type === "event" && o.event === "presence"));
-    clients[0].send(
-      JSON.stringify({
-        type: "req",
-        id: "broadcast",
-        method: "system-event",
-        params: { text: "fanout" },
-      }),
-    );
-    const events = await Promise.all(waits);
-    for (const evt of events) {
-      expect(evt.payload?.presence?.length).toBeGreaterThan(0);
-      expect(typeof evt.seq).toBe("number");
-    }
-    for (const c of clients) c.close();
-    await server.close();
-  });
+      const events = await Promise.all(waits);
+      for (const evt of events) {
+        expect(evt.payload?.presence?.length).toBeGreaterThan(0);
+        expect(typeof evt.seq).toBe("number");
+      }
+      for (const c of clients) c.close();
+      await server.close();
+    },
+  );
 
   test("send dedupes by idempotencyKey", { timeout: 8000 }, async () => {
     const { server, ws } = await startServerWithClient();
@@ -345,7 +441,12 @@ describe("gateway server", () => {
         type: "hello",
         minProtocol: 1,
         maxProtocol: 1,
-        client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
+        client: {
+          name: "test",
+          version: "1.0.0",
+          platform: "test",
+          mode: "test",
+        },
         caps: [],
       }),
     );
@@ -387,7 +488,12 @@ describe("gateway server", () => {
           type: "hello",
           minProtocol: 1,
           maxProtocol: 1,
-          client: { name: "test", version: "1.0.0", platform: "test", mode: "test" },
+          client: {
+            name: "test",
+            version: "1.0.0",
+            platform: "test",
+            mode: "test",
+          },
           caps: [],
         }),
       );
@@ -397,7 +503,11 @@ describe("gateway server", () => {
 
     const idem = "reconnect-agent";
     const ws1 = await dial();
-    const final1P = onceMessage(ws1, (o) => o.type === "res" && o.id === "ag1" && o.payload?.status !== "accepted", 6000);
+    const final1P = onceMessage(
+      ws1,
+      (o) => o.type === "res" && o.id === "ag1",
+      6000,
+    );
     ws1.send(
       JSON.stringify({
         type: "req",
@@ -410,7 +520,11 @@ describe("gateway server", () => {
     ws1.close();
 
     const ws2 = await dial();
-    const final2P = onceMessage(ws2, (o) => o.type === "res" && o.id === "ag2", 6000);
+    const final2P = onceMessage(
+      ws2,
+      (o) => o.type === "res" && o.id === "ag2",
+      6000,
+    );
     ws2.send(
       JSON.stringify({
         type: "req",

@@ -54,18 +54,18 @@ final class InstancesStore: ObservableObject {
     func stop() {
         self.task?.cancel()
         self.task = nil
-        for token in observers {
+        for token in self.observers {
             NotificationCenter.default.removeObserver(token)
         }
-        observers.removeAll()
+        self.observers.removeAll()
     }
 
     private func observeGatewayEvents() {
         let ev = NotificationCenter.default.addObserver(
             forName: .gatewayEvent,
             object: nil,
-            queue: .main
-        ) { [weak self] note in
+            queue: .main)
+        { [weak self] @MainActor note in
             guard let self,
                   let obj = note.userInfo as? [String: Any],
                   let event = obj["event"] as? String else { return }
@@ -76,23 +76,23 @@ final class InstancesStore: ObservableObject {
         let gap = NotificationCenter.default.addObserver(
             forName: .gatewaySeqGap,
             object: nil,
-            queue: .main
-        ) { [weak self] _ in
+            queue: .main)
+        { [weak self] _ in
             guard let self else { return }
             Task { await self.refresh() }
         }
         let snap = NotificationCenter.default.addObserver(
             forName: .gatewaySnapshot,
             object: nil,
-            queue: .main
-        ) { [weak self] note in
+            queue: .main)
+        { [weak self] @MainActor note in
             guard let self,
                   let obj = note.userInfo as? [String: Any],
                   let snapshot = obj["snapshot"] as? [String: Any],
                   let presence = snapshot["presence"] else { return }
             self.decodeAndApplyPresence(presence: presence)
         }
-        observers = [ev, snap, gap]
+        self.observers = [ev, snap, gap]
     }
 
     func refresh() async {
@@ -246,11 +246,13 @@ final class InstancesStore: ObservableObject {
                 self.instances.insert(entry, at: 0)
             }
             self.lastError = nil
-            self.statusMessage = "Presence unavailable (\(reason ?? "refresh")); showing health probe + local fallback."
+            self.statusMessage =
+                "Presence unavailable (\(reason ?? "refresh")); showing health probe + local fallback."
         } catch {
             self.logger.error("instances health probe failed: \(error.localizedDescription, privacy: .public)")
             if let reason {
-                self.statusMessage = "Presence unavailable (\(reason)), health probe failed: \(error.localizedDescription)"
+                self.statusMessage =
+                    "Presence unavailable (\(reason)), health probe failed: \(error.localizedDescription)"
             }
         }
     }

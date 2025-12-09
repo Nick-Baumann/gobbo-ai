@@ -1,4 +1,4 @@
-import { Type, type Static, type TSchema } from "@sinclair/typebox";
+import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 const NonEmptyString = Type.String({ minLength: 1 });
 
@@ -34,6 +34,21 @@ export const SnapshotSchema = Type.Object(
     health: HealthSnapshotSchema,
     stateVersion: StateVersionSchema,
     uptimeMs: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+
+export const TickEventSchema = Type.Object(
+  {
+    ts: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+
+export const ShutdownEventSchema = Type.Object(
+  {
+    reason: NonEmptyString,
+    restartExpectedMs: Type.Optional(Type.Integer({ minimum: 0 })),
   },
   { additionalProperties: false },
 );
@@ -154,6 +169,21 @@ export const EventFrameSchema = Type.Object(
   { additionalProperties: false },
 );
 
+// Discriminated union of all top-level frames. Using a discriminator makes
+// downstream codegen (quicktype) produce tighter types instead of all-optional
+// blobs.
+export const GatewayFrameSchema = Type.Union(
+  [
+    HelloSchema,
+    HelloOkSchema,
+    HelloErrorSchema,
+    RequestFrameSchema,
+    ResponseFrameSchema,
+    EventFrameSchema,
+  ],
+  { discriminator: "type" },
+);
+
 export const AgentEventSchema = Type.Object(
   {
     runId: NonEmptyString,
@@ -196,6 +226,7 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   RequestFrame: RequestFrameSchema,
   ResponseFrame: ResponseFrameSchema,
   EventFrame: EventFrameSchema,
+  GatewayFrame: GatewayFrameSchema,
   PresenceEntry: PresenceEntrySchema,
   StateVersion: StateVersionSchema,
   Snapshot: SnapshotSchema,
@@ -203,7 +234,11 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   AgentEvent: AgentEventSchema,
   SendParams: SendParamsSchema,
   AgentParams: AgentParamsSchema,
+  TickEvent: TickEventSchema,
+  ShutdownEvent: ShutdownEventSchema,
 };
+
+export const PROTOCOL_VERSION = 1 as const;
 
 export type Hello = Static<typeof HelloSchema>;
 export type HelloOk = Static<typeof HelloOkSchema>;
@@ -211,11 +246,14 @@ export type HelloError = Static<typeof HelloErrorSchema>;
 export type RequestFrame = Static<typeof RequestFrameSchema>;
 export type ResponseFrame = Static<typeof ResponseFrameSchema>;
 export type EventFrame = Static<typeof EventFrameSchema>;
+export type GatewayFrame = Static<typeof GatewayFrameSchema>;
 export type Snapshot = Static<typeof SnapshotSchema>;
 export type PresenceEntry = Static<typeof PresenceEntrySchema>;
 export type ErrorShape = Static<typeof ErrorShapeSchema>;
 export type StateVersion = Static<typeof StateVersionSchema>;
 export type AgentEvent = Static<typeof AgentEventSchema>;
+export type TickEvent = Static<typeof TickEventSchema>;
+export type ShutdownEvent = Static<typeof ShutdownEventSchema>;
 
 export const ErrorCodes = {
   NOT_LINKED: "NOT_LINKED",
