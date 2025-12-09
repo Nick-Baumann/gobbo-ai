@@ -7,6 +7,7 @@ import { logInfo } from "../logger.js";
 import { getChildLogger } from "../logging.js";
 import { toWhatsappJid } from "../utils.js";
 import { loadWebMedia } from "./media.js";
+import { getActiveWebListener } from "./active-listener.js";
 import { createWaSocket, waitForWaConnection } from "./session.js";
 
 export async function sendMessageWhatsApp(
@@ -15,22 +16,25 @@ export async function sendMessageWhatsApp(
   options: { verbose: boolean; mediaUrl?: string },
 ): Promise<{ messageId: string; toJid: string }> {
   const correlationId = randomUUID();
-  const sock = await createWaSocket(false, options.verbose);
+  const active = getActiveWebListener();
+  const usingActive = Boolean(active);
+  const sock = usingActive ? null : await createWaSocket(false, options.verbose);
   const logger = getChildLogger({
     module: "web-outbound",
     correlationId,
     to,
   });
   try {
-    logInfo("🔌 Connecting to WhatsApp Web…");
-    logger.info("connecting to whatsapp web");
-    await waitForWaConnection(sock);
-    // waitForWaConnection sets up listeners and error handling; keep the presence update safe.
     const jid = toWhatsappJid(to);
-    try {
-      await sock.sendPresenceUpdate("composing", jid);
-    } catch (err) {
-      logVerbose(`Presence update skipped: ${String(err)}`);
+    if (!usingActive) {
+      logInfo("🔌 Connecting to WhatsApp Web…");
+      logger.info("connecting to whatsapp web");
+      await waitForWaConnection(sock!);
+      try {
+        await sock!.sendPresenceUpdate("composing", jid);
+      } catch (err) {
+        logVerbose(`Presence update skipped: ${String(err)}`);
+      }
     }
     let payload: AnyMessageContent = { text: body };
     if (options.mediaUrl) {
@@ -76,18 +80,34 @@ export async function sendMessageWhatsApp(
       { jid, hasMedia: Boolean(options.mediaUrl) },
       "sending message",
     );
-    const result = await sock.sendMessage(jid, payload);
-    const messageId = result?.key?.id ?? "unknown";
+    const result = usingActive
+      ? await (async () => {
+          let mediaBuffer: Buffer | undefined;
+          let mediaType: string | undefined;
+          if (options.mediaUrl) {
+            const media = await loadWebMedia(options.mediaUrl);
+            mediaBuffer = media.buffer;
+            mediaType = media.contentType;
+          }
+          await active!.sendComposingTo(to);
+          return active!.sendMessage(to, body, mediaBuffer, mediaType);
+        })()
+      : await sock!.sendMessage(jid, payload);
+    const messageId = usingActive
+      ? (result as { messageId?: string })?.messageId ?? "unknown"
+      : (result as any)?.key?.id ?? "unknown";
     logInfo(
       `✅ Sent via web session. Message ID: ${messageId} -> ${jid}${options.mediaUrl ? " (media)" : ""}`,
     );
     logger.info({ jid, messageId }, "sent message");
     return { messageId, toJid: jid };
   } finally {
-    try {
-      sock.ws?.close();
-    } catch (err) {
-      logVerbose(`Socket close failed: ${String(err)}`);
+    if (!usingActive) {
+      try {
+        sock?.ws?.close();
+      } catch (err) {
+        logVerbose(`Socket close failed: ${String(err)}`);
+      }
     }
   }
 }

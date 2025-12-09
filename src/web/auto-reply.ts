@@ -21,6 +21,7 @@ import { jidToE164, normalizeE164 } from "../utils.js";
 import { monitorWebInbox } from "./inbound.js";
 import { loadWebMedia } from "./media.js";
 import { sendMessageWhatsApp } from "./outbound.js";
+import { setActiveWebListener } from "./active-listener.js";
 import {
   computeBackoff,
   newConnectionId,
@@ -1016,7 +1017,10 @@ export async function monitorWebProvider(
       `WhatsApp gateway connected${selfE164 ? ` as ${selfE164}` : ""}.`,
     );
 
+    setActiveWebListener(listener);
+
     const closeListener = async () => {
+      setActiveWebListener(null);
       if (heartbeat) clearInterval(heartbeat);
       if (replyHeartbeatTimer) clearInterval(replyHeartbeatTimer);
       if (watchdogTimer) clearInterval(watchdogTimer);
