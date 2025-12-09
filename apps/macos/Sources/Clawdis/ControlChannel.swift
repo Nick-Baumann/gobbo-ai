@@ -13,12 +13,14 @@ struct ControlHeartbeatEvent: Codable {
     let reason: String?
 }
 
-struct ControlAgentEvent: Codable, Sendable {
+struct ControlAgentEvent: Codable, Sendable, Identifiable {
+    var id: String { "\(runId)-\(seq)" }
     let runId: String
     let seq: Int
     let stream: String
     let ts: Double
     let data: [String: AnyCodable]
+    let summary: String?
 }
 
 enum ControlChannelError: Error, LocalizedError {
@@ -135,31 +137,24 @@ final class ControlChannel: ObservableObject {
             queue: .main)
         { [weak self] note in
             guard let self,
-                  let obj = note.userInfo as? [String: Any],
-                  let event = obj["event"] as? String else { return }
-            switch event {
-            case "agent":
-                if let payload = obj["payload"] as? [String: Any],
-                   let runId = payload["runId"] as? String,
-                   let seq = payload["seq"] as? Int,
-                   let stream = payload["stream"] as? String,
-                   let ts = payload["ts"] as? Double,
-                   let dataDict = payload["data"] as? [String: Any]
-                {
-                    let wrapped = dataDict.mapValues { AnyCodable($0) }
+                  let frame = note.object as? GatewayFrame else { return }
+            switch frame {
+            case let .event(evt) where evt.event == "agent":
+                if let data = evt.payload?.value,
+                   JSONSerialization.isValidJSONObject(data),
+                   let blob = try? JSONSerialization.data(withJSONObject: data),
+                   let agent = try? JSONDecoder().decode(AgentEvent.self, from: blob) {
                     Task { @MainActor in
                         AgentEventStore.shared.append(ControlAgentEvent(
-                            runId: runId,
-                            seq: seq,
-                            stream: stream,
-                            ts: ts,
-                            data: wrapped))
+                            runId: agent.runid,
+                            seq: agent.seq,
+                            stream: agent.stream,
+                            ts: Double(agent.ts),
+                            data: agent.data.mapValues { Clawdis.AnyCodable($0.value) },
+                            summary: nil))
                     }
                 }
-            case "presence":
-                // InstancesStore listens separately via notification
-                break
-            case "shutdown":
+            case let .event(evt) where evt.event == "shutdown":
                 Task { @MainActor in self.state = .degraded("gateway shutdown") }
             default:
                 break
