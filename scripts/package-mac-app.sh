@@ -35,6 +35,8 @@ swift build -c "$BUILD_CONFIG" --product "$PRODUCT" --product "${PRODUCT}CLI" --
 
 BIN="$BUILD_PATH/$BUILD_CONFIG/$PRODUCT"
 CLI_BIN="$BUILD_PATH/$BUILD_CONFIG/ClawdisCLI"
+echo "pkg: binary $BIN" >&2
+echo "pkg: cli $CLI_BIN" >&2
 echo "🧹 Cleaning old app bundle"
 rm -rf "$APP_ROOT"
 mkdir -p "$APP_ROOT/Contents/MacOS"

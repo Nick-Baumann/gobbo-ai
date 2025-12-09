@@ -2,6 +2,7 @@ import net from "node:net";
 
 import { getHealthSnapshot, type HealthSummary } from "../commands/health.js";
 import { getStatusSummary, type StatusSummary } from "../commands/status.js";
+import { logDebug, logError } from "../logger.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { type AgentEventPayload, onAgentEvent } from "./agent-events.js";
 import {
@@ -76,6 +77,7 @@ export async function startControlChannel(
       const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? "";
       for (const line of lines) {
+        logDebug(`control: line ${line.slice(0, 200)}`);
         handleLine(socket, line.trim());
       }
     });
@@ -104,7 +106,7 @@ export async function startControlChannel(
     try {
       parsed = JSON.parse(line) as ControlRequest;
     } catch (err) {
-      runtime.log?.(
+      logError(
         `control: parse error (${String(err)}) on line: ${line.slice(0, 200)}`,
       );
       return write(socket, {
@@ -134,7 +136,7 @@ export async function startControlChannel(
       });
 
     try {
-      runtime.log?.(`control: recv ${parsed.method}`);
+      logDebug(`control: recv ${parsed.method}`);
       switch (parsed.method) {
         case "ping": {
           respond({ pong: true, ts: Date.now() });
@@ -177,11 +179,9 @@ export async function startControlChannel(
           respond(undefined, false, `unknown method: ${parsed.method}`);
           break;
       }
-      runtime.log?.(
-        `control: ${parsed.method} responded in ${Date.now() - started}ms`,
-      );
+      logDebug(`control: ${parsed.method} responded in ${Date.now() - started}ms`);
     } catch (err) {
-      runtime.log?.(
+      logError(
         `control: ${parsed.method} failed in ${Date.now() - started}ms: ${String(err)}`,
       );
       respond(undefined, false, String(err));

@@ -625,13 +625,10 @@ export async function runCommandReply(
               toolCallId?: string;
               tool_call_id?: string;
             };
-            const role =
-              typeof msg.role === "string" ? msg.role.toLowerCase() : "";
+            const role = (msg.role ?? "") as string;
             const isToolResult =
-              role === "toolresult" || role === "tool_result";
-            if (!isToolResult || !Array.isArray(msg.content)) {
-              // not a tool result message we care about
-            } else {
+              role === "toolResult" || role === "tool_result";
+            if (isToolResult && Array.isArray(msg.content)) {
               const toolName = inferToolName(msg);
               const toolCallId = msg.toolCallId ?? msg.tool_call_id;
               const meta =
@@ -675,6 +672,11 @@ export async function runCommandReply(
                 flushPendingTool,
                 TOOL_RESULT_DEBOUNCE_MS,
               );
+              return;
+            }
+
+            if (msg.role === "assistant") {
+              streamAssistantFinal(msg as AssistantMessage);
             }
           }
 
