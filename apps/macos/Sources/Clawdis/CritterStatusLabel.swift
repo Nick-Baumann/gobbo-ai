@@ -243,44 +243,51 @@ enum CritterIconRenderer {
         NSGraphicsContext.saveGraphicsState()
         if let context = NSGraphicsContext(bitmapImageRep: rep) {
             NSGraphicsContext.current = context
+            context.interpolationQuality = .none
+            context.cgContext.setShouldAntialias(false)
             defer { NSGraphicsContext.restoreGraphicsState() }
 
-            let w = size.width
-            let h = size.height
+            let stepX = size.width / max(CGFloat(rep.pixelsWide), 1)
+            let stepY = size.height / max(CGFloat(rep.pixelsHigh), 1)
+            let snapX: (CGFloat) -> CGFloat = { ($0 / stepX).rounded() * stepX }
+            let snapY: (CGFloat) -> CGFloat = { ($0 / stepY).rounded() * stepY }
 
-            let bodyW = w * 0.78
-            let bodyH = h * 0.58
-            let bodyX = (w - bodyW) / 2
-            let bodyY = h * 0.36
-            let bodyCorner = w * 0.09
+            let w = snapX(size.width)
+            let h = snapY(size.height)
 
-            let earW = w * 0.22
-            let earH = bodyH * 0.54 * earScale * (1 - 0.08 * abs(earWiggle))
-            let earCorner = earW * 0.24
+            let bodyW = snapX(w * 0.78)
+            let bodyH = snapY(h * 0.58)
+            let bodyX = snapX((w - bodyW) / 2)
+            let bodyY = snapY(h * 0.36)
+            let bodyCorner = snapX(w * 0.09)
+
+            let earW = snapX(w * 0.22)
+            let earH = snapY(bodyH * 0.54 * earScale * (1 - 0.08 * abs(earWiggle)))
+            let earCorner = snapX(earW * 0.24)
             let leftEarRect = CGRect(
-                x: bodyX - earW * 0.55 + earWiggle,
-                y: bodyY + bodyH * 0.08 + earWiggle * 0.4,
+                x: snapX(bodyX - earW * 0.55 + earWiggle),
+                y: snapY(bodyY + bodyH * 0.08 + earWiggle * 0.4),
                 width: earW,
                 height: earH)
             let rightEarRect = CGRect(
-                x: bodyX + bodyW - earW * 0.45 - earWiggle,
-                y: bodyY + bodyH * 0.08 - earWiggle * 0.4,
+                x: snapX(bodyX + bodyW - earW * 0.45 - earWiggle),
+                y: snapY(bodyY + bodyH * 0.08 - earWiggle * 0.4),
                 width: earW,
                 height: earH)
 
-            let legW = w * 0.11
-            let legH = h * 0.26
-            let legSpacing = w * 0.085
-            let legsWidth = 4 * legW + 3 * legSpacing
-            let legStartX = (w - legsWidth) / 2
-            let legLift = legH * 0.35 * legWiggle
-            let legYBase = bodyY - legH + h * 0.05
+            let legW = snapX(w * 0.11)
+            let legH = snapY(h * 0.26)
+            let legSpacing = snapX(w * 0.085)
+            let legsWidth = snapX(4 * legW + 3 * legSpacing)
+            let legStartX = snapX((w - legsWidth) / 2)
+            let legLift = snapY(legH * 0.35 * legWiggle)
+            let legYBase = snapY(bodyY - legH + h * 0.05)
 
             let eyeOpen = max(0.05, 1 - blink)
-            let eyeW = bodyW * 0.2
-            let eyeH = bodyH * 0.26 * eyeOpen
-            let eyeY = bodyY + bodyH * 0.56
-            let eyeOffset = bodyW * 0.24
+            let eyeW = snapX(bodyW * 0.2)
+            let eyeH = snapY(bodyH * 0.26 * eyeOpen)
+            let eyeY = snapY(bodyY + bodyH * 0.56)
+            let eyeOffset = snapX(bodyW * 0.24)
 
             context.cgContext.setFillColor(NSColor.labelColor.cgColor)
 
@@ -318,21 +325,21 @@ enum CritterIconRenderer {
             context.cgContext.saveGState()
             context.cgContext.setBlendMode(CGBlendMode.clear)
 
-            let leftCenter = CGPoint(x: w / 2 - eyeOffset, y: eyeY)
-            let rightCenter = CGPoint(x: w / 2 + eyeOffset, y: eyeY)
+            let leftCenter = CGPoint(x: snapX(w / 2 - eyeOffset), y: snapY(eyeY))
+            let rightCenter = CGPoint(x: snapX(w / 2 + eyeOffset), y: snapY(eyeY))
 
             if earHoles || earScale > 1.05 {
-                let holeW = earW * 0.6
-                let holeH = earH * 0.46
-                let holeCorner = holeW * 0.34
+                let holeW = snapX(earW * 0.6)
+                let holeH = snapY(earH * 0.46)
+                let holeCorner = snapX(holeW * 0.34)
                 let leftHoleRect = CGRect(
-                    x: leftEarRect.midX - holeW / 2,
-                    y: leftEarRect.midY - holeH / 2 + earH * 0.04,
+                    x: snapX(leftEarRect.midX - holeW / 2),
+                    y: snapY(leftEarRect.midY - holeH / 2 + earH * 0.04),
                     width: holeW,
                     height: holeH)
                 let rightHoleRect = CGRect(
-                    x: rightEarRect.midX - holeW / 2,
-                    y: rightEarRect.midY - holeH / 2 + earH * 0.04,
+                    x: snapX(rightEarRect.midX - holeW / 2),
+                    y: snapY(rightEarRect.midY - holeH / 2 + earH * 0.04),
                     width: holeW,
                     height: holeH)
 
@@ -349,15 +356,15 @@ enum CritterIconRenderer {
             }
 
             let left = CGMutablePath()
-            left.move(to: CGPoint(x: leftCenter.x - eyeW / 2, y: leftCenter.y - eyeH))
-            left.addLine(to: CGPoint(x: leftCenter.x + eyeW / 2, y: leftCenter.y))
-            left.addLine(to: CGPoint(x: leftCenter.x - eyeW / 2, y: leftCenter.y + eyeH))
+            left.move(to: CGPoint(x: snapX(leftCenter.x - eyeW / 2), y: snapY(leftCenter.y - eyeH)))
+            left.addLine(to: CGPoint(x: snapX(leftCenter.x + eyeW / 2), y: snapY(leftCenter.y)))
+            left.addLine(to: CGPoint(x: snapX(leftCenter.x - eyeW / 2), y: snapY(leftCenter.y + eyeH)))
             left.closeSubpath()
 
             let right = CGMutablePath()
-            right.move(to: CGPoint(x: rightCenter.x + eyeW / 2, y: rightCenter.y - eyeH))
-            right.addLine(to: CGPoint(x: rightCenter.x - eyeW / 2, y: rightCenter.y))
-            right.addLine(to: CGPoint(x: rightCenter.x + eyeW / 2, y: rightCenter.y + eyeH))
+            right.move(to: CGPoint(x: snapX(rightCenter.x + eyeW / 2), y: snapY(rightCenter.y - eyeH)))
+            right.addLine(to: CGPoint(x: snapX(rightCenter.x - eyeW / 2), y: snapY(rightCenter.y)))
+            right.addLine(to: CGPoint(x: snapX(rightCenter.x + eyeW / 2), y: snapY(rightCenter.y + eyeH)))
             right.closeSubpath()
 
             context.cgContext.addPath(left)
