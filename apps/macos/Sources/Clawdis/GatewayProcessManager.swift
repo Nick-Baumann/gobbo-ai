@@ -231,8 +231,4 @@ final class GatewayProcessManager: ObservableObject {
     func projectRootPath() -> String {
         CommandResolver.projectRootPath()
     }
-
-    func clearLog() {
-        self.log = ""
-    }
 }

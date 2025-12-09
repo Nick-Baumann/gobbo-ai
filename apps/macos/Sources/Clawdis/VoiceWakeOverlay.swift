@@ -271,6 +271,8 @@ final class VoiceWakeOverlayController: ObservableObject {
                 active=\(active.uuidString, privacy: .public) \
                 got=\(token.uuidString, privacy: .public)
                 """)
+            // If tokens diverge, clear the stale overlay so the UI can resync.
+            self.dismiss(reason: .explicit, outcome: .empty)
             return false
         }
         return true
