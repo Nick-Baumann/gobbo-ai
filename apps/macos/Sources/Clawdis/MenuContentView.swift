@@ -114,7 +114,7 @@ struct MenuContent: View {
                 case let .degraded(reason):
                     let detail = HealthStore.shared.degradedSummary ?? reason
                     let ageText = lastAge.map { " · checked \($0)" } ?? ""
-                    label = "Health degraded: \(detail)\(ageText)"
+                    label = "\(detail)\(ageText)"
                     color = .orange
                 case .unknown:
                     label = "Health pending"

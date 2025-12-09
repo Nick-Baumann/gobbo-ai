@@ -196,7 +196,7 @@ struct GeneralSettings: View {
         case .connected: "Connected"
         case .connecting: "Connecting…"
         case .disconnected: "Disconnected"
-        case let .degraded(msg): "Degraded: \(msg)"
+        case let .degraded(msg): msg
         }
     }
 
