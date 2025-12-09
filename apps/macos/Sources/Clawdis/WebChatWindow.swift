@@ -226,7 +226,9 @@ extension WebChatWindowController {
                     0,
                     NI_NUMERICHOST) == 0
                 {
-                    let ip = String(cString: hostname)
+                    let end = hostname.firstIndex(of: 0) ?? hostname.count
+                    let bytes = hostname[..<end].map { UInt8(bitPattern: $0) }
+                    let ip = String(decoding: bytes, as: UTF8.self)
                     if !ip.hasPrefix("169.254") { return ip }
                 }
             }

@@ -50,6 +50,21 @@ final class GatewayProcessManager: ObservableObject {
     private var stopping = false
     private var recentCrashes: [Date] = []
 
+    private final class GatewayLockHandle {
+        private let fd: FileDescriptor
+        private let path: String
+
+        init(fd: FileDescriptor, path: String) {
+            self.fd = fd
+            self.path = path
+        }
+
+        func cancel() {
+            try? self.fd.close()
+            try? FileManager.default.removeItem(atPath: self.path)
+        }
+    }
+
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "gateway")
     private let logLimit = 20000 // characters to keep in-memory
     private let maxCrashes = 3
@@ -182,20 +197,17 @@ final class GatewayProcessManager: ObservableObject {
         }
     }
 
-    /// Minimal clone of the Node gateway lock: bind a UDS and return the listener.
-    private func acquireGatewayLock(path: String) throws -> NWListener {
-        // Remove stale socket if needed
+    /// Minimal clone of the Node gateway lock: take an exclusive file lock.
+    private func acquireGatewayLock(path: String) throws -> GatewayLockHandle {
+        // Remove stale lock if needed (mirrors CLI behavior).
         try? FileManager.default.removeItem(atPath: path)
-        let params = NWParameters.tcp
-        params.allowLocalEndpointReuse = false
-        let endpoint = NWEndpoint.unix(path: path)
-        let listener = try NWListener(using: params, on: endpoint)
-        listener.newConnectionHandler = { connection in
-            // Any new connection indicates another starter; reject.
-            connection.cancel()
-        }
-        listener.start(queue: .global())
-        return listener
+        let fd = try FileDescriptor.open(
+            FilePath(path),
+            .readWrite,
+            options: [.create, .exclusiveCreate],
+            permissions: [.ownerReadWrite]
+        )
+        return GatewayLockHandle(fd: fd, path: path)
     }
 
     private func didStart(_ execution: Execution) {
