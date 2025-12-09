@@ -105,9 +105,7 @@ actor AgentRPC {
             stdinHandle.write(data)
             stdinHandle.write(Data([0x0A]))
 
-            let line = try await nextLine()
-            let parsed = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
-            guard let parsed else { throw RpcError(message: "invalid JSON") }
+            let parsed = try await self.nextJSONObject()
 
             if let ok = parsed["ok"] as? Bool, let type = parsed["type"] as? String, type == "result" {
                 if ok {
@@ -147,10 +145,9 @@ actor AgentRPC {
             stdinHandle.write(data)
             stdinHandle.write(Data([0x0A]))
 
-            let line = try await nextLine()
-            let parsed = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
-            if let ok = parsed?["ok"] as? Bool, ok { return (true, nil) }
-            return (false, parsed?["error"] as? String ?? "rpc status failed: \(line)")
+            let parsed = try await self.nextJSONObject()
+            if let ok = parsed["ok"] as? Bool, ok { return (true, nil) }
+            return (false, parsed["error"] as? String ?? "rpc status failed: \(parsed)")
         } catch {
             self.logger.error("rpc status failed: \(error.localizedDescription, privacy: .public)")
             await self.stop()
@@ -284,6 +281,25 @@ actor AgentRPC {
                 self.waiters.removeFirst()
                 waiter.resume(returning: line)
             }
+        }
+    }
+
+    /// Read the next line that successfully parses as JSON. Non-JSON lines (e.g., stray stdout logs)
+    /// are skipped to keep the RPC bridge resilient to accidental prints.
+    private func nextJSONObject(maxSkips: Int = 30) async throws -> [String: Any] {
+        var skipped = 0
+        while true {
+            let line = try await self.nextLine()
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                skipped += 1
+                if skipped >= maxSkips {
+                    throw RpcError(message: "rpc returned non-JSON output: \(line)")
+                }
+                continue
+            }
+            return obj
         }
     }
 
