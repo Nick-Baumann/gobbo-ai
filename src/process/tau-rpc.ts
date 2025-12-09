@@ -78,7 +78,29 @@ class TauRpcClient {
 
     // Parse the line once to track agent lifecycle signals.
     try {
-      const evt = JSON.parse(line) as { type?: string; message?: unknown };
+      const evt = JSON.parse(line) as {
+        type?: string;
+        command?: string;
+        success?: boolean;
+        error?: string;
+        message?: unknown;
+      };
+
+      if (evt.type === "response" && evt.command === "prompt") {
+        if (evt.success === false) {
+          const pending = this.pending;
+          this.pending = undefined;
+          this.buffer = [];
+          if (pending) {
+            clearTimeout(pending.timer);
+            pending.reject(
+              new Error(evt.error ?? "tau rpc prompt failed (response=false)"),
+            );
+          }
+          this.child?.kill("SIGKILL");
+          return;
+        }
+      }
 
       if (evt?.type === "agent_end") {
         // Tau signals the end of the prompt/response cycle; resolve with all buffered output.
@@ -124,7 +146,8 @@ class TauRpcClient {
       const ok = child.stdin.write(
         `${JSON.stringify({
           type: "prompt",
-          message: { role: "user", content: [{ type: "text", text: prompt }] },
+          // RPC v0.17+ accepts raw string prompts and normalizes internally.
+          message: prompt,
         })}\n`,
         (err) => (err ? reject(err) : resolve()),
       );
