@@ -22,6 +22,7 @@ import { defaultRuntime } from "../runtime.js";
 import { monitorTelegramProvider } from "../telegram/monitor.js";
 import { sendMessageTelegram } from "../telegram/send.js";
 import { sendMessageWhatsApp } from "../web/outbound.js";
+import { ensureWebChatServerFromConfig } from "../webchat/server.js";
 import {
   ErrorCodes,
   type ErrorShape,
@@ -729,6 +730,13 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
     `gateway listening on ws://127.0.0.1:${port} (PID ${process.pid})`,
   );
   defaultRuntime.log(`gateway log file: ${getResolvedLoggerSettings().file}`);
+
+  // Start loopback WebChat server (unless disabled via config).
+  void ensureWebChatServerFromConfig({
+    gatewayUrl: `ws://127.0.0.1:${port}`,
+  }).catch((err) => {
+    logError(`gateway: webchat failed to start: ${String(err)}`);
+  });
 
   // Launch configured providers (WhatsApp Web, Telegram) so gateway replies via the
   // surface the message came from. Tests can opt out via CLAWDIS_SKIP_PROVIDERS.

@@ -15,9 +15,10 @@ Updated: 2025-12-09
 - `webchat.gatewayPort` config can point at a non-default Gateway port if needed.
 
 ## Endpoints
-- `GET /webchat/info?session=<key>` → `{ port, sessionId, initialMessages, basePath }` plus history from the Gateway session store.
-- `GET /webchat/*` → static assets.
-- `POST /webchat/rpc` → proxies a chat/agent action through the Gateway connection and returns `{ ok, payloads?, error? }`.
+- UI is now served at the root: `http://127.0.0.1:<port>/` (legacy `/webchat/` still works).
+- `GET /webchat/info?session=<key>` (alias `/info`) → `{ port, sessionId, initialMessages, basePath }` plus history from the Gateway session store.
+- `GET /` (or `/webchat/*`) → static assets.
+- `POST /webchat/rpc` (alias `/rpc`) → proxies a chat/agent action through the Gateway connection and returns `{ ok, payloads?, error? }`.
 
 ## How it connects
 - On startup, the WebChat server dials the Gateway WebSocket and performs the mandatory `hello` handshake; the `hello-ok` snapshot seeds presence + health immediately.

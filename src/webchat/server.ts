@@ -557,12 +557,14 @@ export function __broadcastGatewayEventForTests(
   broadcastAll({ type: "gateway-event", event, payload });
 }
 
-export async function ensureWebChatServerFromConfig() {
+export async function ensureWebChatServerFromConfig(opts?: {
+  gatewayUrl?: string;
+}) {
   const cfg = loadConfig();
   if (cfg.webchat?.enabled === false) return null;
   const port = cfg.webchat?.port ?? WEBCHAT_DEFAULT_PORT;
   try {
-    return await startWebChatServer(port);
+    return await startWebChatServer(port, opts?.gatewayUrl);
   } catch (err) {
     logDebug(`webchat server failed to start: ${String(err)}`);
     throw err;

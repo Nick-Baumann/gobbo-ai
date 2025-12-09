@@ -13,7 +13,10 @@ import { loginWeb, logoutWeb } from "../provider-web.js";
 import { runRpcLoop } from "../rpc/loop.js";
 import { defaultRuntime } from "../runtime.js";
 import { VERSION } from "../version.js";
-import { startWebChatServer } from "../webchat/server.js";
+import {
+  ensureWebChatServerFromConfig,
+  startWebChatServer,
+} from "../webchat/server.js";
 import { createDefaultDeps } from "./deps.js";
 import {
   forceFreePort,
@@ -282,6 +285,22 @@ Examples:
       }
       try {
         await startGatewayServer(port);
+        try {
+          const webchat = await ensureWebChatServerFromConfig({
+            gatewayUrl: `ws://127.0.0.1:${port}`,
+          });
+          if (webchat) {
+            defaultRuntime.log(
+              info(
+                `webchat listening on http://127.0.0.1:${webchat.port}/`,
+              ),
+            );
+          } else {
+            defaultRuntime.log(info("webchat disabled via config"));
+          }
+        } catch (webchatErr) {
+          defaultRuntime.error(`WebChat failed to start: ${String(webchatErr)}`);
+        }
       } catch (err) {
         if (err instanceof GatewayLockError) {
           defaultRuntime.error(`Gateway failed to start: ${err.message}`);
@@ -588,14 +607,14 @@ Shows token usage per session when the agent reports it; set inbound.reply.agent
       const server = await startWebChatServer(port);
       const payload = {
         port: server.port,
-        basePath: "/webchat/",
+        basePath: "/",
         host: "127.0.0.1",
       };
       if (opts.json) {
         defaultRuntime.log(JSON.stringify(payload));
       } else {
         defaultRuntime.log(
-          info(`webchat listening on http://127.0.0.1:${server.port}/webchat/`),
+          info(`webchat listening on http://127.0.0.1:${server.port}/`),
         );
       }
     });

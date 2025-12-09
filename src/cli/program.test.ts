@@ -56,7 +56,7 @@ describe("cli program", () => {
     await program.parseAsync(["webchat", "--json"], { from: "user" });
     expect(startWebChatServer).toHaveBeenCalled();
     expect(runtime.log).toHaveBeenCalledWith(
-      JSON.stringify({ port: 18788, basePath: "/webchat/", host: "127.0.0.1" }),
+      JSON.stringify({ port: 18788, basePath: "/", host: "127.0.0.1" }),
     );
   });
 });
