@@ -198,3 +198,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-12-06: trained for 6 epochs instead of 8
 - 2025-12-09: 1.4x throughput on inference
 - 2025-12-09: added one more validation check
+- 2025-12-10: tightened type signatures
