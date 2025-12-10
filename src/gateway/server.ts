@@ -856,9 +856,8 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
             break;
           }
           case "system-event": {
-            const text = String(
-              (req.params as { text?: unknown } | undefined)?.text ?? "",
-            ).trim();
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            const text = String(params.text ?? "").trim();
             if (!text) {
               respond(
                 false,
@@ -867,7 +866,40 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
               );
               break;
             }
-            updateSystemPresence(text);
+            const instanceId =
+              typeof params.instanceId === "string"
+                ? params.instanceId
+                : undefined;
+            const host =
+              typeof params.host === "string" ? params.host : undefined;
+            const ip = typeof params.ip === "string" ? params.ip : undefined;
+            const mode =
+              typeof params.mode === "string" ? params.mode : undefined;
+            const version =
+              typeof params.version === "string" ? params.version : undefined;
+            const lastInputSeconds =
+              typeof params.lastInputSeconds === "number" &&
+              Number.isFinite(params.lastInputSeconds)
+                ? params.lastInputSeconds
+                : undefined;
+            const reason =
+              typeof params.reason === "string" ? params.reason : undefined;
+            const tags =
+              Array.isArray(params.tags) &&
+              params.tags.every((t) => typeof t === "string")
+                ? (params.tags as string[])
+                : undefined;
+            updateSystemPresence({
+              text,
+              instanceId,
+              host,
+              ip,
+              mode,
+              version,
+              lastInputSeconds,
+              reason,
+              tags,
+            });
             enqueueSystemEvent(text);
             presenceVersion += 1;
             broadcast(
