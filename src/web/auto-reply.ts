@@ -327,10 +327,10 @@ export async function runWebHeartbeatOnce(opts: {
         { to, reason: "heartbeat-token", rawLength: replyPayload.text?.length },
         "heartbeat skipped",
       );
-      console.log(success("heartbeat: ok (HEARTBEAT_OK)"));
-      emitHeartbeatEvent({ status: "ok-token", to });
-      return;
-    }
+          console.log(success("heartbeat: ok (HEARTBEAT_OK)"));
+          emitHeartbeatEvent({ status: "ok-token", to });
+          return;
+        }
 
     if (hasMedia) {
       heartbeatLogger.warn(
@@ -369,8 +369,9 @@ export async function runWebHeartbeatOnce(opts: {
     );
     console.log(success(`heartbeat: alert sent to ${to}`));
   } catch (err) {
-    heartbeatLogger.warn({ to, error: String(err) }, "heartbeat failed");
-    console.log(danger(`heartbeat: failed - ${String(err)}`));
+    const reason = String(err);
+    heartbeatLogger.warn({ to, error: reason }, "heartbeat failed");
+    console.log(danger(`heartbeat: failed - ${reason}`));
     emitHeartbeatEvent({ status: "failed", to, reason: String(err) });
     throw err;
   }
@@ -1380,15 +1381,9 @@ export async function monitorWebProvider(
           reconnectAttempts,
           maxAttempts: reconnectPolicy.maxAttempts,
         },
-        "web reconnect: max attempts reached",
+        "web reconnect: max attempts reached; continuing in degraded mode",
       );
-      runtime.error(
-        danger(
-          `WhatsApp Web connection closed (status ${status}). Reached max retries (${reconnectPolicy.maxAttempts}); exiting so you can relink.`,
-        ),
-      );
-      await closeListener();
-      break;
+      reconnectAttempts = 0;
     }
 
     const delay = computeBackoff(reconnectPolicy, reconnectAttempts);

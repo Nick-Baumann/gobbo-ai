@@ -218,7 +218,7 @@ export async function statusCommand(
     runtime.log(`  ${line}`);
   }
   if (health) {
-    runtime.log(info("WA connect: reported by gateway (no direct probe)"));
+    runtime.log(info("Gateway health: reachable"));
 
     const tgLine = health.telegram.configured
       ? health.telegram.probe?.ok

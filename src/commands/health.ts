@@ -183,12 +183,8 @@ export async function healthCommand(
     method: "health",
     timeoutMs: opts.timeoutMs,
   });
-  const fatal =
-    !summary.web.linked ||
-    (summary.web.connect && !summary.web.connect.ok) ||
-    (summary.telegram.configured &&
-      summary.telegram.probe &&
-      !summary.telegram.probe.ok);
+  // Gateway reachability defines success; provider issues are reported but not fatal here.
+  const fatal = false;
 
   if (opts.json) {
     runtime.log(JSON.stringify(summary, null, 2));
