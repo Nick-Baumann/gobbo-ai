@@ -495,6 +495,10 @@ enum CommandResolver {
             projectRoot: projectRoot)
     }
 
+    static var attachExistingGatewayOnly: Bool {
+        UserDefaults.standard.bool(forKey: attachExistingGatewayOnlyKey)
+    }
+
     static func connectionModeIsRemote() -> Bool {
         self.connectionSettings().mode == .remote
     }

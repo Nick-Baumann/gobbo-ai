@@ -161,6 +161,14 @@ final class AppState: ObservableObject {
         didSet { self.ifNotPreview { UserDefaults.standard.set(self.webChatPort, forKey: webChatPortKey) } }
     }
 
+    @Published var attachExistingGatewayOnly: Bool {
+        didSet {
+            self.ifNotPreview {
+                UserDefaults.standard.set(self.attachExistingGatewayOnly, forKey: attachExistingGatewayOnlyKey)
+            }
+        }
+    }
+
     @Published var remoteTarget: String {
         didSet { self.ifNotPreview { UserDefaults.standard.set(self.remoteTarget, forKey: remoteTargetKey) } }
     }
@@ -238,6 +246,7 @@ final class AppState: ObservableObject {
         self.webChatSwiftUIEnabled = UserDefaults.standard.object(forKey: webChatSwiftUIEnabledKey) as? Bool ?? false
         let storedPort = UserDefaults.standard.integer(forKey: webChatPortKey)
         self.webChatPort = storedPort > 0 ? storedPort : 18788
+        self.attachExistingGatewayOnly = UserDefaults.standard.bool(forKey: attachExistingGatewayOnlyKey)
 
         if !self.isPreview {
             Task.detached(priority: .utility) { [weak self] in
@@ -353,6 +362,7 @@ extension AppState {
         state.remoteTarget = "user@example.com"
         state.remoteIdentity = "~/.ssh/id_ed25519"
         state.remoteProjectRoot = "~/Projects/clawdis"
+        state.attachExistingGatewayOnly = false
         return state
     }
 }
@@ -379,6 +389,10 @@ enum AppStateStore {
     static var webChatPort: Int {
         let stored = UserDefaults.standard.integer(forKey: webChatPortKey)
         return stored > 0 ? stored : 18788
+    }
+
+    static var attachExistingGatewayOnly: Bool {
+        UserDefaults.standard.bool(forKey: attachExistingGatewayOnlyKey)
     }
 }
 

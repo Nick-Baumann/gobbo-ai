@@ -23,6 +23,7 @@ struct DebugSettings: View {
     @State private var portKillStatus: String?
     @State private var pendingKill: DebugActions.PortListener?
     @AppStorage(webChatSwiftUIEnabledKey) private var webChatSwiftUIEnabled: Bool = false
+    @AppStorage(attachExistingGatewayOnlyKey) private var attachExistingGatewayOnly: Bool = false
 
     var body: some View {
         ScrollView(.vertical) {
@@ -57,6 +58,9 @@ struct DebugSettings: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                Toggle("Only attach to existing gateway (don’t spawn locally)", isOn: self.$attachExistingGatewayOnly)
+                    .toggleStyle(.switch)
+                    .help("When enabled in local mode, the mac app will only connect to an already-running gateway and will not start one itself.")
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Gateway stdout/stderr")
                         .font(.caption.weight(.semibold))
