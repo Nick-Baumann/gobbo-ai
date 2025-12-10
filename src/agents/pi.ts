@@ -95,10 +95,11 @@ function parsePiJson(raw: string): AgentParseResult {
         .trim();
 
       if (isAssistantMessage) {
+        // Always remember the last assistant message so we keep usage/model meta even when no text.
+        lastAssistant = msg;
         if (msgText && msgText !== lastPushed) {
           texts.push(msgText);
           lastPushed = msgText;
-          lastAssistant = msg;
         }
       } else if (isToolResult && msg.content) {
         const toolText = msg.content
@@ -119,15 +120,14 @@ function parsePiJson(raw: string): AgentParseResult {
     }
   }
 
-  const meta: AgentMeta | undefined =
-    lastAssistant && texts.length
-      ? {
-          model: lastAssistant.model,
-          provider: lastAssistant.provider,
-          stopReason: lastAssistant.stopReason,
-          usage: lastAssistant.usage,
-        }
-      : undefined;
+  const meta: AgentMeta | undefined = lastAssistant
+    ? {
+        model: lastAssistant.model,
+        provider: lastAssistant.provider,
+        stopReason: lastAssistant.stopReason,
+        usage: lastAssistant.usage,
+      }
+    : undefined;
 
   return {
     texts,

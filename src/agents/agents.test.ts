@@ -57,4 +57,15 @@ describe("pi agent helpers", () => {
     expect(tool?.toolName).toBe("bash");
     expect(tool?.meta).toBe("ls -la");
   });
+
+  it("keeps usage meta even when assistant message has no text", () => {
+    const stdout = [
+      '{"type":"message_start","message":{"role":"assistant"}}',
+      '{"type":"message_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm"}],"usage":{"input":10,"output":5},"model":"pi-1","provider":"inflection","stopReason":"end"}}',
+    ].join("\n");
+    const parsed = piSpec.parseOutput(stdout);
+    expect(parsed.texts?.length ?? 0).toBe(0);
+    expect((parsed.meta?.usage as { input?: number })?.input).toBe(10);
+    expect(parsed.meta?.model).toBe("pi-1");
+  });
 });

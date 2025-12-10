@@ -59,12 +59,15 @@ function stripRpcNoise(raw: string): string {
         typeof role === "string" && role.toLowerCase().includes("tool");
       if (!isAssistant && !isToolRole) continue;
 
-      // Ignore assistant messages that have no text content (pure toolcall scaffolding).
+      // Ignore assistant messages that have no text content unless they carry usage (final message_end often does).
       if (msg?.role === "assistant" && Array.isArray(msg?.content)) {
         const hasText = msg.content.some(
           (c: unknown) => (c as { type?: string })?.type === "text",
         );
-        if (!hasText) continue;
+        const hasUsage =
+          typeof msg?.usage === "object" &&
+          (msg.usage?.input != null || msg.usage?.output != null);
+        if (!hasText && !hasUsage) continue;
       }
     } catch {
       // not JSON; keep as-is
