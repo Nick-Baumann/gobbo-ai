@@ -243,7 +243,9 @@ actor PortGuardian {
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
-        return String(cString: buffer)
+        // Drop trailing null and decode as UTF-8.
+        let trimmed = buffer.prefix { $0 != 0 }
+        return String(decoding: trimmed.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         #else
         return nil
         #endif
