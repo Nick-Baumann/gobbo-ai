@@ -100,12 +100,46 @@ function parsePresence(text: string): SystemPresence {
   };
 }
 
-export function updateSystemPresence(text: string) {
+type SystemPresencePayload = {
+  text: string;
+  instanceId?: string;
+  host?: string;
+  ip?: string;
+  version?: string;
+  lastInputSeconds?: number;
+  mode?: string;
+  reason?: string;
+  tags?: string[];
+};
+
+export function updateSystemPresence(payload: SystemPresencePayload) {
   ensureSelfPresence();
-  const parsed = parsePresence(text);
+  const parsed = parsePresence(payload.text);
   const key =
-    parsed.host?.toLowerCase() || parsed.ip || parsed.text.slice(0, 64);
-  entries.set(key, parsed);
+    payload.instanceId?.toLowerCase() ||
+    parsed.instanceId?.toLowerCase() ||
+    parsed.host?.toLowerCase() ||
+    parsed.ip ||
+    parsed.text.slice(0, 64) ||
+    os.hostname().toLowerCase();
+  const existing = entries.get(key) ?? ({} as SystemPresence);
+  const merged: SystemPresence = {
+    ...existing,
+    ...parsed,
+    host: payload.host ?? parsed.host ?? existing.host,
+    ip: payload.ip ?? parsed.ip ?? existing.ip,
+    version: payload.version ?? parsed.version ?? existing.version,
+    mode: payload.mode ?? parsed.mode ?? existing.mode,
+    lastInputSeconds:
+      payload.lastInputSeconds ??
+      parsed.lastInputSeconds ??
+      existing.lastInputSeconds,
+    reason: payload.reason ?? parsed.reason ?? existing.reason,
+    instanceId: payload.instanceId ?? parsed.instanceId ?? existing.instanceId,
+    text: payload.text || parsed.text || existing.text,
+    ts: Date.now(),
+  };
+  entries.set(key, merged);
 }
 
 export function upsertPresence(key: string, presence: Partial<SystemPresence>) {
