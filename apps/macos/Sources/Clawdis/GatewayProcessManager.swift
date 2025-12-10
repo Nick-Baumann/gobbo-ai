@@ -112,6 +112,14 @@ final class GatewayProcessManager: ObservableObject {
             if await self.attachExistingGatewayIfAvailable() {
                 return
             }
+            // Respect debug toggle: only attach, never spawn, when enabled.
+            if AppStateStore.attachExistingGatewayOnly {
+                await MainActor.run {
+                    self.status = .stopped
+                    self.appendLog("[gateway] attach-only enabled; not spawning local gateway\n")
+                }
+                return
+            }
             await self.spawnGateway()
         }
     }
