@@ -271,8 +271,7 @@ struct ToolsSettings: View {
         let current = self.installStates[tool.id] ?? .checking
         return Binding(
             get: { self.installStates[tool.id] ?? current },
-            set: { self.installStates[tool.id] = $0 }
-        )
+            set: { self.installStates[tool.id] = $0 })
     }
 
     private func refreshAll() {

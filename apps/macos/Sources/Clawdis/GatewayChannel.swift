@@ -34,7 +34,7 @@ private actor GatewayChannelActor {
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     private var watchdogTask: Task<Void, Never>?
-    private let defaultRequestTimeoutMs: Double = 15_000
+    private let defaultRequestTimeoutMs: Double = 15000
 
     init(url: URL, token: String?) {
         self.url = url
@@ -94,7 +94,8 @@ private actor GatewayChannelActor {
             maxprotocol: GATEWAY_PROTOCOL_VERSION,
             client: [
                 "name": ClawdisProtocol.AnyCodable("clawdis-mac"),
-                "version": ClawdisProtocol.AnyCodable(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"),
+                "version": ClawdisProtocol.AnyCodable(
+                    Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"),
                 "platform": ClawdisProtocol.AnyCodable(platform),
                 "mode": ClawdisProtocol.AnyCodable("app"),
                 "instanceId": ClawdisProtocol.AnyCodable(Host.current().localizedName ?? UUID().uuidString),
@@ -106,7 +107,10 @@ private actor GatewayChannelActor {
         let data = try JSONEncoder().encode(hello)
         try await self.task?.send(.data(data))
         guard let msg = try await task?.receive() else {
-            throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed (no response)"])
+            throw NSError(
+                domain: "Gateway",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "hello failed (no response)"])
         }
         try await self.handleHelloResponse(msg)
     }
@@ -118,7 +122,10 @@ private actor GatewayChannelActor {
         @unknown default: nil
         }
         guard let data else {
-            throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed (empty response)"])
+            throw NSError(
+                domain: "Gateway",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "hello failed (empty response)"])
         }
         let decoder = JSONDecoder()
         if let ok = try? decoder.decode(HelloOk.self, from: data) {
@@ -134,9 +141,15 @@ private actor GatewayChannelActor {
             return
         }
         if let err = try? decoder.decode(HelloError.self, from: data) {
-            throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello-error: \(err.reason)"])
+            throw NSError(
+                domain: "Gateway",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "hello-error: \(err.reason)"])
         }
-        throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "hello failed (unexpected response)"])
+        throw NSError(
+            domain: "Gateway",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "hello failed (unexpected response)"])
     }
 
     private func listen() {

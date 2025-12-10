@@ -33,7 +33,9 @@ struct MenuContent: View {
                 self.voiceWakeMicMenu
             }
             if AppStateStore.webChatEnabled {
-                Button("Open Chat") { WebChatManager.shared.show(sessionKey: WebChatManager.shared.preferredSessionKey()) }
+                Button("Open Chat") {
+                    WebChatManager.shared.show(sessionKey: WebChatManager.shared.preferredSessionKey())
+                }
             }
             Divider()
             Button("Settings…") { self.open(tab: .general) }
@@ -59,7 +61,9 @@ struct MenuContent: View {
                                                 await self.reloadSessionMenu()
                                             }
                                         } label: {
-                                            Label(level.capitalized, systemImage: row.thinkingLevel == normalized ? "checkmark" : "")
+                                            Label(
+                                                level.capitalized,
+                                                systemImage: row.thinkingLevel == normalized ? "checkmark" : "")
                                         }
                                     }
                                 }
@@ -75,7 +79,9 @@ struct MenuContent: View {
                                                 await self.reloadSessionMenu()
                                             }
                                         } label: {
-                                            Label(level.capitalized, systemImage: row.verboseLevel == normalized ? "checkmark" : "")
+                                            Label(
+                                                level.capitalized,
+                                                systemImage: row.verboseLevel == normalized ? "checkmark" : "")
                                         }
                                     }
                                 }
@@ -216,19 +222,21 @@ struct MenuContent: View {
             }
         }()
 
-        return Button(action: {}) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                Text(label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-            .padding(.vertical, 4)
-        }
-        .buttonStyle(.plain)
-        .disabled(true)
+        return Button(
+            action: {},
+            label: {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 8, height: 8)
+                    Text(label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
+                .padding(.vertical, 4)
+            })
+            .buttonStyle(.plain)
+            .disabled(true)
     }
 
     private var heartbeatStatusRow: some View {
@@ -254,19 +262,21 @@ struct MenuContent: View {
             }
         }()
 
-        return Button(action: {}) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                Text(label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-            .padding(.vertical, 2)
-        }
-        .buttonStyle(.plain)
-        .disabled(true)
+        return Button(
+            action: {},
+            label: {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 8, height: 8)
+                    Text(label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
+                .padding(.vertical, 2)
+            })
+            .buttonStyle(.plain)
+            .disabled(true)
     }
 
     private var activeBinding: Binding<Bool> {

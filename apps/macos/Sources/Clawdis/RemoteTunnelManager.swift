@@ -11,12 +11,16 @@ actor RemoteTunnelManager {
     func ensureControlTunnel() async throws -> UInt16 {
         let settings = CommandResolver.connectionSettings()
         guard settings.mode == .remote else {
-            throw NSError(domain: "RemoteTunnel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Remote mode is not enabled"])
+            throw NSError(
+                domain: "RemoteTunnel",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Remote mode is not enabled"])
         }
 
         if let tunnel = self.controlTunnel,
            tunnel.process.isRunning,
-           let local = tunnel.localPort {
+           let local = tunnel.localPort
+        {
             return local
         }
 

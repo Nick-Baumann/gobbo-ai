@@ -1,6 +1,6 @@
+import ClawdisProtocol
 import Foundation
 import Testing
-import ClawdisProtocol
 
 @Suite struct GatewayFrameDecodeTests {
     @Test func decodesEventFrameWithAnyCodablePayload() throws {

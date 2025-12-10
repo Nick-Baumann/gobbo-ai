@@ -525,13 +525,18 @@ extension GeneralSettings {
         let target = LogLocator.bestLogFile()
 
         if let target {
-            NSWorkspace.shared.selectFile(target.path, inFileViewerRootedAtPath: target.deletingLastPathComponent().path)
+            NSWorkspace.shared.selectFile(
+                target.path,
+                inFileViewerRootedAtPath: target.deletingLastPathComponent().path)
             return
         }
 
         let alert = NSAlert()
         alert.messageText = "Log file not found"
-        alert.informativeText = "Looked for clawdis logs in /tmp/clawdis/. Run a health check or send a message to generate activity, then try again."
+        alert.informativeText = """
+        Looked for clawdis logs in /tmp/clawdis/.
+        Run a health check or send a message to generate activity, then try again.
+        """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

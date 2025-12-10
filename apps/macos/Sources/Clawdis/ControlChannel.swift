@@ -147,9 +147,14 @@ final class ControlChannel: ObservableObject {
         // to free the port instead of a vague message.
         let nsError = error as NSError
         if nsError.domain == "Gateway",
-           nsError.localizedDescription.contains("hello failed (unexpected response)") {
+           nsError.localizedDescription.contains("hello failed (unexpected response)")
+        {
             let port = GatewayEnvironment.gatewayPort()
-            return "Gateway handshake got non-gateway data on localhost:\(port). Another process is using that port or the SSH forward failed. Stop the local gateway/port-forward on \(port) and retry Remote mode."
+            return """
+            Gateway handshake got non-gateway data on localhost:\(port).
+            Another process is using that port or the SSH forward failed.
+            Stop the local gateway/port-forward on \(port) and retry Remote mode.
+            """
         }
 
         if let urlError = error as? URLError {
@@ -171,7 +176,8 @@ final class ControlChannel: ObservableObject {
         }
 
         if nsError.domain == "Gateway", nsError.code == 5 {
-            return "Gateway request timed out; check the gateway process on localhost:\(GatewayEnvironment.gatewayPort())."
+            let port = GatewayEnvironment.gatewayPort()
+            return "Gateway request timed out; check the gateway process on localhost:\(port)."
         }
 
         let detail = nsError.localizedDescription.isEmpty ? "unknown gateway error" : nsError.localizedDescription

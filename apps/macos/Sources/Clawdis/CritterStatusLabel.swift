@@ -234,11 +234,11 @@ enum CritterIconRenderer {
             colorSpaceName: .deviceRGB,
             bitmapFormat: [],
             bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else {
-            return NSImage(size: size)
+            bitsPerPixel: 0)
+        else {
+            return NSImage(size: self.size)
         }
-        rep.size = size
+        rep.size = self.size
 
         NSGraphicsContext.saveGraphicsState()
         if let context = NSGraphicsContext(bitmapImageRep: rep) {
@@ -247,8 +247,8 @@ enum CritterIconRenderer {
             context.cgContext.setShouldAntialias(false)
             defer { NSGraphicsContext.restoreGraphicsState() }
 
-            let stepX = size.width / max(CGFloat(rep.pixelsWide), 1)
-            let stepY = size.height / max(CGFloat(rep.pixelsHigh), 1)
+            let stepX = self.size.width / max(CGFloat(rep.pixelsWide), 1)
+            let stepY = self.size.height / max(CGFloat(rep.pixelsHigh), 1)
             let snapX: (CGFloat) -> CGFloat = { ($0 / stepX).rounded() * stepX }
             let snapY: (CGFloat) -> CGFloat = { ($0 / stepY).rounded() * stepY }
 
@@ -373,7 +373,7 @@ enum CritterIconRenderer {
             context.cgContext.restoreGState()
         } else {
             NSGraphicsContext.restoreGraphicsState()
-            return NSImage(size: size)
+            return NSImage(size: self.size)
         }
 
         let image = NSImage(size: size)

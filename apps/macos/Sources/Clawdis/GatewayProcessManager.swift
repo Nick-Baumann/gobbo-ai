@@ -1,7 +1,7 @@
 import Foundation
+import Network
 import OSLog
 import Subprocess
-import Network
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -229,8 +229,7 @@ final class GatewayProcessManager: ObservableObject {
             FilePath(path),
             .readWrite,
             options: [.create, .exclusiveCreate],
-            permissions: [.ownerReadWrite]
-        )
+            permissions: [.ownerReadWrite])
         return GatewayLockHandle(fd: fd, path: path)
     }
 

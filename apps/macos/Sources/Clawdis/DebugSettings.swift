@@ -94,7 +94,7 @@ struct DebugSettings: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    if self.portReports.isEmpty && !self.portCheckInFlight {
+                    if self.portReports.isEmpty, !self.portCheckInFlight {
                         Text("Check which process owns 18788/18789 and suggest fixes.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -281,8 +281,7 @@ struct DebugSettings: View {
                 primaryButton: .destructive(Text("Kill")) {
                     Task { await self.killConfirmed(listener.pid) }
                 },
-                secondaryButton: .cancel()
-            )
+                secondaryButton: .cancel())
         }
     }
 

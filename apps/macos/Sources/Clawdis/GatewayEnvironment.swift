@@ -105,7 +105,10 @@ enum GatewayEnvironment {
                     nodeVersion: runtime.version.description,
                     gatewayVersion: installed.description,
                     requiredGateway: expected.description,
-                    message: "Gateway version \(installed.description) is incompatible with app \(expected.description); install/update the global package.")
+                    message: """
+                    Gateway version \(installed.description) is incompatible with app \(expected.description);
+                    install or update the global package.
+                    """)
             }
 
             let gatewayLabel = gatewayBin != nil ? "global" : "local"

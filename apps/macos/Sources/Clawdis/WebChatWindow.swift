@@ -123,7 +123,18 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func loadPlaceholder() {
         let html = """
-        <html><body style='font-family:-apple-system;margin:0;padding:0;display:flex;align-items:center;justify-content:center;height:100vh;color:#888'>Connecting to web chat…</body></html>
+        <html>
+          <body style='font-family:-apple-system;
+                       margin:0;
+                       padding:0;
+                       display:flex;
+                       align-items:center;
+                       justify-content:center;
+                       height:100vh;
+                       color:#888'>
+            Connecting to web chat…
+          </body>
+        </html>
         """
         self.webView.loadHTMLString(html, baseURL: nil)
     }
@@ -165,9 +176,9 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func prepareEndpoint(remotePort: Int) async throws -> URL {
         if CommandResolver.connectionModeIsRemote() {
-            return try await self.startOrRestartTunnel()
+            try await self.startOrRestartTunnel()
         } else {
-            return URL(string: "http://127.0.0.1:\(remotePort)/")!
+            URL(string: "http://127.0.0.1:\(remotePort)/")!
         }
     }
 
@@ -208,7 +219,10 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func isWebChatBooted() async -> Bool {
         await withCheckedContinuation { cont in
-            self.webView.evaluateJavaScript("document.getElementById('app')?.dataset.booted === '1' || document.body.dataset.webchatError === '1'") { result, _ in
+            self.webView.evaluateJavaScript("""
+            document.getElementById('app')?.dataset.booted === '1' ||
+            document.body.dataset.webchatError === '1'
+            """) { result, _ in
                 cont.resume(returning: result as? Bool ?? false)
             }
         }
@@ -306,8 +320,18 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
     private func showError(_ text: String) {
         self.bootWatchTask?.cancel()
         let html = """
-        <html><body style='font-family:-apple-system;margin:0;padding:0;display:flex;align-items:center;justify-content:center;height:100vh;color:#c00'>Web chat failed to connect.<br><br>\(
-            text)</body></html>
+        <html>
+          <body style='font-family:-apple-system;
+                       margin:0;
+                       padding:0;
+                       display:flex;
+                       align-items:center;
+                       justify-content:center;
+                       height:100vh;
+                       color:#c00'>
+            Web chat failed to connect.<br><br>\(text)
+          </body>
+        </html>
         """
         self.webView.loadHTMLString(html, baseURL: nil)
     }
@@ -354,8 +378,8 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
     private func installDismissMonitor() {
         guard self.localDismissMonitor == nil, let panel = self.window else { return }
         self.localDismissMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] _ in
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown])
+        { [weak self] _ in
             guard let self else { return }
             let pt = NSEvent.mouseLocation // screen coordinates
             if !panel.frame.contains(pt) {
@@ -379,8 +403,8 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
         let o1 = nc.addObserver(
             forName: NSApplication.didResignActiveNotification,
             object: nil,
-            queue: .main
-        ) { [weak self] _ in
+            queue: .main)
+        { [weak self] _ in
             Task { @MainActor in
                 self?.closePanel()
             }
@@ -388,8 +412,8 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
         let o2 = nc.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification,
             object: window,
-            queue: .main
-        ) { [weak self] _ in
+            queue: .main)
+        { [weak self] _ in
             Task { @MainActor in
                 guard let self, case .panel = self.presentation else { return }
                 if !(window.occlusionState.contains(.visible)) {
@@ -402,7 +426,9 @@ final class WebChatWindowController: NSWindowController, WKNavigationDelegate, N
 
     private func removePanelObservers() {
         let nc = NotificationCenter.default
-        for o in self.observers { nc.removeObserver(o) }
+        for o in self.observers {
+            nc.removeObserver(o)
+        }
         self.observers.removeAll()
     }
 }
@@ -431,7 +457,7 @@ extension WebChatWindowController {
                 {
                     let end = hostname.firstIndex(of: 0) ?? hostname.count
                     let bytes = hostname[..<end].map { UInt8(bitPattern: $0) }
-                    let ip = String(decoding: bytes, as: UTF8.self)
+                    guard let ip = String(bytes: bytes, encoding: .utf8) else { continue }
                     if !ip.hasPrefix("169.254") { return ip }
                 }
             }
@@ -539,7 +565,10 @@ final class WebChatManager {
                 self.browserTunnel?.terminate()
                 self.browserTunnel = tunnel
                 guard let local = tunnel.localPort else {
-                    throw NSError(domain: "WebChat", code: 7, userInfo: [NSLocalizedDescriptionKey: "Tunnel missing local port"])
+                    throw NSError(
+                        domain: "WebChat",
+                        code: 7,
+                        userInfo: [NSLocalizedDescriptionKey: "Tunnel missing local port"])
                 }
                 base = URL(string: "http://127.0.0.1:\(local)/")!
             } catch {

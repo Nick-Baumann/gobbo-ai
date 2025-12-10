@@ -23,11 +23,12 @@ actor PortGuardian {
 
     private var records: [Record] = []
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "portguard")
-    nonisolated private static let appSupportDir: URL = {
+    private nonisolated static let appSupportDir: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return base.appendingPathComponent("Clawdis", isDirectory: true)
     }()
-    nonisolated private static var recordPath: URL {
+
+    private nonisolated static var recordPath: URL {
         self.appSupportDir.appendingPathComponent("port-guard.json", isDirectory: false)
     }
 
@@ -43,12 +44,20 @@ actor PortGuardian {
             guard !listeners.isEmpty else { continue }
             for listener in listeners {
                 if self.isExpected(listener, port: port, mode: mode) {
-                    self.logger.info("port \(port, privacy: .public) already served by expected \(listener.command, privacy: .public) (pid \(listener.pid)) — keeping")
+                    let message = """
+                    port \(port) already served by expected \(listener.command)
+                    (pid \(listener.pid)) — keeping
+                    """
+                    self.logger.info("\(message, privacy: .public)")
                     continue
                 }
                 let killed = await self.kill(listener.pid)
                 if killed {
-                    self.logger.error("port \(port, privacy: .public) was held by \(listener.command, privacy: .public) (pid \(listener.pid)); terminated")
+                    let message = """
+                    port \(port) was held by \(listener.command)
+                    (pid \(listener.pid)); terminated
+                    """
+                    self.logger.error("\(message, privacy: .public)")
                 } else {
                     self.logger.error("failed to terminate pid \(listener.pid) on port \(port, privacy: .public)")
                 }
@@ -60,7 +69,13 @@ actor PortGuardian {
     func record(port: Int, pid: Int32, command: String, mode: AppState.ConnectionMode) async {
         try? FileManager.default.createDirectory(at: Self.appSupportDir, withIntermediateDirectories: true)
         self.records.removeAll { $0.pid == pid }
-        self.records.append(Record(port: port, pid: pid, command: command, mode: mode.rawValue, timestamp: Date().timeIntervalSince1970))
+        self.records.append(
+            Record(
+                port: port,
+                pid: pid,
+                command: command,
+                mode: mode.rawValue,
+                timestamp: Date().timeIntervalSince1970))
         self.save()
     }
 
@@ -93,9 +108,9 @@ actor PortGuardian {
 
         var summary: String {
             switch self.status {
-            case let .ok(text): return text
-            case let .missing(text): return text
-            case let .interference(text, _): return text
+            case let .ok(text): text
+            case let .missing(text): text
+            case let .interference(text, _): text
             }
         }
     }
@@ -105,6 +120,7 @@ actor PortGuardian {
         let path = Self.executablePath(for: listener.pid)
         return Descriptor(pid: listener.pid, command: listener.command, executablePath: path)
     }
+
     // MARK: - Internals
 
     private struct Listener {
@@ -132,6 +148,7 @@ actor PortGuardian {
             let listeners = await self.listeners(on: port)
             let expectedDesc: String
             let okPredicate: (Listener) -> Bool
+            let expectedCommands = ["node", "clawdis", "tsx", "pnpm", "bun"]
 
             switch mode {
             case .remote:
@@ -143,7 +160,7 @@ actor PortGuardian {
                     : "Gateway websocket (node/tsx)"
                 okPredicate = { listener in
                     let c = listener.command.lowercased()
-                    return c.contains("node") || c.contains("clawdis") || c.contains("tsx") || c.contains("pnpm") || c.contains("bun")
+                    return expectedCommands.contains { c.contains($0) }
                 }
             }
 
@@ -166,11 +183,19 @@ actor PortGuardian {
             if offenders.isEmpty {
                 let list = listeners.map { "\($0.command) (\($0.pid))" }.joined(separator: ", ")
                 let okText = "Port \(port) is served by \(list)."
-                reports.append(.init(port: port, expected: expectedDesc, status: .ok(okText), listeners: reportListeners))
+                reports.append(.init(
+                    port: port,
+                    expected: expectedDesc,
+                    status: .ok(okText),
+                    listeners: reportListeners))
             } else {
                 let list = offenders.map { "\($0.command) (\($0.pid))" }.joined(separator: ", ")
                 let reason = "Port \(port) is held by \(list), expected \(expectedDesc)."
-                reports.append(.init(port: port, expected: expectedDesc, status: .interference(reason, offenders: offenders), listeners: reportListeners))
+                reports.append(.init(
+                    port: port,
+                    expected: expectedDesc,
+                    status: .interference(reason, offenders: offenders),
+                    listeners: reportListeners))
             }
         }
 
@@ -245,11 +270,13 @@ actor PortGuardian {
         guard length > 0 else { return nil }
         // Drop trailing null and decode as UTF-8.
         let trimmed = buffer.prefix { $0 != 0 }
-        return String(decoding: trimmed.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        let bytes = trimmed.map { UInt8(bitPattern: $0) }
+        return String(bytes: bytes, encoding: .utf8)
         #else
         return nil
         #endif
     }
+
     private func kill(_ pid: Int32) async -> Bool {
         let term = await ShellExecutor.run(command: ["kill", "-TERM", "\(pid)"], cwd: nil, env: nil, timeout: 2)
         if term.ok { return true }
@@ -259,6 +286,7 @@ actor PortGuardian {
 
     private func isExpected(_ listener: Listener, port: Int, mode: AppState.ConnectionMode) -> Bool {
         let cmd = listener.command.lowercased()
+        let expectedCommands = ["node", "clawdis", "tsx", "pnpm", "bun"]
         switch mode {
         case .remote:
             if port == 18788 {
@@ -266,7 +294,7 @@ actor PortGuardian {
             }
             return false
         case .local:
-            return cmd.contains("node") || cmd.contains("clawdis") || cmd.contains("tsx") || cmd.contains("pnpm") || cmd.contains("bun")
+            return expectedCommands.contains { cmd.contains($0) }
         }
     }
 

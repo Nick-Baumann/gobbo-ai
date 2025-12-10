@@ -18,7 +18,8 @@ final class ConnectionModeCoordinator {
                 try await ControlChannel.shared.configure(mode: .local)
             } catch {
                 // Control channel will mark itself degraded; nothing else to do here.
-                self.logger.error("control channel local configure failed: \(error.localizedDescription, privacy: .public)")
+                self.logger.error(
+                    "control channel local configure failed: \(error.localizedDescription, privacy: .public)")
             }
             if paused {
                 GatewayProcessManager.shared.stop()

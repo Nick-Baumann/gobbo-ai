@@ -15,7 +15,7 @@ struct ClawdisApp: App {
     @State private var statusItem: NSStatusItem?
     @State private var isMenuPresented = false
     @State private var isPanelVisible = false
-    
+
     @MainActor
     private func updateStatusHighlight() {
         self.statusItem?.button?.highlight(self.isPanelVisible)
@@ -94,7 +94,7 @@ struct ClawdisApp: App {
             handler.leadingAnchor.constraint(equalTo: button.leadingAnchor),
             handler.trailingAnchor.constraint(equalTo: button.trailingAnchor),
             handler.topAnchor.constraint(equalTo: button.topAnchor),
-            handler.bottomAnchor.constraint(equalTo: button.bottomAnchor)
+            handler.bottomAnchor.constraint(equalTo: button.bottomAnchor),
         ])
     }
 

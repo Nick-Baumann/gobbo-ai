@@ -1,6 +1,6 @@
+import ClawdisProtocol
 import Testing
 @testable import Clawdis
-import ClawdisProtocol
 
 @Suite struct InstancesStoreTests {
     @Test
