@@ -1,5 +1,8 @@
 import Foundation
 import OSLog
+#if canImport(Darwin)
+import Darwin
+#endif
 
 actor PortGuardian {
     static let shared = PortGuardian()
@@ -10,6 +13,12 @@ actor PortGuardian {
         let command: String
         let mode: String
         let timestamp: TimeInterval
+    }
+
+    struct Descriptor: Sendable {
+        let pid: Int32
+        let command: String
+        let executablePath: String?
     }
 
     private var records: [Record] = []
@@ -63,6 +72,12 @@ actor PortGuardian {
         }
     }
 
+    func describe(port: Int) async -> Descriptor? {
+        guard let listener = await self.listeners(on: port).first else { return nil }
+        let path = Self.executablePath(for: listener.pid)
+        return Descriptor(pid: listener.pid, command: listener.command, executablePath: path)
+    }
+
     // MARK: - Internals
 
     private struct Listener {
@@ -110,6 +125,17 @@ actor PortGuardian {
         }
         flush()
         return listeners
+    }
+
+    private static func executablePath(for pid: Int32) -> String? {
+        #if canImport(Darwin)
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return String(cString: buffer)
+        #else
+        return nil
+        #endif
     }
 
     private func kill(_ pid: Int32) async -> Bool {

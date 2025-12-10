@@ -138,7 +138,15 @@ final class GatewayProcessManager: ObservableObject {
             if let snap = decodeHealthSnapshot(from: data) {
                 let linked = snap.web.linked ? "linked" : "not linked"
                 let authAge = snap.web.authAgeMs.flatMap(msToAge) ?? "unknown age"
-                details = "port \(port), \(linked), auth \(authAge)"
+                let instance = await PortGuardian.shared.describe(port: port)
+                let instanceText: String
+                if let instance {
+                    let path = instance.executablePath ?? "path unknown"
+                    instanceText = "pid \(instance.pid) \(instance.command) @ \(path)"
+                } else {
+                    instanceText = "pid unknown"
+                }
+                details = "port \(port), \(linked), auth \(authAge), \(instanceText)"
             } else {
                 details = "port \(port), health probe succeeded"
             }
