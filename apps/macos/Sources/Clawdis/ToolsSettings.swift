@@ -203,7 +203,6 @@ struct ToolsSettings: View {
 
     @AppStorage("tools.packageManager") private var packageManagerRaw = NodePackageManager.npm.rawValue
     @State private var installStates: [String: InstallState] = [:]
-    private let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -244,7 +243,7 @@ struct ToolsSettings: View {
     }
 
     private func section(for kind: ToolEntry.Kind, title: String) -> some View {
-        let filtered = self.tools.filter { $0.kind == kind && self.shouldShow(tool: $0) }
+        let filtered = self.tools.filter { $0.kind == kind }
         return VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.callout.weight(.semibold))
@@ -274,12 +273,6 @@ struct ToolsSettings: View {
             get: { self.installStates[tool.id] ?? current },
             set: { self.installStates[tool.id] = $0 }
         )
-    }
-
-    private func shouldShow(tool: ToolEntry) -> Bool {
-        if self.isPreview { return true }
-        guard let state = self.installStates[tool.id] else { return false }
-        return state == .installed
     }
 
     private func refreshAll() {
