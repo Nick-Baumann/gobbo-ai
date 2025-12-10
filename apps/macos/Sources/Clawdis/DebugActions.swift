@@ -237,84 +237,12 @@ enum DebugActions {
 
     // MARK: - Port diagnostics
 
-    struct PortListener: Identifiable {
-        let pid: Int
-        let command: String
-        let user: String?
-
-        var id: Int { self.pid }
-    }
-
-    struct PortReport: Identifiable {
-        enum Status {
-            case ok(String)
-            case missing(String)
-            case interference(String, offenders: [PortListener])
-        }
-
-        let port: Int
-        let expected: String
-        let status: Status
-
-        var id: Int { self.port }
-
-        var offenders: [PortListener] {
-            if case let .interference(_, offenders) = self.status { return offenders }
-            return []
-        }
-
-        var summary: String {
-            switch self.status {
-            case let .ok(text): return text
-            case let .missing(text): return text
-            case let .interference(text, _): return text
-            }
-        }
-    }
+    typealias PortListener = PortGuardian.ReportListener
+    typealias PortReport = PortGuardian.PortReport
 
     static func checkGatewayPorts() async -> [PortReport] {
         let mode = CommandResolver.connectionSettings().mode
-        let ports = [18788, 18789]
-        var reports: [PortReport] = []
-
-        for port in ports {
-            let listeners = await self.listeners(on: port)
-            let expectedDesc: String
-            let okPredicate: (PortListener) -> Bool
-
-            switch mode {
-            case .remote:
-                expectedDesc = "SSH tunnel to remote gateway"
-                okPredicate = { $0.command.lowercased().contains("ssh") }
-            case .local:
-                expectedDesc = port == 18788
-                    ? "Gateway webchat/static host"
-                    : "Gateway websocket (node/tsx)"
-                okPredicate = { cmd in
-                    let c = cmd.command.lowercased()
-                    return c.contains("node") || c.contains("clawdis") || c.contains("tsx")
-                }
-            }
-
-            if listeners.isEmpty {
-                let text = "Nothing is listening on \(port) (\(expectedDesc))."
-                reports.append(.init(port: port, expected: expectedDesc, status: .missing(text)))
-                continue
-            }
-
-            let offenders = listeners.filter { !okPredicate($0) }
-            if offenders.isEmpty {
-                let list = listeners.map { "\($0.command) (\($0.pid))" }.joined(separator: ", ")
-                let okText = "Port \(port) is served by \(list)."
-                reports.append(.init(port: port, expected: expectedDesc, status: .ok(okText)))
-            } else {
-                let list = offenders.map { "\($0.command) (\($0.pid))" }.joined(separator: ", ")
-                let reason = "Port \(port) is held by \(list), expected \(expectedDesc)."
-                reports.append(.init(port: port, expected: expectedDesc, status: .interference(reason, offenders: offenders)))
-            }
-        }
-
-        return reports
+        return await PortGuardian.shared.diagnose(mode: mode)
     }
 
     static func killProcess(_ pid: Int) async -> Result<Void, DebugActionError> {
@@ -324,47 +252,6 @@ enum DebugActions {
         if force.ok { return .success(()) }
         let detail = force.message ?? primary.message ?? "kill failed"
         return .failure(.message(detail))
-    }
-
-    private static func listeners(on port: Int) async -> [PortListener] {
-        let res = await ShellExecutor.run(
-            command: ["lsof", "-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-Fpcn"],
-            cwd: nil,
-            env: nil,
-            timeout: 5)
-        guard res.ok, let data = res.payload, !data.isEmpty else { return [] }
-        let text = String(data: data, encoding: .utf8) ?? ""
-        var listeners: [PortListener] = []
-        var currentPid: Int?
-        var currentCmd: String?
-        var currentUser: String?
-
-        func flush() {
-            if let pid = currentPid, let cmd = currentCmd {
-                listeners.append(PortListener(pid: pid, command: cmd, user: currentUser))
-            }
-            currentPid = nil
-            currentCmd = nil
-            currentUser = nil
-        }
-
-        for line in text.split(separator: "\n") {
-            guard let prefix = line.first else { continue }
-            let value = String(line.dropFirst())
-            switch prefix {
-            case "p":
-                flush()
-                currentPid = Int(value)
-            case "c":
-                currentCmd = value
-            case "u":
-                currentUser = value
-            default:
-                continue
-            }
-        }
-        flush()
-        return listeners
     }
 
     @MainActor

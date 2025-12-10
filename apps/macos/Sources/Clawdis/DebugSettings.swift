@@ -21,6 +21,7 @@ struct DebugSettings: View {
     @State private var portCheckInFlight = false
     @State private var portReports: [DebugActions.PortReport] = []
     @State private var portKillStatus: String?
+    @State private var pendingKill: DebugActions.PortListener?
 
     var body: some View {
         ScrollView(.vertical) {
@@ -105,19 +106,28 @@ struct DebugSettings: View {
                                 Text(report.summary)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                if !report.offenders.isEmpty {
-                                    ForEach(report.offenders) { offender in
+                                ForEach(report.listeners) { listener in
+                                    VStack(alignment: .leading, spacing: 2) {
                                         HStack(spacing: 8) {
-                                            Text("\(offender.command) (\(offender.pid))")
+                                            Text("\(listener.command) (\(listener.pid))")
                                                 .font(.caption.monospaced())
+                                                .foregroundStyle(listener.expected ? .secondary : Color.red)
                                                 .lineLimit(1)
                                             Spacer()
                                             Button("Kill") {
-                                                Task { await self.kill(offender.pid) }
+                                                self.requestKill(listener)
                                             }
                                             .buttonStyle(.bordered)
                                         }
+                                        Text(listener.fullCommand)
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                            .truncationMode(.middle)
                                     }
+                                    .padding(6)
+                                    .background(Color.secondary.opacity(0.05))
+                                    .cornerRadius(4)
                                 }
                             }
                             .padding(8)
@@ -264,6 +274,16 @@ struct DebugSettings: View {
             await self.reloadModels()
             self.loadSessionStorePath()
         }
+        .alert(item: self.$pendingKill) { listener in
+            Alert(
+                title: Text("Kill \(listener.command) (\(listener.pid))?"),
+                message: Text("This process looks expected for the current mode. Kill anyway?"),
+                primaryButton: .destructive(Text("Kill")) {
+                    Task { await self.killConfirmed(listener.pid) }
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 
     @MainActor
@@ -276,8 +296,17 @@ struct DebugSettings: View {
     }
 
     @MainActor
-    private func kill(_ pid: Int) async {
-        let result = await DebugActions.killProcess(pid)
+    private func requestKill(_ listener: DebugActions.PortListener) {
+        if listener.expected {
+            self.pendingKill = listener
+        } else {
+            Task { await self.killConfirmed(listener.pid) }
+        }
+    }
+
+    @MainActor
+    private func killConfirmed(_ pid: Int32) async {
+        let result = await DebugActions.killProcess(Int(pid))
         switch result {
         case .success:
             self.portKillStatus = "Sent kill to \(pid)."
