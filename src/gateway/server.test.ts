@@ -656,6 +656,25 @@ describe("gateway server", () => {
     await expect(startGatewayServer(port)).rejects.toBeInstanceOf(
       GatewayLockError,
     );
+    await expect(startGatewayServer(port)).rejects.toThrow(
+      /already listening/i,
+    );
     blocker.close();
+  });
+
+  test("releases port after close", async () => {
+    const port = await getFreePort();
+    const server = await startGatewayServer(port);
+    await server.close();
+
+    // If the port was released, another listener can bind immediately.
+    const probe = createServer();
+    await new Promise<void>((resolve, reject) => {
+      probe.once("error", reject);
+      probe.listen(port, "127.0.0.1", () => resolve());
+    });
+    await new Promise<void>((resolve, reject) =>
+      probe.close((err) => (err ? reject(err) : resolve())),
+    );
   });
 });
