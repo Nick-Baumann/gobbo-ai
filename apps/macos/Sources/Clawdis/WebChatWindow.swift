@@ -538,8 +538,10 @@ final class WebChatManager {
     static let shared = WebChatManager()
     private var windowController: WebChatWindowController?
     private var panelController: WebChatWindowController?
+    private var panelSessionKey: String?
     private var swiftWindowController: WebChatSwiftUIWindowController?
     private var swiftPanelController: WebChatSwiftUIWindowController?
+    private var swiftPanelSessionKey: String?
     private var browserTunnel: WebChatTunnel?
     var onPanelVisibilityChanged: ((Bool) -> Void)?
 
@@ -575,12 +577,18 @@ final class WebChatManager {
     func togglePanel(sessionKey: String, anchorProvider: @escaping () -> NSRect?) {
         if AppStateStore.webChatSwiftUIEnabled {
             if let controller = self.swiftPanelController {
-                if controller.isVisible {
+                if self.swiftPanelSessionKey != sessionKey {
                     controller.close()
+                    self.swiftPanelController = nil
+                    self.swiftPanelSessionKey = nil
                 } else {
-                    controller.presentAnchored(anchorProvider: anchorProvider)
+                    if controller.isVisible {
+                        controller.close()
+                    } else {
+                        controller.presentAnchored(anchorProvider: anchorProvider)
+                    }
+                    return
                 }
-                return
             }
             let controller = WebChatSwiftUIWindowController(
                 sessionKey: sessionKey,
@@ -592,21 +600,30 @@ final class WebChatManager {
                 self?.onPanelVisibilityChanged?(visible)
             }
             self.swiftPanelController = controller
+            self.swiftPanelSessionKey = sessionKey
             controller.presentAnchored(anchorProvider: anchorProvider)
         } else {
             if let controller = self.panelController {
-                if controller.window?.isVisible == true {
-                    controller.closePanel()
+                if self.panelSessionKey != sessionKey {
+                    controller.shutdown()
+                    controller.close()
+                    self.panelController = nil
+                    self.panelSessionKey = nil
                 } else {
-                    controller.presentAnchoredPanel(anchorProvider: anchorProvider)
+                    if controller.window?.isVisible == true {
+                        controller.closePanel()
+                    } else {
+                        controller.presentAnchoredPanel(anchorProvider: anchorProvider)
+                    }
+                    return
                 }
-                return
             }
 
             let controller = WebChatWindowController(
                 sessionKey: sessionKey,
                 presentation: .panel(anchorProvider: anchorProvider))
             self.panelController = controller
+            self.panelSessionKey = sessionKey
             controller.onPanelClosed = { [weak self] in
                 self?.panelHidden()
             }
@@ -656,10 +673,12 @@ final class WebChatManager {
         self.panelController?.shutdown()
         self.panelController?.close()
         self.panelController = nil
+        self.panelSessionKey = nil
         self.swiftWindowController?.close()
         self.swiftWindowController = nil
         self.swiftPanelController?.close()
         self.swiftPanelController = nil
+        self.swiftPanelSessionKey = nil
     }
 
     @MainActor
@@ -712,17 +731,18 @@ final class WebChatManager {
         self.panelController?.shutdown()
         self.panelController?.close()
         self.panelController = nil
+        self.panelSessionKey = nil
 
         self.swiftWindowController?.close()
         self.swiftWindowController = nil
         self.swiftPanelController?.close()
         self.swiftPanelController = nil
+        self.swiftPanelSessionKey = nil
     }
 
     private func panelHidden() {
         self.onPanelVisibilityChanged?(false)
-        self.panelController = nil
-        self.swiftPanelController = nil
+        // Keep panel controllers cached so reopening doesn't re-bootstrap.
     }
 }
 
