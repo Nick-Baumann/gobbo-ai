@@ -106,8 +106,6 @@ describe("trigger handling", () => {
   });
 
   it("ignores think directives that only appear in the context wrapper", async () => {
-    const prevPreferRpc = process.env.CLAWDIS_USE_PI_RPC;
-    process.env.CLAWDIS_USE_PI_RPC = "1";
     const rpcMock = vi.spyOn(tauRpc, "runPiRpc").mockResolvedValue({
       stdout:
         '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}',
@@ -139,17 +137,9 @@ describe("trigger handling", () => {
     const prompt = rpcMock.mock.calls[0]?.[0]?.prompt ?? "";
     expect(prompt).toContain("Give me the status");
     expect(prompt).not.toContain("/thinking high");
-
-    if (prevPreferRpc === undefined) {
-      delete process.env.CLAWDIS_USE_PI_RPC;
-    } else {
-      process.env.CLAWDIS_USE_PI_RPC = prevPreferRpc;
-    }
   });
 
   it("does not emit directive acks for heartbeats with /think", async () => {
-    const prevPreferRpc = process.env.CLAWDIS_USE_PI_RPC;
-    process.env.CLAWDIS_USE_PI_RPC = "1";
     const rpcMock = vi.spyOn(tauRpc, "runPiRpc").mockResolvedValue({
       stdout:
         '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}',
@@ -182,11 +172,5 @@ describe("trigger handling", () => {
     expect(text).toBe("ok");
     expect(text).not.toMatch(/Thinking level set/i);
     expect(rpcMock).toHaveBeenCalledOnce();
-
-    if (prevPreferRpc === undefined) {
-      delete process.env.CLAWDIS_USE_PI_RPC;
-    } else {
-      process.env.CLAWDIS_USE_PI_RPC = prevPreferRpc;
-    }
   });
 });

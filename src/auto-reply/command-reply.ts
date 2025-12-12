@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -79,55 +78,6 @@ function stripRpcNoise(raw: string): string {
     if (line.trim()) kept.push(line);
   }
   return kept.join("\n");
-}
-
-async function runJsonFallback(opts: {
-  argv: string[];
-  cwd?: string;
-  timeoutMs: number;
-}): Promise<{
-  stdout: string;
-  stderr: string;
-  code: number;
-  signal?: NodeJS.Signals | null;
-  killed?: boolean;
-}> {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(opts.argv[0], opts.argv.slice(1), {
-      cwd: opts.cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(
-        new Error(
-          `pi json fallback timed out after ${Math.round(opts.timeoutMs / 1000)}s`,
-        ),
-      );
-    }, opts.timeoutMs);
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-    child.on("exit", (code, signal) => {
-      clearTimeout(timer);
-      resolve({
-        stdout,
-        stderr,
-        code: code ?? 0,
-        signal,
-        killed: child.killed,
-      });
-    });
-  });
 }
 
 function extractRpcAssistantText(raw: string): string | undefined {
@@ -611,32 +561,11 @@ export async function runCommandReply(
       streamedAny = true;
     };
 
-    // Default to RPC (it is testable/offline and avoids spawning long-lived CLI processes).
-    // Set `CLAWDIS_USE_PI_RPC=0` to force the JSON fallback path.
-    const preferRpc = process.env.CLAWDIS_USE_PI_RPC !== "0";
-
     const run = async () => {
       const runId = params.runId ?? crypto.randomUUID();
       let body = promptArg ?? "";
       if (!body || !body.trim()) {
         body = templatingCtx.Body ?? templatingCtx.BodyStripped ?? "";
-      }
-      if (!preferRpc) {
-        const jsonArgv = (() => {
-          const copy = [...finalArgv];
-          const idx = copy.indexOf("--mode");
-          if (idx >= 0 && copy[idx + 1]) copy[idx + 1] = "json";
-          else copy.push("--mode", "json");
-          return copy;
-        })();
-        logVerbose(
-          `Running command auto-reply in json mode: ${jsonArgv.join(" ")}${reply.cwd ? ` (cwd: ${reply.cwd})` : ""}`,
-        );
-        return await runJsonFallback({
-          argv: jsonArgv,
-          cwd: reply.cwd,
-          timeoutMs,
-        });
       }
 
       const rpcPromptIndex =
