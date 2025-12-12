@@ -2,6 +2,51 @@ import ClawdisProtocol
 import Foundation
 import OSLog
 
+protocol WebSocketTasking: AnyObject {
+    var state: URLSessionTask.State { get }
+    func resume()
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?)
+    func send(_ message: URLSessionWebSocketTask.Message) async throws
+    func receive() async throws -> URLSessionWebSocketTask.Message
+    func receive(completionHandler: @escaping @Sendable (Result<URLSessionWebSocketTask.Message, Error>) -> Void)
+}
+
+extension URLSessionWebSocketTask: WebSocketTasking {}
+
+struct WebSocketTaskBox: @unchecked Sendable {
+    let task: any WebSocketTasking
+
+    var state: URLSessionTask.State { self.task.state }
+
+    func resume() { self.task.resume() }
+
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        self.task.cancel(with: closeCode, reason: reason)
+    }
+
+    func send(_ message: URLSessionWebSocketTask.Message) async throws {
+        try await self.task.send(message)
+    }
+
+    func receive() async throws -> URLSessionWebSocketTask.Message {
+        try await self.task.receive()
+    }
+
+    func receive(completionHandler: @escaping @Sendable (Result<URLSessionWebSocketTask.Message, Error>) -> Void) {
+        self.task.receive(completionHandler: completionHandler)
+    }
+}
+
+protocol WebSocketSessioning: AnyObject {
+    func makeWebSocketTask(url: URL) -> WebSocketTaskBox
+}
+
+extension URLSession: WebSocketSessioning {
+    func makeWebSocketTask(url: URL) -> WebSocketTaskBox {
+        WebSocketTaskBox(task: self.webSocketTask(with: url))
+    }
+}
+
 struct GatewayEvent: Codable {
     let type: String
     let event: String?
@@ -18,16 +63,16 @@ extension Notification.Name {
     static let gatewaySeqGap = Notification.Name("clawdis.gateway.seqgap")
 }
 
-private actor GatewayChannelActor {
+actor GatewayChannelActor {
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "gateway")
-    private var task: URLSessionWebSocketTask?
+    private var task: WebSocketTaskBox?
     private var pending: [String: CheckedContinuation<GatewayFrame, Error>] = [:]
     private var connected = false
     private var isConnecting = false
     private var connectWaiters: [CheckedContinuation<Void, Error>] = []
     private var url: URL
     private var token: String?
-    private let session = URLSession(configuration: .default)
+    private let session: WebSocketSessioning
     private var backoffMs: Double = 500
     private var shouldReconnect = true
     private var lastSeq: Int?
@@ -38,9 +83,10 @@ private actor GatewayChannelActor {
     private var watchdogTask: Task<Void, Never>?
     private let defaultRequestTimeoutMs: Double = 15000
 
-    init(url: URL, token: String?) {
+    init(url: URL, token: String?, session: WebSocketSessioning? = nil) {
         self.url = url
         self.token = token
+        self.session = session ?? URLSession(configuration: .default)
         Task { [weak self] in
             await self?.startWatchdog()
         }
@@ -80,7 +126,7 @@ private actor GatewayChannelActor {
         defer { self.isConnecting = false }
 
         self.task?.cancel(with: .goingAway, reason: nil)
-        self.task = self.session.webSocketTask(with: self.url)
+        self.task = self.session.makeWebSocketTask(url: self.url)
         self.task?.resume()
         do {
             try await self.sendHello()
