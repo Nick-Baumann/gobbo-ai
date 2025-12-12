@@ -270,11 +270,15 @@ enum SessionLoader {
                 throw SessionLoadError.decodeFailed(error.localizedDescription)
             }
 
+            let storeDir = URL(fileURLWithPath: path).deletingLastPathComponent()
+
             return decoded.map { key, entry in
                 let updated = entry.updatedAt.map { Date(timeIntervalSince1970: $0 / 1000) }
                 let input = entry.inputTokens ?? 0
                 let output = entry.outputTokens ?? 0
-                let total = entry.totalTokens ?? input + output
+                let fallbackTotal = entry.totalTokens ?? input + output
+                let promptTokens = entry.sessionId.flatMap { self.promptTokensFromSessionLog(sessionId: $0, storeDir: storeDir) }
+                let total = max(fallbackTotal, promptTokens ?? 0)
                 let context = entry.contextTokens ?? defaults.contextTokens
                 let model = entry.model ?? defaults.model
 
@@ -297,6 +301,67 @@ enum SessionLoader {
             }
             .sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
         }.value
+    }
+
+    private static func promptTokensFromSessionLog(sessionId: String, storeDir: URL) -> Int? {
+        let trimmed = sessionId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let candidates: [URL] = [
+            storeDir.appendingPathComponent("\(trimmed).jsonl"),
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".pi/agent/sessions")
+                .appendingPathComponent("\(trimmed).jsonl"),
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".tau/agent/sessions/clawdis")
+                .appendingPathComponent("\(trimmed).jsonl"),
+        ]
+
+        guard let logURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+            return nil
+        }
+
+        guard let text = try? String(contentsOf: logURL, encoding: .utf8) else { return nil }
+        var lastUsage: [String: Any]?
+
+        for line in text.split(whereSeparator: \.isNewline) {
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedLine.isEmpty { continue }
+            guard let data = trimmedLine.data(using: .utf8) else { continue }
+            guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+
+            if let message = obj["message"] as? [String: Any], let usage = message["usage"] as? [String: Any] {
+                lastUsage = usage
+                continue
+            }
+            if let usage = obj["usage"] as? [String: Any] {
+                lastUsage = usage
+                continue
+            }
+        }
+
+        guard let lastUsage else { return nil }
+
+        let input = self.number(from: lastUsage["input"]) ?? 0
+        let output = self.number(from: lastUsage["output"]) ?? 0
+        let cacheRead = self.number(from: lastUsage["cacheRead"] ?? lastUsage["cache_read"]) ?? 0
+        let cacheWrite = self.number(from: lastUsage["cacheWrite"] ?? lastUsage["cache_write"]) ?? 0
+        let totalTokens = self.number(from: lastUsage["totalTokens"] ?? lastUsage["total_tokens"] ?? lastUsage["total"])
+
+        let prompt = input + cacheRead + cacheWrite
+        if prompt > 0 { return prompt }
+        if let totalTokens, totalTokens > output { return totalTokens - output }
+        return nil
+    }
+
+    private static func number(from raw: Any?) -> Int? {
+        switch raw {
+        case let v as Int: v
+        case let v as Double: Int(v)
+        case let v as NSNumber: v.intValue
+        case let v as String: Int(v)
+        default: nil
+        }
     }
 
     private static func standardize(_ path: String) -> String {

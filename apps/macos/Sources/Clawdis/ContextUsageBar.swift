@@ -31,9 +31,10 @@ struct ContextUsageBar: View {
                     .fill(Color.secondary.opacity(0.25))
                 Capsule()
                     .fill(self.tint)
-                    .frame(width: fillWidth)
+                    .frame(width: max(1, fillWidth))
             }
         }
+        .frame(maxWidth: .infinity)
         .frame(height: self.height)
         .accessibilityLabel("Context usage")
         .accessibilityValue(self.accessibilityValue)
@@ -46,4 +47,3 @@ struct ContextUsageBar: View {
         return "\(pct) percent used"
     }
 }
-
