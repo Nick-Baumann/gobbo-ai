@@ -9,8 +9,13 @@ import Testing
             OSAllocatedUnfairLock<(@Sendable (Result<URLSessionWebSocketTask.Message, Error>) -> Void)?>(initialState: nil)
         private let cancelCount = OSAllocatedUnfairLock(initialState: 0)
         private let sendCount = OSAllocatedUnfairLock(initialState: 0)
+        private let helloDelayMs: Int
 
         var state: URLSessionTask.State = .suspended
+
+        init(helloDelayMs: Int = 0) {
+            self.helloDelayMs = helloDelayMs
+        }
 
         func snapshotCancelCount() -> Int { self.cancelCount.withLock { $0 } }
 
@@ -53,7 +58,10 @@ import Testing
         }
 
         func receive() async throws -> URLSessionWebSocketTask.Message {
-            .data(Self.helloOkData())
+            if self.helloDelayMs > 0 {
+                try await Task.sleep(nanoseconds: UInt64(self.helloDelayMs) * 1_000_000)
+            }
+            return .data(Self.helloOkData())
         }
 
         func receive(
@@ -97,6 +105,11 @@ import Testing
     private final class FakeWebSocketSession: WebSocketSessioning, @unchecked Sendable {
         private let makeCount = OSAllocatedUnfairLock(initialState: 0)
         private let tasks = OSAllocatedUnfairLock(initialState: [FakeWebSocketTask]())
+        private let helloDelayMs: Int
+
+        init(helloDelayMs: Int = 0) {
+            self.helloDelayMs = helloDelayMs
+        }
 
         func snapshotMakeCount() -> Int { self.makeCount.withLock { $0 } }
         func snapshotCancelCount() -> Int {
@@ -108,7 +121,7 @@ import Testing
         func makeWebSocketTask(url: URL) -> WebSocketTaskBox {
             _ = url
             self.makeCount.withLock { $0 += 1 }
-            let task = FakeWebSocketTask()
+            let task = FakeWebSocketTask(helloDelayMs: self.helloDelayMs)
             self.tasks.withLock { $0.append(task) }
             return WebSocketTaskBox(task: task)
         }
@@ -156,5 +169,20 @@ import Testing
         _ = try await conn.request(method: "status", params: nil)
         #expect(session.snapshotMakeCount() == 2)
         #expect(session.snapshotCancelCount() == 1)
+    }
+
+    @Test func concurrentRequestsStillUseSingleWebSocket() async throws {
+        let session = FakeWebSocketSession(helloDelayMs: 150)
+        let url = URL(string: "ws://example.invalid")!
+        let cfg = ConfigSource(token: nil)
+        let conn = GatewayConnection(
+            configProvider: { (url, cfg.snapshotToken()) },
+            sessionBox: WebSocketSessionBox(session: session))
+
+        async let r1: Data = conn.request(method: "status", params: nil)
+        async let r2: Data = conn.request(method: "status", params: nil)
+        _ = try await (r1, r2)
+
+        #expect(session.snapshotMakeCount() == 1)
     }
 }
