@@ -355,7 +355,8 @@ actor GatewayChannelActor {
                 do {
                     try await self.task?.send(.data(data))
                 } catch {
-                    self.pending.removeValue(forKey: id)
+                    let wrapped = self.wrap(error, context: "gateway send \(method)")
+                    let waiter = self.pending.removeValue(forKey: id)
                     // Treat send failures as a broken socket: mark disconnected and trigger reconnect.
                     self.connected = false
                     self.task?.cancel(with: .goingAway, reason: nil)
@@ -363,7 +364,7 @@ actor GatewayChannelActor {
                         guard let self else { return }
                         await self.scheduleReconnect()
                     }
-                    cont.resume(throwing: self.wrap(error, context: "gateway send \(method)"))
+                    if let waiter { waiter.resume(throwing: wrapped) }
                 }
             }
         }
