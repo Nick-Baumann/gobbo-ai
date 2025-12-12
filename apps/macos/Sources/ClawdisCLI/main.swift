@@ -414,15 +414,25 @@ struct ClawdisCLI {
     private static func send(request: Request) async throws -> Response {
         try await self.ensureAppRunning()
 
-        return try await self.sendViaSocket(request: request)
+        let timeout = self.rpcTimeoutSeconds(for: request)
+        return try await self.sendViaSocket(request: request, timeoutSeconds: timeout)
     }
 
     /// Attempt a direct UNIX socket call; falls back to XPC if unavailable.
-    private static func sendViaSocket(request: Request) async throws -> Response {
+    private static func sendViaSocket(request: Request, timeoutSeconds: TimeInterval) async throws -> Response {
         let path = controlSocketPath
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw POSIXError(.ECONNREFUSED) }
         defer { close(fd) }
+
+        var noSigPipe: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout.size(ofValue: noSigPipe)))
+
+        let flags = fcntl(fd, F_GETFL)
+        if flags != -1 {
+            _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+        }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
@@ -438,11 +448,45 @@ struct ClawdisCLI {
                 connect(fd, sockPtr, len)
             }
         }
-        guard result == 0 else { throw POSIXError(.ECONNREFUSED) }
+        if result != 0 {
+            let err = errno
+            if err == EINPROGRESS {
+                try self.waitForSocket(
+                    fd: fd,
+                    events: Int16(POLLOUT),
+                    until: deadline,
+                    timeoutSeconds: timeoutSeconds)
+                var soError: Int32 = 0
+                var soLen = socklen_t(MemoryLayout.size(ofValue: soError))
+                _ = getsockopt(fd, SOL_SOCKET, SO_ERROR, &soError, &soLen)
+                if soError != 0 { throw POSIXError(POSIXErrorCode(rawValue: soError) ?? .ECONNREFUSED) }
+            } else {
+                throw POSIXError(POSIXErrorCode(rawValue: err) ?? .ECONNREFUSED)
+            }
+        }
 
         let payload = try JSONEncoder().encode(request)
-        _ = payload.withUnsafeBytes { buf in
-            write(fd, buf.baseAddress!, payload.count)
+        try payload.withUnsafeBytes { buf in
+            guard let base = buf.baseAddress else { return }
+            var written = 0
+            while written < payload.count {
+                try self.ensureDeadline(deadline, timeoutSeconds: timeoutSeconds)
+                let n = write(fd, base.advanced(by: written), payload.count - written)
+                if n > 0 {
+                    written += n
+                    continue
+                }
+                if n == -1, errno == EINTR { continue }
+                if n == -1, errno == EAGAIN {
+                    try self.waitForSocket(
+                        fd: fd,
+                        events: Int16(POLLOUT),
+                        until: deadline,
+                        timeoutSeconds: timeoutSeconds)
+                    continue
+                }
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
         }
         shutdown(fd, SHUT_WR)
 
@@ -450,15 +494,57 @@ struct ClawdisCLI {
         var buffer = [UInt8](repeating: 0, count: 8192)
         let bufSize = buffer.count
         while true {
+            try self.ensureDeadline(deadline, timeoutSeconds: timeoutSeconds)
+            try self.waitForSocket(
+                fd: fd,
+                events: Int16(POLLIN),
+                until: deadline,
+                timeoutSeconds: timeoutSeconds)
             let n = buffer.withUnsafeMutableBytes { read(fd, $0.baseAddress!, bufSize) }
-            if n > 0 {
-                data.append(buffer, count: n)
-            } else {
-                break
-            }
+            if n > 0 { data.append(buffer, count: n); continue }
+            if n == 0 { break }
+            if n == -1, errno == EINTR { continue }
+            if n == -1, errno == EAGAIN { continue }
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
         guard !data.isEmpty else { throw POSIXError(.ECONNRESET) }
         return try JSONDecoder().decode(Response.self, from: data)
+    }
+
+    private static func rpcTimeoutSeconds(for request: Request) -> TimeInterval {
+        switch request {
+        case let .runShell(_, _, _, timeoutSec, _):
+            // Allow longer for commands; still cap overall to a sane bound.
+            return min(300, max(10, (timeoutSec ?? 10) + 2))
+        default:
+            // Fail-fast so callers (incl. SSH tool calls) don't hang forever.
+            return 10
+        }
+    }
+
+    private static func ensureDeadline(_ deadline: Date, timeoutSeconds: TimeInterval) throws {
+        if Date() >= deadline {
+            throw CLITimeoutError(seconds: timeoutSeconds)
+        }
+    }
+
+    private static func waitForSocket(
+        fd: Int32,
+        events: Int16,
+        until deadline: Date,
+        timeoutSeconds: TimeInterval) throws
+    {
+        while true {
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining <= 0 { throw CLITimeoutError(seconds: timeoutSeconds) }
+            var pfd = pollfd(fd: fd, events: events, revents: 0)
+            let ms = Int32(max(1, min(remaining, 0.5) * 1000)) // small slices so we enforce total timeout
+            let n = poll(&pfd, 1, ms)
+            if n > 0 { return }
+            if n == 0 { continue }
+            if errno == EINTR { continue }
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     private static func ensureAppRunning() async throws {
@@ -477,6 +563,14 @@ struct ClawdisCLI {
 }
 
 enum CLIError: Error { case help, version }
+
+struct CLITimeoutError: Error, CustomStringConvertible {
+    let seconds: TimeInterval
+    var description: String {
+        let rounded = Int(max(1, seconds.rounded(.toNearestOrEven)))
+        return "timed out after \(rounded)s"
+    }
+}
 
 extension [String] {
     mutating func popFirst() -> String? {
