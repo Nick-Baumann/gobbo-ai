@@ -20,7 +20,7 @@ final class BridgeDiscoveryModel: ObservableObject {
         if self.browser != nil { return }
         let params = NWParameters.tcp
         let browser = NWBrowser(
-            for: .bonjour(type: ClawdisBonjour.bridgeServiceType, domain: ClawdisBonjour.bridgeServiceDomain),
+            for: .bonjour(type: ClawdisBonjour.bridgeServiceType, domain: nil),
             using: params)
 
         browser.stateUpdateHandler = { [weak self] state in

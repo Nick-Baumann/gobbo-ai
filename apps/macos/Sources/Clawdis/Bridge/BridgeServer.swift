@@ -30,7 +30,7 @@ actor BridgeServer {
             listener.service = NWListener.Service(
                 name: "\(name) (Clawdis)",
                 type: ClawdisBonjour.bridgeServiceType,
-                domain: ClawdisBonjour.bridgeServiceDomain,
+                domain: nil,
                 txtRecord: nil)
 
             listener.newConnectionHandler = { [weak self] connection in
