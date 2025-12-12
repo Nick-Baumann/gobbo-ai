@@ -783,7 +783,7 @@ export async function monitorWebProvider(
       const batch = pendingBatches.get(conversationId);
       if (!batch || batch.messages.length === 0) return;
       if (getQueueSize() > 0) {
-        batch.timer = setTimeout(() => void processBatch(conversationId), 150);
+        batch.timer = setTimeout(() => processBatch(conversationId), 150);
         return;
       }
       pendingBatches.delete(conversationId);
@@ -854,15 +854,25 @@ export async function monitorWebProvider(
         const sessionCfg = cfg.inbound?.reply?.session;
         const mainKey = (sessionCfg?.mainKey ?? "main").trim() || "main";
         const storePath = resolveStorePath(sessionCfg?.store);
-        const to = latest.senderE164
-          ? normalizeE164(latest.senderE164)
-          : jidToE164(latest.from);
+        const to = (() => {
+          if (latest.senderE164) return normalizeE164(latest.senderE164);
+          // In direct chats, `latest.from` is already the canonical conversation id,
+          // which is an E.164 string (e.g. "+1555"). Only fall back to JID parsing
+          // when we were handed a JID-like string.
+          if (latest.from.includes("@")) return jidToE164(latest.from);
+          return normalizeE164(latest.from);
+        })();
         if (to) {
-          await updateLastRoute({
+          void updateLastRoute({
             storePath,
             sessionKey: mainKey,
             channel: "whatsapp",
             to,
+          }).catch((err) => {
+            replyLogger.warn(
+              { error: String(err), storePath, sessionKey: mainKey, to },
+              "failed updating last route",
+            );
           });
         }
       }
@@ -969,8 +979,7 @@ export async function monitorWebProvider(
       if (getQueueSize() === 0) {
         await processBatch(key);
       } else {
-        bucket.timer =
-          bucket.timer ?? setTimeout(() => void processBatch(key), 150);
+        bucket.timer = bucket.timer ?? setTimeout(() => processBatch(key), 150);
       }
     };
 
@@ -1401,6 +1410,12 @@ export async function monitorWebProvider(
         },
         "web reconnect: max attempts reached; continuing in degraded mode",
       );
+      runtime.error(
+        danger(
+          `WhatsApp Web reconnect: max attempts reached (${reconnectAttempts}/${reconnectPolicy.maxAttempts}). Stopping web monitoring.`,
+        ),
+      );
+      await closeListener();
       break;
     }
 

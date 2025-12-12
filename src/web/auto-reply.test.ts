@@ -202,6 +202,58 @@ describe("partial reply gating", () => {
     expect(reply).toHaveBeenCalledWith("final reply");
   });
 
+  it("updates last-route for direct chats without senderE164", async () => {
+    const now = Date.now();
+    const store = await makeSessionStore({
+      main: { sessionId: "sid", updatedAt: now - 1 },
+    });
+
+    const replyResolver = vi.fn().mockResolvedValue(undefined);
+
+    const mockConfig: ClawdisConfig = {
+      inbound: {
+        allowFrom: ["*"],
+        reply: {
+          mode: "command",
+          session: { store: store.storePath, mainKey: "main" },
+        },
+      },
+    };
+
+    setLoadConfigMock(mockConfig);
+
+    await monitorWebProvider(
+      false,
+      async ({ onMessage }) => {
+        await onMessage({
+          id: "m1",
+          from: "+1000",
+          conversationId: "+1000",
+          to: "+2000",
+          body: "hello",
+          timestamp: now,
+          chatType: "direct",
+          chatId: "direct:+1000",
+          sendComposing: vi.fn().mockResolvedValue(undefined),
+          reply: vi.fn().mockResolvedValue(undefined),
+          sendMedia: vi.fn().mockResolvedValue(undefined),
+        });
+        return { close: vi.fn().mockResolvedValue(undefined) };
+      },
+      false,
+      replyResolver,
+    );
+
+    const stored = JSON.parse(await fs.readFile(store.storePath, "utf8")) as {
+      main?: { lastChannel?: string; lastTo?: string };
+    };
+    expect(stored.main?.lastChannel).toBe("whatsapp");
+    expect(stored.main?.lastTo).toBe("+1000");
+
+    resetLoadConfigMock();
+    await store.cleanup();
+  });
+
   it("defaults to self-only when no config is present", async () => {
     const cfg: ClawdisConfig = {
       inbound: {
@@ -661,6 +713,10 @@ describe("web auto-reply", () => {
     const originalMax = process.getMaxListeners();
     process.setMaxListeners?.(1); // force low to confirm bump
 
+    const store = await makeSessionStore({
+      main: { sessionId: "sid", updatedAt: Date.now() },
+    });
+
     const sendMedia = vi.fn();
     const reply = vi.fn().mockResolvedValue(undefined);
     const sendComposing = vi.fn();
@@ -684,7 +740,12 @@ describe("web auto-reply", () => {
       .spyOn(commandQueue, "getQueueSize")
       .mockImplementation(() => (queueBusy ? 1 : 0));
 
-    setLoadConfigMock(() => ({ inbound: { timestampPrefix: "UTC" } }));
+    setLoadConfigMock(() => ({
+      inbound: {
+        timestampPrefix: "UTC",
+        reply: { mode: "command", session: { store: store.storePath } },
+      },
+    }));
 
     await monitorWebProvider(false, listenerFactory, false, resolver);
     expect(capturedOnMessage).toBeDefined();
@@ -713,7 +774,7 @@ describe("web auto-reply", () => {
 
     // Let the queued batch flush once the queue is free
     queueBusy = false;
-    vi.advanceTimersByTime(200);
+    await vi.advanceTimersByTimeAsync(200);
 
     expect(resolver).toHaveBeenCalledTimes(1);
     const args = resolver.mock.calls[0][0];
@@ -730,6 +791,7 @@ describe("web auto-reply", () => {
     queueSpy.mockRestore();
     process.setMaxListeners?.(originalMax);
     vi.useRealTimers();
+    await store.cleanup();
   });
 
   it("falls back to text when media send fails", async () => {
