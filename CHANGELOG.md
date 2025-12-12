@@ -13,7 +13,7 @@ First Clawdis release post rebrand. This is a semver-major because we dropped le
 
 ### macOS companion app
 - **Clawdis.app menu bar companion**: packaged, signed bundle with gateway start/stop, launchd toggle, project-root and pnpm/node auto-resolution, live log shortcut, restart button, and status/recipient table plus badges/dimming for attention and paused states.
-- **On-device Voice Wake**: Apple speech recognizer with wake-word table, language picker, live mic meter, “hold until silence,” animated ears/legs, and an SSH forwarder + test harness that runs `clawdis-mac agent --message …` on your target machine and surfaces errors clearly.
+- **On-device Voice Wake**: Apple speech recognizer with wake-word table, language picker, live mic meter, “hold until silence,” animated ears/legs, and main-session routing that replies on the **last used surface** (WhatsApp/Telegram/WebChat). Delivery failures are logged, and the run remains visible via WebChat/session logs.
 - **WebChat & Debugging**: bundled WebChat UI, Debug tab with heartbeat sliders, session-store picker, log opener (`clawlog`), gateway restart, health probes, and scrollable settings panes.
 
 ### WhatsApp & agent experience

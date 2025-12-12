@@ -72,7 +72,7 @@ clawdis gateway --force
 
 ## macOS Companion App (Clawdis.app)
 
-- **On-device Voice Wake:** listens for wake words (e.g. “Claude”) using Apple’s on-device speech recognizer (macOS 26+). macOS still shows the standard Speech/Mic permissions prompt, but audio stays on device.
+- **On-device Voice Wake:** listens for wake words (e.g. “Claude”) using Apple’s on-device speech recognizer (macOS 26+). macOS still shows the standard Speech/Mic permissions prompt, but audio stays on device. Replies are delivered to the **last-used main surface** (WhatsApp/Telegram/WebChat); if delivery fails, you can still inspect the run in WebChat/logs.
 - **Push-to-talk (Right Option hold):** hold right Option to speak; the voice overlay shows live partials and sends when you release.
 - **Config tab:** pick the model from your local Pi model catalog (`pi-mono/packages/ai/src/models.generated.ts`), or enter a custom model ID; edit session store path and context tokens.
 - **Voice settings:** language + additional languages, mic picker, live level meter, trigger-word table, and a built-in test harness.
