@@ -189,28 +189,87 @@ struct ClawdisCLI {
 
     private static func printVersion() {
         let info = self.loadInfo()
-        let version = info["CFBundleShortVersionString"] as? String ?? "unknown"
-        let build = info["CFBundleVersion"] as? String ?? ""
+        let version = (info["CFBundleShortVersionString"] as? String) ?? self.loadPackageJSONVersion() ?? "unknown"
+        var build = info["CFBundleVersion"] as? String ?? ""
+        if build.isEmpty, version != "unknown" {
+            build = version
+        }
         let git = info["ClawdisGitCommit"] as? String ?? "unknown"
         let ts = info["ClawdisBuildTimestamp"] as? String ?? "unknown"
-        print("clawdis-mac \(version) (\(build)) git:\(git) built:\(ts)")
+
+        let buildPart = build.isEmpty ? "" : " (\(build))"
+        print("clawdis-mac \(version)\(buildPart) git:\(git) built:\(ts)")
     }
 
     private static func loadInfo() -> [String: Any] {
         if let dict = Bundle.main.infoDictionary, !dict.isEmpty { return dict }
-        guard let exe = CommandLine.arguments.first else { return [:] }
-        let url = URL(fileURLWithPath: exe)
-            .resolvingSymlinksInPath()
-            .deletingLastPathComponent() // MacOS
-            .deletingLastPathComponent() // Contents
-            .appendingPathComponent("Info.plist")
-        if let data = try? Data(contentsOf: url),
-           let dict = try? PropertyListSerialization
-               .propertyList(from: data, options: [], format: nil) as? [String: Any]
-        {
-            return dict
+
+        guard let exeURL = self.resolveExecutableURL() else { return [:] }
+
+        var dir = exeURL.deletingLastPathComponent()
+        for _ in 0..<10 {
+            let candidate = dir.appendingPathComponent("Info.plist")
+            if let dict = self.loadPlistDictionary(at: candidate) {
+                return dict
+            }
+            let parent = dir.deletingLastPathComponent()
+            if parent.path == dir.path { break }
+            dir = parent
         }
+
         return [:]
+    }
+
+    private static func loadPlistDictionary(at url: URL) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? PropertyListSerialization
+            .propertyList(from: data, options: [], format: nil) as? [String: Any]
+    }
+
+    private static func resolveExecutableURL() -> URL? {
+        var size: UInt32 = UInt32(PATH_MAX)
+        var buffer = [CChar](repeating: 0, count: Int(size))
+
+        let result = buffer.withUnsafeMutableBufferPointer { ptr in
+            _NSGetExecutablePath(ptr.baseAddress, &size)
+        }
+
+        if result != 0 {
+            buffer = [CChar](repeating: 0, count: Int(size))
+            let result2 = buffer.withUnsafeMutableBufferPointer { ptr in
+                _NSGetExecutablePath(ptr.baseAddress, &size)
+            }
+            guard result2 == 0 else { return nil }
+        }
+
+        let nulIndex = buffer.firstIndex(of: 0) ?? buffer.count
+        let bytes = buffer.prefix(nulIndex).map { UInt8(bitPattern: $0) }
+        let path = String(decoding: bytes, as: UTF8.self)
+        return URL(fileURLWithPath: path).resolvingSymlinksInPath()
+    }
+
+    private static func loadPackageJSONVersion() -> String? {
+        guard let exeURL = self.resolveExecutableURL() else { return nil }
+
+        var dir = exeURL.deletingLastPathComponent()
+        for _ in 0..<12 {
+            let candidate = dir.appendingPathComponent("package.json")
+            if let version = self.loadPackageJSONVersion(at: candidate) {
+                return version
+            }
+            let parent = dir.deletingLastPathComponent()
+            if parent.path == dir.path { break }
+            dir = parent
+        }
+
+        return nil
+    }
+
+    private static func loadPackageJSONVersion(at url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        guard obj["name"] as? String == "clawdis" else { return nil }
+        return obj["version"] as? String
     }
 
     private static func send(request: Request) async throws -> Response {
