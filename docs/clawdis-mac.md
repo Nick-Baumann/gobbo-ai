@@ -64,7 +64,7 @@ struct Response { ok: Bool; message?: String; payload?: Data }
 
 ## CLI (`clawdis-mac`)
 - Subcommands (JSON out, non-zero exit on failure):
-  - `notify --title --body [--sound]`
+  - `notify --title --body [--sound] [--priority passive|active|timeSensitive]`
   - `ensure-permissions --cap accessibility --cap screenRecording [--interactive]`
   - `screenshot [--display-id N | --window-id N] [--out path]`
   - `run -- cmd args... [--cwd] [--env KEY=VAL] [--timeout 30] [--needs-screen-recording]`

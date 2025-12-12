@@ -49,6 +49,8 @@ cat > "$ENT_TMP" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>com.apple.developer.usernotifications.time-sensitive</key>
+    <true/>
     <key>com.apple.security.hardened-runtime</key>
     <true/>
     <key>com.apple.security.cs.allow-jit</key>
