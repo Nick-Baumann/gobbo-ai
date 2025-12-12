@@ -4,9 +4,9 @@ enum InstanceIdentity {
     private static let suiteName = "com.steipete.clawdis.shared"
     private static let instanceIdKey = "instanceId"
 
-    private static let defaults: UserDefaults = {
+    private static var defaults: UserDefaults {
         UserDefaults(suiteName: suiteName) ?? .standard
-    }()
+    }
 
     static let instanceId: String = {
         if let existing = defaults.string(forKey: instanceIdKey)?
