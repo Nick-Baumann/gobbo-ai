@@ -1108,11 +1108,17 @@
         "sessionId": {
           "type": "string"
         },
+        "sessionKey": {
+          "type": "string"
+        },
         "thinking": {
           "type": "string"
         },
         "deliver": {
           "type": "boolean"
+        },
+        "channel": {
+          "type": "string"
         },
         "timeout": {
           "minimum": 0,
@@ -1126,6 +1132,104 @@
       "required": [
         "message",
         "idempotencyKey"
+      ]
+    },
+    "ChatHistoryParams": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "sessionKey": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionKey"
+      ]
+    },
+    "ChatSendParams": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "sessionKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "thinking": {
+          "type": "string"
+        },
+        "deliver": {
+          "type": "boolean"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {}
+        },
+        "timeoutMs": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionKey",
+        "message",
+        "idempotencyKey"
+      ]
+    },
+    "ChatEvent": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "runId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sessionKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "const": "delta",
+              "type": "string"
+            },
+            {
+              "const": "final",
+              "type": "string"
+            },
+            {
+              "const": "error",
+              "type": "string"
+            }
+          ]
+        },
+        "message": {},
+        "errorMessage": {
+          "type": "string"
+        },
+        "usage": {},
+        "stopReason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runId",
+        "sessionKey",
+        "seq",
+        "state"
       ]
     },
     "TickEvent": {

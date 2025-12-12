@@ -33,10 +33,11 @@ enum VoiceWakeForwarder {
     }
 
     struct ForwardOptions: Sendable {
-        var session: String = "main"
+        var sessionKey: String = "main"
         var thinking: String = "low"
         var deliver: Bool = true
         var to: String?
+        var channel: String = "last"
     }
 
     @discardableResult
@@ -45,12 +46,15 @@ enum VoiceWakeForwarder {
         options: ForwardOptions = ForwardOptions()) async -> Result<Void, VoiceWakeForwardError>
     {
         let payload = Self.prefixedTranscript(transcript)
+        let channel = options.channel.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let deliver = options.deliver && channel != "webchat"
         let result = await AgentRPC.shared.send(
             text: payload,
             thinking: options.thinking,
-            session: options.session,
-            deliver: options.deliver,
-            to: options.to)
+            sessionKey: options.sessionKey,
+            deliver: deliver,
+            to: options.to,
+            channel: channel)
 
         if result.ok {
             self.logger.info("voice wake forward ok")

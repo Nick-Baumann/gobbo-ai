@@ -57,9 +57,10 @@ enum ControlRequestHandler {
             let rpcResult = await AgentRPC.shared.send(
                 text: trimmed,
                 thinking: thinking,
-                session: sessionKey,
+                sessionKey: sessionKey,
                 deliver: deliver,
-                to: to)
+                to: to,
+                channel: nil)
             return rpcResult.ok
                 ? Response(ok: true, message: rpcResult.text ?? "sent")
                 : Response(ok: false, message: rpcResult.error ?? "failed to send")

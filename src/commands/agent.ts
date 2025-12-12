@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { chunkText } from "../auto-reply/chunk.js";
 import { runCommandReply } from "../auto-reply/command-reply.js";
 import {
   applyTemplate,
@@ -36,6 +37,8 @@ type AgentCommandOpts = {
   timeout?: string;
   deliver?: boolean;
   surface?: string;
+  provider?: string;
+  bestEffortDeliver?: boolean;
 };
 
 type SessionResolution = {
@@ -369,11 +372,47 @@ export async function agentCommand(
 
   const payloads = result.payloads ?? [];
   const deliver = opts.deliver === true;
-  const targetTo = opts.to ? normalizeE164(opts.to) : allowFrom[0];
-  if (deliver && !targetTo) {
-    throw new Error(
-      "Delivering to WhatsApp requires --to <E.164> or inbound.allowFrom[0]",
-    );
+  const bestEffortDeliver = opts.bestEffortDeliver === true;
+  const provider = (opts.provider ?? "whatsapp").toLowerCase();
+
+  const whatsappTarget = opts.to ? normalizeE164(opts.to) : allowFrom[0];
+  const telegramTarget = opts.to?.trim() || undefined;
+
+  const logDeliveryError = (err: unknown) => {
+    const message = `Delivery failed (${provider}): ${String(err)}`;
+    runtime.error?.(message);
+    if (!runtime.error) runtime.log(message);
+  };
+
+  if (deliver) {
+    if (provider === "whatsapp" && !whatsappTarget) {
+      const err = new Error(
+        "Delivering to WhatsApp requires --to <E.164> or inbound.allowFrom[0]",
+      );
+      if (!bestEffortDeliver) throw err;
+      logDeliveryError(err);
+    }
+    if (provider === "telegram" && !telegramTarget) {
+      const err = new Error("Delivering to Telegram requires --to <chatId>");
+      if (!bestEffortDeliver) throw err;
+      logDeliveryError(err);
+    }
+    if (provider === "webchat") {
+      const err = new Error(
+        "Delivering to WebChat is not supported via `clawdis agent`; use WebChat RPC instead.",
+      );
+      if (!bestEffortDeliver) throw err;
+      logDeliveryError(err);
+    }
+    if (
+      provider !== "whatsapp" &&
+      provider !== "telegram" &&
+      provider !== "webchat"
+    ) {
+      const err = new Error(`Unknown provider: ${provider}`);
+      if (!bestEffortDeliver) throw err;
+      logDeliveryError(err);
+    }
   }
 
   if (opts.json) {
@@ -414,22 +453,55 @@ export async function agentCommand(
       runtime.log(lines.join("\n"));
     }
 
-    if (deliver && targetTo) {
-      const text = payload.text ?? "";
-      const media = mediaList;
-      if (!text && media.length === 0) continue;
+    if (!deliver) continue;
 
-      const primaryMedia = media[0];
-      await deps.sendMessageWhatsApp(targetTo, text, {
-        verbose: false,
-        mediaUrl: primaryMedia,
-      });
+    const text = payload.text ?? "";
+    const media = mediaList;
+    if (!text && media.length === 0) continue;
 
-      for (const extra of media.slice(1)) {
-        await deps.sendMessageWhatsApp(targetTo, "", {
+    if (provider === "whatsapp" && whatsappTarget) {
+      try {
+        const primaryMedia = media[0];
+        await deps.sendMessageWhatsApp(whatsappTarget, text, {
           verbose: false,
-          mediaUrl: extra,
+          mediaUrl: primaryMedia,
         });
+
+        for (const extra of media.slice(1)) {
+          await deps.sendMessageWhatsApp(whatsappTarget, "", {
+            verbose: false,
+            mediaUrl: extra,
+          });
+        }
+      } catch (err) {
+        if (!bestEffortDeliver) throw err;
+        logDeliveryError(err);
+      }
+      continue;
+    }
+
+    if (provider === "telegram" && telegramTarget) {
+      try {
+        if (media.length === 0) {
+          for (const chunk of chunkText(text, 4000)) {
+            await deps.sendMessageTelegram(telegramTarget, chunk, {
+              verbose: false,
+            });
+          }
+        } else {
+          let first = true;
+          for (const url of media) {
+            const caption = first ? text : "";
+            first = false;
+            await deps.sendMessageTelegram(telegramTarget, caption, {
+              verbose: false,
+              mediaUrl: url,
+            });
+          }
+        }
+      } catch (err) {
+        if (!bestEffortDeliver) throw err;
+        logDeliveryError(err);
       }
     }
   }

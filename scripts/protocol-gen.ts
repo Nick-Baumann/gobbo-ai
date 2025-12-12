@@ -2,12 +2,6 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProtocolSchemas } from "../src/gateway/protocol/schema.js";
-import {
-  InputData,
-  JSONSchemaInput,
-  JSONSchemaStore,
-  quicktype,
-} from "quicktype-core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -53,40 +47,8 @@ async function writeJsonSchema() {
   return { jsonSchemaPath, schemaString: JSON.stringify(rootSchema) };
 }
 
-async function writeSwiftModels(schemaString: string) {
-  const schemaInput = new JSONSchemaInput(new JSONSchemaStore());
-  await schemaInput.addSource({ name: "ClawdisGateway", schema: schemaString });
-
-  const inputData = new InputData();
-  inputData.addInput(schemaInput);
-
-  const qtResult = await quicktype({
-    inputData,
-    lang: "swift",
-    topLevel: "GatewayFrame",
-    rendererOptions: {
-      "struct-or-class": "struct",
-      "immutable-types": "true",
-      "accessLevel": "public",
-    },
-  });
-
-  const swiftDir = path.join(
-    repoRoot,
-    "apps",
-    "macos",
-    "Sources",
-    "ClawdisProtocol",
-  );
-  await fs.mkdir(swiftDir, { recursive: true });
-  const swiftPath = path.join(swiftDir, "Protocol.swift");
-  await fs.writeFile(swiftPath, qtResult.lines.join("\n"));
-  console.log(`wrote ${swiftPath}`);
-}
-
 async function main() {
-  const { schemaString } = await writeJsonSchema();
-  await writeSwiftModels(schemaString);
+  await writeJsonSchema();
 }
 
 main().catch((err) => {

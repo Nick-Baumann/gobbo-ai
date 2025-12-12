@@ -13,9 +13,10 @@ import Testing
 
     @Test func forwardOptionsDefaults() {
         let opts = VoiceWakeForwarder.ForwardOptions()
-        #expect(opts.session == "main")
+        #expect(opts.sessionKey == "main")
         #expect(opts.thinking == "low")
         #expect(opts.deliver == true)
         #expect(opts.to == nil)
+        #expect(opts.channel == "last")
     }
 }

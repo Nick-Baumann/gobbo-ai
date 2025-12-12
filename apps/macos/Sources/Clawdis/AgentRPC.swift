@@ -62,17 +62,19 @@ actor AgentRPC {
     func send(
         text: String,
         thinking: String?,
-        session: String,
+        sessionKey: String,
         deliver: Bool,
-        to: String?) async -> (ok: Bool, text: String?, error: String?)
+        to: String?,
+        channel: String? = nil) async -> (ok: Bool, text: String?, error: String?)
     {
         do {
             let params: [String: Any] = [
                 "message": text,
-                "sessionId": session,
+                "sessionKey": sessionKey,
                 "thinking": thinking ?? "default",
                 "deliver": deliver,
                 "to": to ?? "",
+                "channel": channel ?? "",
                 "idempotencyKey": UUID().uuidString,
             ]
             _ = try await self.controlRequest(method: "agent", params: ControlRequestParams(raw: params))

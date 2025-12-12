@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -20,6 +21,8 @@ export type SessionEntry = {
   totalTokens?: number;
   model?: string;
   contextTokens?: number;
+  lastChannel?: "whatsapp" | "telegram" | "webchat";
+  lastTo?: string;
   // Optional flag to mirror Mac app UI and future sync states.
   syncing?: boolean | string;
 };
@@ -64,6 +67,37 @@ export async function saveSessionStore(
     JSON.stringify(store, null, 2),
     "utf-8",
   );
+}
+
+export async function updateLastRoute(params: {
+  storePath: string;
+  sessionKey: string;
+  channel: SessionEntry["lastChannel"];
+  to?: string;
+}) {
+  const { storePath, sessionKey, channel, to } = params;
+  const store = loadSessionStore(storePath);
+  const existing = store[sessionKey];
+  const now = Date.now();
+  const next: SessionEntry = {
+    sessionId: existing?.sessionId ?? crypto.randomUUID(),
+    updatedAt: Math.max(existing?.updatedAt ?? 0, now),
+    systemSent: existing?.systemSent,
+    abortedLastRun: existing?.abortedLastRun,
+    thinkingLevel: existing?.thinkingLevel,
+    verboseLevel: existing?.verboseLevel,
+    inputTokens: existing?.inputTokens,
+    outputTokens: existing?.outputTokens,
+    totalTokens: existing?.totalTokens,
+    model: existing?.model,
+    contextTokens: existing?.contextTokens,
+    syncing: existing?.syncing,
+    lastChannel: channel,
+    lastTo: to?.trim() ? to.trim() : undefined,
+  };
+  store[sessionKey] = next;
+  await saveSessionStore(storePath, store);
+  return next;
 }
 
 // Decide which session bucket to use (per-sender vs global).

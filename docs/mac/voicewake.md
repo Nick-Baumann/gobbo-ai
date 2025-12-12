@@ -5,7 +5,7 @@ read_when:
 ---
 # Voice Wake & Push-to-Talk
 
-Updated: 2025-12-08 · Owners: mac app
+Updated: 2025-12-12 · Owners: mac app
 
 ## Modes
 - **Wake-word mode** (default): always-on Speech recognizer waits for trigger tokens (`swabbleTriggerWords`). On match it starts capture, shows the overlay with partial text, and auto-sends after silence.
@@ -29,11 +29,12 @@ Updated: 2025-12-08 · Owners: mac app
 ## User-facing settings
 - **Voice Wake** toggle: enables wake-word runtime.
 - **Hold Cmd+Fn to talk**: enables the push-to-talk monitor. Disabled on macOS < 26.
-- Language & mic pickers, live level meter, trigger-word table, tester, forward target/command all remain unchanged.
+- Language & mic pickers, live level meter, trigger-word table, tester.
 - **Sounds**: chimes on trigger detect and on send; defaults to the macOS “Glass” system sound. You can pick any `NSSound`-loadable file (e.g. MP3/WAV/AIFF) for each event or choose **No Sound**.
 
 ## Forwarding behavior
 - When Voice Wake is enabled, transcripts are forwarded to the active gateway/agent (the same local vs remote mode used by the rest of the mac app).
+- Replies are delivered to the **last-used main surface** (WhatsApp/Telegram/WebChat). If delivery fails, the error is logged and the run is still visible via WebChat/session logs.
 
 ## Forwarding payload
 - `VoiceWakeForwarder.prefixedTranscript(_:)` prepends the machine hint before sending. Shared between wake-word and push-to-talk paths.
