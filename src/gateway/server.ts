@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import {
+  createServer as createHttpServer,
+  type Server as HttpServer,
+} from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import chalk from "chalk";
 import { type WebSocket, WebSocketServer } from "ws";
 import { createDefaultDeps } from "../cli/deps.js";
@@ -850,7 +853,9 @@ export async function startGatewayServer(
                 break;
               }
             }
-            const { storePath, store, entry } = loadSessionEntry(p.sessionKey);
+            const { cfg, storePath, store, entry } = loadSessionEntry(
+              p.sessionKey,
+            );
             const now = Date.now();
             const sessionId = entry?.sessionId ?? randomUUID();
             const sessionEntry: SessionEntry = {
@@ -859,7 +864,15 @@ export async function startGatewayServer(
               thinkingLevel: entry?.thinkingLevel,
               verboseLevel: entry?.verboseLevel,
               systemSent: entry?.systemSent,
+              lastChannel: entry?.lastChannel,
+              lastTo: entry?.lastTo,
             };
+            const mainKey =
+              (cfg.inbound?.reply?.session?.mainKey ?? "main").trim() || "main";
+            if (p.sessionKey === mainKey) {
+              sessionEntry.lastChannel = "webchat";
+              delete sessionEntry.lastTo;
+            }
             if (store) {
               store[p.sessionKey] = sessionEntry;
               if (storePath) {
@@ -1081,8 +1094,10 @@ export async function startGatewayServer(
               message: string;
               to?: string;
               sessionId?: string;
+              sessionKey?: string;
               thinking?: string;
               deliver?: boolean;
+              channel?: string;
               idempotencyKey: string;
               timeout?: number;
             };
@@ -1095,7 +1110,90 @@ export async function startGatewayServer(
               break;
             }
             const message = params.message.trim();
-            const runId = params.sessionId || randomUUID();
+
+            const requestedSessionKey =
+              typeof params.sessionKey === "string" && params.sessionKey.trim()
+                ? params.sessionKey.trim()
+                : undefined;
+            let resolvedSessionId = params.sessionId?.trim() || undefined;
+            let sessionEntry: SessionEntry | undefined;
+            let bestEffortDeliver = false;
+
+            if (requestedSessionKey) {
+              const { cfg, storePath, store, entry } =
+                loadSessionEntry(requestedSessionKey);
+              const now = Date.now();
+              const sessionId = entry?.sessionId ?? randomUUID();
+              sessionEntry = {
+                sessionId,
+                updatedAt: now,
+                thinkingLevel: entry?.thinkingLevel,
+                verboseLevel: entry?.verboseLevel,
+                systemSent: entry?.systemSent,
+                lastChannel: entry?.lastChannel,
+                lastTo: entry?.lastTo,
+              };
+              if (store) {
+                store[requestedSessionKey] = sessionEntry;
+                if (storePath) {
+                  await saveSessionStore(storePath, store);
+                }
+              }
+              resolvedSessionId = sessionId;
+              const mainKey =
+                (cfg.inbound?.reply?.session?.mainKey ?? "main").trim() ||
+                "main";
+              if (requestedSessionKey === mainKey) {
+                chatRunSessions.set(sessionId, requestedSessionKey);
+                bestEffortDeliver = true;
+              }
+            }
+
+            const runId = resolvedSessionId || randomUUID();
+
+            const requestedChannelRaw =
+              typeof params.channel === "string" ? params.channel.trim() : "";
+            const requestedChannel = requestedChannelRaw
+              ? requestedChannelRaw.toLowerCase()
+              : "last";
+
+            const lastChannel = sessionEntry?.lastChannel;
+            const lastTo =
+              typeof sessionEntry?.lastTo === "string"
+                ? sessionEntry.lastTo.trim()
+                : "";
+
+            const resolvedChannel = (() => {
+              if (requestedChannel === "last") {
+                return lastChannel ?? "whatsapp";
+              }
+              if (
+                requestedChannel === "whatsapp" ||
+                requestedChannel === "telegram" ||
+                requestedChannel === "webchat"
+              ) {
+                return requestedChannel;
+              }
+              return lastChannel ?? "whatsapp";
+            })();
+
+            const resolvedTo = (() => {
+              const explicit =
+                typeof params.to === "string" && params.to.trim()
+                  ? params.to.trim()
+                  : undefined;
+              if (explicit) return explicit;
+              if (
+                resolvedChannel === "whatsapp" ||
+                resolvedChannel === "telegram"
+              ) {
+                return lastTo || undefined;
+              }
+              return undefined;
+            })();
+
+            const deliver =
+              params.deliver === true && resolvedChannel !== "webchat";
             // Acknowledge via event to avoid double res frames
             const ackEvent = {
               type: "event",
@@ -1114,11 +1212,14 @@ export async function startGatewayServer(
               await agentCommand(
                 {
                   message,
-                  to: params.to,
-                  sessionId: params.sessionId,
+                  to: resolvedTo,
+                  sessionId: resolvedSessionId,
                   thinking: params.thinking,
-                  deliver: params.deliver,
+                  deliver,
+                  provider: resolvedChannel,
                   timeout: params.timeout?.toString(),
+                  bestEffortDeliver,
+                  surface: "VoiceWake",
                 },
                 defaultRuntime,
                 deps,

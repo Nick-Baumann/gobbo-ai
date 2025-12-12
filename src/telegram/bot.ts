@@ -10,6 +10,7 @@ import { formatAgentEnvelope } from "../auto-reply/envelope.js";
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import { loadConfig } from "../config/config.js";
+import { resolveStorePath, updateLastRoute } from "../config/sessions.js";
 import { danger, logVerbose } from "../globals.js";
 import { getChildLogger } from "../logging.js";
 import { mediaKindFromMime } from "../media/constants.js";
@@ -144,6 +145,18 @@ export function createTelegramBot(opts: TelegramBotOptions) {
         MediaType: media?.contentType,
         MediaUrl: media?.path,
       };
+
+      if (!isGroup) {
+        const sessionCfg = cfg.inbound?.reply?.session;
+        const mainKey = (sessionCfg?.mainKey ?? "main").trim() || "main";
+        const storePath = resolveStorePath(sessionCfg?.store);
+        await updateLastRoute({
+          storePath,
+          sessionKey: mainKey,
+          channel: "telegram",
+          to: String(chatId),
+        });
+      }
 
       if (logVerbose()) {
         const preview = body.slice(0, 200).replace(/\n/g, "\\n");

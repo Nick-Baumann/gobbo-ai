@@ -10,6 +10,7 @@ import {
   resolveSessionKey,
   resolveStorePath,
   saveSessionStore,
+  updateLastRoute,
 } from "../config/sessions.js";
 import { danger, isVerbose, logVerbose, success } from "../globals.js";
 import { emitHeartbeatEvent } from "../infra/heartbeat-events.js";
@@ -848,6 +849,23 @@ export async function monitorWebProvider(
       console.log(
         `\n[${tsDisplay}] ${fromDisplay} -> ${latest.to}: ${combinedBody}`,
       );
+
+      if (latest.chatType !== "group") {
+        const sessionCfg = cfg.inbound?.reply?.session;
+        const mainKey = (sessionCfg?.mainKey ?? "main").trim() || "main";
+        const storePath = resolveStorePath(sessionCfg?.store);
+        const to = latest.senderE164
+          ? normalizeE164(latest.senderE164)
+          : jidToE164(latest.from);
+        if (to) {
+          await updateLastRoute({
+            storePath,
+            sessionKey: mainKey,
+            channel: "whatsapp",
+            to,
+          });
+        }
+      }
 
       const replyResult = await (replyResolver ?? getReplyFromConfig)(
         {

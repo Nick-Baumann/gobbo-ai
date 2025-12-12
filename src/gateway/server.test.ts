@@ -2,8 +2,8 @@ import { type AddressInfo, createServer } from "node:net";
 import { describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 import { emitAgentEvent } from "../infra/agent-events.js";
-import { startGatewayServer } from "./server.js";
 import { GatewayLockError } from "../infra/gateway-lock.js";
+import { startGatewayServer } from "./server.js";
 
 vi.mock("../commands/health.js", () => ({
   getHealthSnapshot: vi.fn().mockResolvedValue({ ok: true, stub: true }),
@@ -35,7 +35,10 @@ async function getFreePort(): Promise<number> {
   });
 }
 
-async function occupyPort(): Promise<{ server: ReturnType<typeof createServer>; port: number }> {
+async function occupyPort(): Promise<{
+  server: ReturnType<typeof createServer>;
+  port: number;
+}> {
   return await new Promise((resolve, reject) => {
     const server = createServer();
     server.once("error", reject);
