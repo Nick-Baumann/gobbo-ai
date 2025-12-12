@@ -35,6 +35,7 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
     private let schemeHandler: CanvasSchemeHandler
     private let webView: WKWebView
     private let watcher: CanvasFileWatcher
+    private let container: HoverChromeContainerView
     let presentation: CanvasPresentation
 
     var onVisibilityChanged: ((Bool) -> Void)?
@@ -65,12 +66,15 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
             }
         }
 
-        let content = HoverChromeContainerView(containing: self.webView)
-        let window = Self.makeWindow(for: presentation, contentView: content)
+        self.container = HoverChromeContainerView(containing: self.webView)
+        let window = Self.makeWindow(for: presentation, contentView: self.container)
         super.init(window: window)
 
         self.webView.navigationDelegate = self
         self.window?.delegate = self
+        self.container.onClose = { [weak self] in
+            self?.hideCanvas()
+        }
 
         self.watcher.start()
     }
@@ -287,18 +291,15 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
 
 // MARK: - Hover chrome container
 
-private final class PassthroughView: NSView {
-    override func hitTest(_: NSPoint) -> NSView? { nil }
-}
-
 private final class HoverChromeContainerView: NSView {
     private let content: NSView
-    private let chrome: NSView
+    private let chrome: CanvasChromeOverlayView
     private var tracking: NSTrackingArea?
+    var onClose: (() -> Void)?
 
     init(containing content: NSView) {
         self.content = content
-        self.chrome = PassthroughView(frame: .zero)
+        self.chrome = CanvasChromeOverlayView(frame: .zero)
         super.init(frame: .zero)
 
         self.wantsLayer = true
@@ -310,13 +311,8 @@ private final class HoverChromeContainerView: NSView {
         self.addSubview(self.content)
 
         self.chrome.translatesAutoresizingMaskIntoConstraints = false
-        self.chrome.wantsLayer = true
-        self.chrome.layer?.cornerRadius = 12
-        self.chrome.layer?.masksToBounds = true
-        self.chrome.layer?.borderWidth = 1
-        self.chrome.layer?.borderColor = NSColor.black.withAlphaComponent(0.18).cgColor
-        self.chrome.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.02).cgColor
         self.chrome.alphaValue = 0
+        self.chrome.onClose = { [weak self] in self?.onClose?() }
         self.addSubview(self.chrome)
 
         NSLayoutConstraint.activate([
@@ -347,7 +343,81 @@ private final class HoverChromeContainerView: NSView {
             userInfo: nil)
         self.addTrackingArea(area)
         self.tracking = area
+}
+
+private final class CanvasDragHandleView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        self.window?.performDrag(with: event)
     }
+
+    override func acceptsFirstMouse(for _: NSEvent?) -> Bool { true }
+}
+
+private final class CanvasChromeOverlayView: NSView {
+    var onClose: (() -> Void)?
+
+    private let dragHandle = CanvasDragHandleView(frame: .zero)
+    private let closeButton: NSButton = {
+        let img = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
+            ?? NSImage(size: NSSize(width: 18, height: 18))
+        let btn = NSButton(image: img, target: nil, action: nil)
+        btn.isBordered = false
+        btn.bezelStyle = .regularSquare
+        btn.imageScaling = .scaleProportionallyDown
+        btn.contentTintColor = NSColor.secondaryLabelColor
+        btn.toolTip = "Close"
+        return btn
+    }()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+
+        self.wantsLayer = true
+        self.layer?.cornerRadius = 12
+        self.layer?.masksToBounds = true
+        self.layer?.borderWidth = 1
+        self.layer?.borderColor = NSColor.black.withAlphaComponent(0.18).cgColor
+        self.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.02).cgColor
+
+        self.dragHandle.translatesAutoresizingMaskIntoConstraints = false
+        self.dragHandle.wantsLayer = true
+        self.dragHandle.layer?.backgroundColor = NSColor.clear.cgColor
+        self.addSubview(self.dragHandle)
+
+        self.closeButton.translatesAutoresizingMaskIntoConstraints = false
+        self.closeButton.target = self
+        self.closeButton.action = #selector(self.handleClose)
+        self.addSubview(self.closeButton)
+
+        NSLayoutConstraint.activate([
+            self.dragHandle.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            self.dragHandle.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+            self.dragHandle.topAnchor.constraint(equalTo: self.topAnchor),
+            self.dragHandle.heightAnchor.constraint(equalToConstant: 30),
+
+            self.closeButton.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -8),
+            self.closeButton.topAnchor.constraint(equalTo: self.topAnchor, constant: 8),
+            self.closeButton.widthAnchor.constraint(equalToConstant: 18),
+            self.closeButton.heightAnchor.constraint(equalToConstant: 18),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // When the chrome is hidden, do not intercept any mouse events (let the WKWebView receive them).
+        guard self.alphaValue > 0.02 else { return nil }
+
+        if self.closeButton.frame.contains(point) { return self.closeButton }
+        if self.dragHandle.frame.contains(point) { return self.dragHandle }
+        return nil
+    }
+
+    @objc private func handleClose() {
+        self.onClose?()
+    }
+}
 
     override func mouseEntered(with _: NSEvent) {
         NSAnimationContext.runAnimationGroup { ctx in
