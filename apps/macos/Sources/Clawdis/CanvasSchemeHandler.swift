@@ -87,22 +87,22 @@ final class CanvasSchemeHandler: NSObject, WKURLSchemeHandler {
             return self.html("Forbidden", title: "Canvas: 403")
         }
 
-	        do {
-	            let data = try Data(contentsOf: standardizedFile)
-	            let mime = CanvasScheme.mimeType(forExtension: standardizedFile.pathExtension)
-	            let servedPath = standardizedFile.path
-	            canvasLogger.debug(
-	                "served \(session, privacy: .public)/\(path, privacy: .public) -> \(servedPath, privacy: .public)")
-	            return CanvasResponse(mime: mime, data: data)
-	        } catch {
-	            let failedPath = standardizedFile.path
-	            let errorText = error.localizedDescription
-	            canvasLogger
-	                .error(
-	                    "failed reading \(failedPath, privacy: .public): \(errorText, privacy: .public)")
-	            return self.html("Failed to read file.", title: "Canvas error")
-	        }
-	    }
+        do {
+            let data = try Data(contentsOf: standardizedFile)
+            let mime = CanvasScheme.mimeType(forExtension: standardizedFile.pathExtension)
+            let servedPath = standardizedFile.path
+            canvasLogger.debug(
+                "served \(session, privacy: .public)/\(path, privacy: .public) -> \(servedPath, privacy: .public)")
+            return CanvasResponse(mime: mime, data: data)
+        } catch {
+            let failedPath = standardizedFile.path
+            let errorText = error.localizedDescription
+            canvasLogger
+                .error(
+                    "failed reading \(failedPath, privacy: .public): \(errorText, privacy: .public)")
+            return self.html("Failed to read file.", title: "Canvas error")
+        }
+    }
 
     private func resolveFileURL(sessionRoot: URL, requestPath: String) -> URL? {
         let fm = FileManager.default

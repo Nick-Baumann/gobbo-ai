@@ -234,12 +234,12 @@ final actor ControlSocketServer {
         #if DEBUG
         // Debug-only escape hatch: allow unsigned/same-UID clients when explicitly opted in.
         // This keeps local development workable (e.g. a SwiftPM-built `clawdis-mac` binary).
-	        let env = ProcessInfo.processInfo.environment["CLAWDIS_ALLOW_UNSIGNED_SOCKET_CLIENTS"]
-	        if env == "1", let callerUID = self.uid(for: pid), callerUID == getuid() {
-	            self.logger.warning(
-	                "allowing unsigned same-UID socket client pid=\(pid) (CLAWDIS_ALLOW_UNSIGNED_SOCKET_CLIENTS=1)")
-	            return true
-	        }
+        let env = ProcessInfo.processInfo.environment["CLAWDIS_ALLOW_UNSIGNED_SOCKET_CLIENTS"]
+        if env == "1", let callerUID = self.uid(for: pid), callerUID == getuid() {
+            self.logger.warning(
+                "allowing unsigned same-UID socket client pid=\(pid) (CLAWDIS_ALLOW_UNSIGNED_SOCKET_CLIENTS=1)")
+            return true
+        }
         #endif
 
         if let callerUID = self.uid(for: pid) {

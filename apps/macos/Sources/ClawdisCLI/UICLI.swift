@@ -323,17 +323,17 @@ enum UICLI {
                 "screenshotPath": screenshotPath,
                 "result": self.toJSONObject(detection),
             ])
-	        } else {
-	            FileHandle.standardOutput.write(Data((screenshotPath + "\n").utf8))
-	            for el in detection.elements.all {
-	                let b = el.bounds
-	                let label = (el.label ?? el.value ?? "").replacingOccurrences(of: "\n", with: " ")
-	                let coords = "\(Int(b.origin.x)),\(Int(b.origin.y))"
-	                let size = "\(Int(b.size.width))x\(Int(b.size.height))"
-	                let line = "\(el.id)\t\(el.type)\t\(coords) \(size)\t\(label)\n"
-	                FileHandle.standardOutput.write(Data(line.utf8))
-	            }
-	        }
+        } else {
+            FileHandle.standardOutput.write(Data((screenshotPath + "\n").utf8))
+            for el in detection.elements.all {
+                let b = el.bounds
+                let label = (el.label ?? el.value ?? "").replacingOccurrences(of: "\n", with: " ")
+                let coords = "\(Int(b.origin.x)),\(Int(b.origin.y))"
+                let size = "\(Int(b.size.width))x\(Int(b.size.height))"
+                let line = "\(el.id)\t\(el.type)\t\(coords) \(size)\t\(label)\n"
+                FileHandle.standardOutput.write(Data(line.utf8))
+            }
+        }
         return 0
     }
 
@@ -522,16 +522,16 @@ enum UICLI {
             ])
         }
 
-	        do {
-	            return try await client.getMostRecentSnapshot(applicationBundleId: resolvedBundle)
-	        } catch {
-	            let command = "clawdis-mac ui see --bundle-id \(resolvedBundle)"
-	            let help = "No recent snapshot for \(resolvedBundle). Run `\(command)` first."
-	            throw NSError(domain: "clawdis.ui", code: 6, userInfo: [
-	                NSLocalizedDescriptionKey: help,
-	            ])
-	        }
-	    }
+        do {
+            return try await client.getMostRecentSnapshot(applicationBundleId: resolvedBundle)
+        } catch {
+            let command = "clawdis-mac ui see --bundle-id \(resolvedBundle)"
+            let help = "No recent snapshot for \(resolvedBundle). Run `\(command)` first."
+            throw NSError(domain: "clawdis.ui", code: 6, userInfo: [
+                NSLocalizedDescriptionKey: help,
+            ])
+        }
+    }
 
     // MARK: - IO helpers
 

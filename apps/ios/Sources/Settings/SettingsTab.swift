@@ -1,4 +1,12 @@
+import ClawdisKit
 import SwiftUI
+
+@MainActor
+private final class ConnectStatusStore: ObservableObject {
+    @Published var text: String?
+}
+
+extension ConnectStatusStore: @unchecked Sendable {}
 
 struct SettingsTab: View {
     @EnvironmentObject private var appModel: NodeAppModel
@@ -8,7 +16,7 @@ struct SettingsTab: View {
     @AppStorage("voiceWake.enabled") private var voiceWakeEnabled: Bool = false
     @AppStorage("bridge.preferredStableID") private var preferredBridgeStableID: String = ""
     @StateObject private var discovery = BridgeDiscoveryModel()
-    @State private var connectStatus: String?
+    @StateObject private var connectStatus = ConnectStatusStore()
     @State private var connectingBridgeID: String?
     @State private var didAutoConnect = false
 
@@ -47,8 +55,8 @@ struct SettingsTab: View {
                         self.bridgeList(showing: .all)
                     }
 
-                    if let connectStatus {
-                        Text(connectStatus)
+                    if let text = self.connectStatus.text {
+                        Text(text)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -77,22 +85,20 @@ struct SettingsTab: View {
                 guard let existing, !existing.isEmpty else { return }
                 guard let target = self.pickAutoConnectBridge(from: newValue) else { return }
 
-	                self.didAutoConnect = true
-	                self.preferredBridgeStableID = target.stableID
-	                self.appModel.connectToBridge(
-	                    endpoint: target.endpoint,
-	                    hello: BridgeHello(
-	                        nodeId: self.instanceId,
-	                        displayName: self.displayName,
-	                        token: existing,
-	                        platform: self.platformString(),
-	                        version: self.appVersion()
-	                    )
-	                )
-	                self.connectStatus = nil
-	            }
+                self.didAutoConnect = true
+                self.preferredBridgeStableID = target.stableID
+                self.appModel.connectToBridge(
+                    endpoint: target.endpoint,
+                    hello: BridgeHello(
+                        nodeId: self.instanceId,
+                        displayName: self.displayName,
+                        token: existing,
+                        platform: self.platformString(),
+                        version: self.appVersion()))
+                self.connectStatus.text = nil
+            }
             .onChange(of: self.appModel.bridgeServerName) { _, _ in
-                self.connectStatus = nil
+                self.connectStatus.text = nil
             }
         }
     }
@@ -173,22 +179,21 @@ struct SettingsTab: View {
                 existing :
                 nil
 
-	            let hello = BridgeHello(
-	                nodeId: self.instanceId,
-	                displayName: self.displayName,
-	                token: existingToken,
-	                platform: self.platformString(),
-	                version: self.appVersion()
-	            )
-	            let token = try await BridgeClient().pairAndHello(
-	                endpoint: bridge.endpoint,
-	                hello: hello,
-	                onStatus: { status in
-	                    Task { @MainActor in
-	                        self.connectStatus = status
-	                    }
-	                }
-	            )
+            let hello = BridgeHello(
+                nodeId: self.instanceId,
+                displayName: self.displayName,
+                token: existingToken,
+                platform: self.platformString(),
+                version: self.appVersion())
+            let token = try await BridgeClient().pairAndHello(
+                endpoint: bridge.endpoint,
+                hello: hello,
+                onStatus: { status in
+                    let store = self.connectStatus
+                    Task { @MainActor in
+                        store.text = status
+                    }
+                })
 
             if !token.isEmpty, token != existingToken {
                 _ = KeychainStore.saveString(
@@ -197,19 +202,17 @@ struct SettingsTab: View {
                     account: self.keychainAccount())
             }
 
-	            self.appModel.connectToBridge(
-	                endpoint: bridge.endpoint,
-	                hello: BridgeHello(
-	                    nodeId: self.instanceId,
-	                    displayName: self.displayName,
-	                    token: token,
-	                    platform: self.platformString(),
-	                    version: self.appVersion()
-	                )
-	            )
+            self.appModel.connectToBridge(
+                endpoint: bridge.endpoint,
+                hello: BridgeHello(
+                    nodeId: self.instanceId,
+                    displayName: self.displayName,
+                    token: token,
+                    platform: self.platformString(),
+                    version: self.appVersion()))
 
         } catch {
-            self.connectStatus = "Failed: \(error.localizedDescription)"
+            self.connectStatus.text = "Failed: \(error.localizedDescription)"
         }
     }
 

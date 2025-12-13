@@ -105,8 +105,8 @@ enum BrowserCLI {
         sub: String,
         options: RunOptions,
         baseURL: URL,
-        jsonOutput: Bool
-    ) async throws -> Int32 {
+        jsonOutput: Bool) async throws -> Int32
+    {
         switch sub {
         case "status":
             return try await self.handleStatus(baseURL: baseURL, jsonOutput: jsonOutput)
@@ -172,8 +172,7 @@ enum BrowserCLI {
             method: "POST",
             url: url,
             body: ["url": urlString],
-            timeoutInterval: 15.0
-        )
+            timeoutInterval: 15.0)
         self.printResult(jsonOutput: jsonOutput, res: res)
         return 0
     }
@@ -188,8 +187,7 @@ enum BrowserCLI {
             method: "POST",
             url: url,
             body: ["targetId": id],
-            timeoutInterval: 5.0
-        )
+            timeoutInterval: 5.0)
         self.printResult(jsonOutput: jsonOutput, res: res)
         return 0
     }
@@ -250,8 +248,7 @@ enum BrowserCLI {
                 "targetId": options.targetId ?? "",
                 "await": options.awaitPromise,
             ],
-            timeoutInterval: 15.0
-        )
+            timeoutInterval: 15.0)
 
         if jsonOutput {
             self.printJSON(ok: true, result: res)

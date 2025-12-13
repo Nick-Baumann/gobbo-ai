@@ -69,13 +69,12 @@ struct CronSettings: View {
                             .font(.headline)
                         Spacer()
                     }
-	                    Text(
-	                        "Jobs are saved, but they will not run automatically until `cron.enabled` is set to `true` " +
-	                            "and the Gateway restarts."
-	                    )
-	                        .font(.footnote)
-	                        .foregroundStyle(.secondary)
-	                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        "Jobs are saved, but they will not run automatically until `cron.enabled` is set to `true` " +
+                            "and the Gateway restarts.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let storePath = self.store.schedulerStorePath, !storePath.isEmpty {
                         Text(storePath)
                             .font(.caption.monospaced())
@@ -497,6 +496,21 @@ private struct CronJobEditor: View {
     let onSave: ([String: Any]) -> Void
 
     private let labelColumnWidth: CGFloat = 160
+    private static let introText =
+        "Create a schedule that wakes clawd via the Gateway. "
+            + "Use an isolated session for agent turns so your main chat stays clean."
+    private static let sessionTargetNote =
+        "Main jobs post a system event into the current main session. "
+            + "Isolated jobs run clawd in a dedicated session and can deliver results (WhatsApp/Telegram/etc)."
+    private static let scheduleKindNote =
+        "“At” runs once, “Every” repeats with a duration, “Cron” uses a 5-field Unix expression."
+    private static let isolatedPayloadNote =
+        "Isolated jobs always run an agent turn. The result can be delivered to a surface, "
+            + "and a short summary is posted back to your main chat."
+    private static let mainPayloadNote =
+        "System events are injected into the current main session. Agent turns require an isolated session target."
+    private static let mainSummaryNote =
+        "Controls the label used when posting the completion summary back to the main session."
 
     @State private var name: String = ""
     @State private var enabled: Bool = true
@@ -527,9 +541,7 @@ private struct CronJobEditor: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(self.job == nil ? "New cron job" : "Edit cron job")
                     .font(.title3.weight(.semibold))
-                Text(
-                    "Create a schedule that wakes clawd via the Gateway. Use an isolated session for agent turns so your main chat stays clean."
-                )
+                Text(Self.introText)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -575,8 +587,7 @@ private struct CronJobEditor: View {
                                 Color.clear
                                     .frame(width: self.labelColumnWidth, height: 1)
                                 Text(
-                                    "Main jobs post a system event into the current main session. Isolated jobs run clawd in a dedicated session and can deliver results (WhatsApp/Telegram/etc)."
-                                )
+                                    Self.sessionTargetNote)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -601,8 +612,7 @@ private struct CronJobEditor: View {
                                 Color.clear
                                     .frame(width: self.labelColumnWidth, height: 1)
                                 Text(
-                                    "“At” runs once, “Every” repeats with a duration, “Cron” uses a 5-field Unix expression."
-                                )
+                                    Self.scheduleKindNote)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -646,9 +656,7 @@ private struct CronJobEditor: View {
                     GroupBox("Payload") {
                         VStack(alignment: .leading, spacing: 10) {
                             if self.sessionTarget == .isolated {
-                                Text(
-                                    "Isolated jobs always run an agent turn. The result can be delivered to a surface, and a short summary is posted back to your main chat."
-                                )
+                                Text(Self.isolatedPayloadNote)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -669,8 +677,7 @@ private struct CronJobEditor: View {
                                         Color.clear
                                             .frame(width: self.labelColumnWidth, height: 1)
                                         Text(
-                                            "System events are injected into the current main session. Agent turns require an isolated session target."
-                                        )
+                                            Self.mainPayloadNote)
                                             .font(.footnote)
                                             .foregroundStyle(.secondary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -703,8 +710,7 @@ private struct CronJobEditor: View {
                                     Color.clear
                                         .frame(width: self.labelColumnWidth, height: 1)
                                     Text(
-                                        "Controls the label used when posting the completion summary back to the main session."
-                                    )
+                                        Self.mainSummaryNote)
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -914,14 +920,14 @@ private struct CronJobEditor: View {
         }()
 
         if self.sessionTarget == .main, payload["kind"] as? String == "agentTurn" {
-	            throw NSError(
-	                domain: "Cron",
-	                code: 0,
-	                userInfo: [
-	                    NSLocalizedDescriptionKey:
-	                        "Main session jobs require systemEvent payloads (switch Session target to isolated).",
-	                ])
-	        }
+            throw NSError(
+                domain: "Cron",
+                code: 0,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Main session jobs require systemEvent payloads (switch Session target to isolated).",
+                ])
+        }
 
         if self.sessionTarget == .isolated, payload["kind"] as? String == "systemEvent" {
             throw NSError(

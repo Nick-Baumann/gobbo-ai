@@ -125,18 +125,18 @@ actor GatewayEndpointStore {
         for (_, continuation) in self.subscribers {
             continuation.yield(next)
         }
-	        switch next {
-	        case let .ready(mode, url, _):
-	            let modeDesc = String(describing: mode)
-	            let urlDesc = url.absoluteString
-	            self.logger
-	                .debug(
-	                    "resolved endpoint mode=\(modeDesc, privacy: .public) url=\(urlDesc, privacy: .public)")
-	        case let .unavailable(mode, reason):
-	            let modeDesc = String(describing: mode)
-	            self.logger
-	                .debug(
-	                    "endpoint unavailable mode=\(modeDesc, privacy: .public) reason=\(reason, privacy: .public)")
-	        }
-	    }
+        switch next {
+        case let .ready(mode, url, _):
+            let modeDesc = String(describing: mode)
+            let urlDesc = url.absoluteString
+            self.logger
+                .debug(
+                    "resolved endpoint mode=\(modeDesc, privacy: .public) url=\(urlDesc, privacy: .public)")
+        case let .unavailable(mode, reason):
+            let modeDesc = String(describing: mode)
+            self.logger
+                .debug(
+                    "endpoint unavailable mode=\(modeDesc, privacy: .public) reason=\(reason, privacy: .public)")
+        }
+    }
 }

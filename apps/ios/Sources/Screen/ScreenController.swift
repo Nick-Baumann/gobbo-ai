@@ -105,19 +105,19 @@ final class ScreenController: ObservableObject {
                         #000;
             overflow: hidden;
           }
-	          body::before {
-	            content:"";
-	            position: fixed;
-	            inset: -20%;
-	            background:
-	              repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
-	                                       transparent 1px, transparent 48px),
-	              repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
-	                                       transparent 1px, transparent 48px);
-	            transform: rotate(-7deg);
-	            opacity: 0.55;
-	            pointer-events: none;
-	          }
+          body::before {
+            content:"";
+            position: fixed;
+            inset: -20%;
+            background:
+              repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
+                                       transparent 1px, transparent 48px),
+              repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
+                                       transparent 1px, transparent 48px);
+            transform: rotate(-7deg);
+            opacity: 0.55;
+            pointer-events: none;
+          }
           canvas {
             display:block;
             width:100vw;

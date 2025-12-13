@@ -58,276 +58,269 @@ struct ClawdisCLI {
         enum Kind {
             case generic
         }
-	    }
+    }
 
-	    private static func parseCommandLine(args: [String]) throws -> ParsedCLIRequest {
-	        var args = args
-	        guard !args.isEmpty else { throw CLIError.help }
-	        let command = args.removeFirst()
+    private static func parseCommandLine(args: [String]) throws -> ParsedCLIRequest {
+        var args = args
+        guard !args.isEmpty else { throw CLIError.help }
+        let command = args.removeFirst()
 
-	        switch command {
-	        case "--help", "-h", "help":
-	            throw CLIError.help
+        switch command {
+        case "--help", "-h", "help":
+            throw CLIError.help
 
-	        case "--version", "-V", "version":
-	            throw CLIError.version
+        case "--version", "-V", "version":
+            throw CLIError.version
 
-	        case "notify":
-	            return try self.parseNotify(args: &args)
+        case "notify":
+            return try self.parseNotify(args: &args)
 
-	        case "ensure-permissions":
-	            return self.parseEnsurePermissions(args: &args)
+        case "ensure-permissions":
+            return self.parseEnsurePermissions(args: &args)
 
-	        case "run":
-	            return self.parseRunShell(args: &args)
+        case "run":
+            return self.parseRunShell(args: &args)
 
-	        case "status":
-	            return ParsedCLIRequest(request: .status, kind: .generic)
+        case "status":
+            return ParsedCLIRequest(request: .status, kind: .generic)
 
-	        case "rpc-status":
-	            return ParsedCLIRequest(request: .rpcStatus, kind: .generic)
+        case "rpc-status":
+            return ParsedCLIRequest(request: .rpcStatus, kind: .generic)
 
-	        case "agent":
-	            return try self.parseAgent(args: &args)
+        case "agent":
+            return try self.parseAgent(args: &args)
 
-	        case "node":
-	            return try self.parseNode(args: &args)
+        case "node":
+            return try self.parseNode(args: &args)
 
-	        case "canvas":
-	            return try self.parseCanvas(args: &args)
+        case "canvas":
+            return try self.parseCanvas(args: &args)
 
-	        default:
-	            throw CLIError.help
-	        }
-	    }
+        default:
+            throw CLIError.help
+        }
+    }
 
-	    private static func parseNotify(args: inout [String]) throws -> ParsedCLIRequest {
-	        var title: String?
-	        var body: String?
-	        var sound: String?
-	        var priority: NotificationPriority?
-	        var delivery: NotificationDelivery?
-	        while !args.isEmpty {
-	            let arg = args.removeFirst()
-	            switch arg {
-	            case "--title": title = args.popFirst()
-	            case "--body": body = args.popFirst()
-	            case "--sound": sound = args.popFirst()
-	            case "--priority":
-	                if let val = args.popFirst(), let p = NotificationPriority(rawValue: val) { priority = p }
-	            case "--delivery":
-	                if let val = args.popFirst(), let d = NotificationDelivery(rawValue: val) { delivery = d }
-	            default: break
-	            }
-	        }
-	        guard let t = title, let b = body else { throw CLIError.help }
-	        return ParsedCLIRequest(
-	            request: .notify(title: t, body: b, sound: sound, priority: priority, delivery: delivery),
-	            kind: .generic
-	        )
-	    }
+    private static func parseNotify(args: inout [String]) throws -> ParsedCLIRequest {
+        var title: String?
+        var body: String?
+        var sound: String?
+        var priority: NotificationPriority?
+        var delivery: NotificationDelivery?
+        while !args.isEmpty {
+            let arg = args.removeFirst()
+            switch arg {
+            case "--title": title = args.popFirst()
+            case "--body": body = args.popFirst()
+            case "--sound": sound = args.popFirst()
+            case "--priority":
+                if let val = args.popFirst(), let p = NotificationPriority(rawValue: val) { priority = p }
+            case "--delivery":
+                if let val = args.popFirst(), let d = NotificationDelivery(rawValue: val) { delivery = d }
+            default: break
+            }
+        }
+        guard let t = title, let b = body else { throw CLIError.help }
+        return ParsedCLIRequest(
+            request: .notify(title: t, body: b, sound: sound, priority: priority, delivery: delivery),
+            kind: .generic)
+    }
 
-	    private static func parseEnsurePermissions(args: inout [String]) -> ParsedCLIRequest {
-	        var caps: [Capability] = []
-	        var interactive = false
-	        while !args.isEmpty {
-	            let arg = args.removeFirst()
-	            switch arg {
-	            case "--cap":
-	                if let val = args.popFirst(), let cap = Capability(rawValue: val) { caps.append(cap) }
-	            case "--interactive":
-	                interactive = true
-	            default:
-	                break
-	            }
-	        }
-	        if caps.isEmpty { caps = Capability.allCases }
-	        return ParsedCLIRequest(request: .ensurePermissions(caps, interactive: interactive), kind: .generic)
-	    }
+    private static func parseEnsurePermissions(args: inout [String]) -> ParsedCLIRequest {
+        var caps: [Capability] = []
+        var interactive = false
+        while !args.isEmpty {
+            let arg = args.removeFirst()
+            switch arg {
+            case "--cap":
+                if let val = args.popFirst(), let cap = Capability(rawValue: val) { caps.append(cap) }
+            case "--interactive":
+                interactive = true
+            default:
+                break
+            }
+        }
+        if caps.isEmpty { caps = Capability.allCases }
+        return ParsedCLIRequest(request: .ensurePermissions(caps, interactive: interactive), kind: .generic)
+    }
 
-	    private static func parseRunShell(args: inout [String]) -> ParsedCLIRequest {
-	        var cwd: String?
-	        var env: [String: String] = [:]
-	        var timeout: Double?
-	        var needsSR = false
-	        var cmd: [String] = []
-	        while !args.isEmpty {
-	            let arg = args.removeFirst()
-	            switch arg {
-	            case "--cwd":
-	                cwd = args.popFirst()
-	            case "--env":
-	                if let pair = args.popFirst() {
-	                    self.parseEnvPair(pair, into: &env)
-	                }
-	            case "--timeout":
-	                if let val = args.popFirst(), let dbl = Double(val) { timeout = dbl }
-	            case "--needs-screen-recording":
-	                needsSR = true
-	            default:
-	                cmd.append(arg)
-	            }
-	        }
-	        return ParsedCLIRequest(
-	            request: .runShell(
-	                command: cmd,
-	                cwd: cwd,
-	                env: env.isEmpty ? nil : env,
-	                timeoutSec: timeout,
-	                needsScreenRecording: needsSR
-	            ),
-	            kind: .generic
-	        )
-	    }
+    private static func parseRunShell(args: inout [String]) -> ParsedCLIRequest {
+        var cwd: String?
+        var env: [String: String] = [:]
+        var timeout: Double?
+        var needsSR = false
+        var cmd: [String] = []
+        while !args.isEmpty {
+            let arg = args.removeFirst()
+            switch arg {
+            case "--cwd":
+                cwd = args.popFirst()
+            case "--env":
+                if let pair = args.popFirst() {
+                    self.parseEnvPair(pair, into: &env)
+                }
+            case "--timeout":
+                if let val = args.popFirst(), let dbl = Double(val) { timeout = dbl }
+            case "--needs-screen-recording":
+                needsSR = true
+            default:
+                cmd.append(arg)
+            }
+        }
+        return ParsedCLIRequest(
+            request: .runShell(
+                command: cmd,
+                cwd: cwd,
+                env: env.isEmpty ? nil : env,
+                timeoutSec: timeout,
+                needsScreenRecording: needsSR),
+            kind: .generic)
+    }
 
-	    private static func parseEnvPair(_ pair: String, into env: inout [String: String]) {
-	        guard let eq = pair.firstIndex(of: "=") else { return }
-	        let key = String(pair[..<eq])
-	        let value = String(pair[pair.index(after: eq)...])
-	        env[key] = value
-	    }
+    private static func parseEnvPair(_ pair: String, into env: inout [String: String]) {
+        guard let eq = pair.firstIndex(of: "=") else { return }
+        let key = String(pair[..<eq])
+        let value = String(pair[pair.index(after: eq)...])
+        env[key] = value
+    }
 
-	    private static func parseAgent(args: inout [String]) throws -> ParsedCLIRequest {
-	        var message: String?
-	        var thinking: String?
-	        var session: String?
-	        var deliver = false
-	        var to: String?
+    private static func parseAgent(args: inout [String]) throws -> ParsedCLIRequest {
+        var message: String?
+        var thinking: String?
+        var session: String?
+        var deliver = false
+        var to: String?
 
-	        while !args.isEmpty {
-	            let arg = args.removeFirst()
-	            switch arg {
-	            case "--message": message = args.popFirst()
-	            case "--thinking": thinking = args.popFirst()
-	            case "--session": session = args.popFirst()
-	            case "--deliver": deliver = true
-	            case "--to": to = args.popFirst()
-	            default:
-	                if message == nil {
-	                    message = arg
-	                }
-	            }
-	        }
+        while !args.isEmpty {
+            let arg = args.removeFirst()
+            switch arg {
+            case "--message": message = args.popFirst()
+            case "--thinking": thinking = args.popFirst()
+            case "--session": session = args.popFirst()
+            case "--deliver": deliver = true
+            case "--to": to = args.popFirst()
+            default:
+                if message == nil {
+                    message = arg
+                }
+            }
+        }
 
-	        guard let message else { throw CLIError.help }
-	        return ParsedCLIRequest(
-	            request: .agent(message: message, thinking: thinking, session: session, deliver: deliver, to: to),
-	            kind: .generic
-	        )
-	    }
+        guard let message else { throw CLIError.help }
+        return ParsedCLIRequest(
+            request: .agent(message: message, thinking: thinking, session: session, deliver: deliver, to: to),
+            kind: .generic)
+    }
 
-	    private static func parseNode(args: inout [String]) throws -> ParsedCLIRequest {
-	        guard let sub = args.popFirst() else { throw CLIError.help }
-	        switch sub {
-	        case "list":
-	            return ParsedCLIRequest(request: .nodeList, kind: .generic)
-	        case "invoke":
-	            var nodeId: String?
-	            var command: String?
-	            var paramsJSON: String?
-	            while !args.isEmpty {
-	                let arg = args.removeFirst()
-	                switch arg {
-	                case "--node": nodeId = args.popFirst()
-	                case "--command": command = args.popFirst()
-	                case "--params-json": paramsJSON = args.popFirst()
-	                default: break
-	                }
-	            }
-	            guard let nodeId, let command else { throw CLIError.help }
-	            return ParsedCLIRequest(
-	                request: .nodeInvoke(nodeId: nodeId, command: command, paramsJSON: paramsJSON),
-	                kind: .generic
-	            )
-	        default:
-	            throw CLIError.help
-	        }
-	    }
+    private static func parseNode(args: inout [String]) throws -> ParsedCLIRequest {
+        guard let sub = args.popFirst() else { throw CLIError.help }
+        switch sub {
+        case "list":
+            return ParsedCLIRequest(request: .nodeList, kind: .generic)
+        case "invoke":
+            var nodeId: String?
+            var command: String?
+            var paramsJSON: String?
+            while !args.isEmpty {
+                let arg = args.removeFirst()
+                switch arg {
+                case "--node": nodeId = args.popFirst()
+                case "--command": command = args.popFirst()
+                case "--params-json": paramsJSON = args.popFirst()
+                default: break
+                }
+            }
+            guard let nodeId, let command else { throw CLIError.help }
+            return ParsedCLIRequest(
+                request: .nodeInvoke(nodeId: nodeId, command: command, paramsJSON: paramsJSON),
+                kind: .generic)
+        default:
+            throw CLIError.help
+        }
+    }
 
-	    private static func parseCanvas(args: inout [String]) throws -> ParsedCLIRequest {
-	        guard let sub = args.popFirst() else { throw CLIError.help }
-	        switch sub {
-	        case "show":
-	            var session = "main"
-	            var path: String?
-	            let placement = self.parseCanvasPlacement(args: &args, session: &session, path: &path)
-	            return ParsedCLIRequest(
-	                request: .canvasShow(session: session, path: path, placement: placement),
-	                kind: .generic
-	            )
-	        case "hide":
-	            var session = "main"
-	            while !args.isEmpty {
-	                let arg = args.removeFirst()
-	                switch arg {
-	                case "--session": session = args.popFirst() ?? session
-	                default: break
-	                }
-	            }
-	            return ParsedCLIRequest(request: .canvasHide(session: session), kind: .generic)
-	        case "goto":
-	            var session = "main"
-	            var path: String?
-	            let placement = self.parseCanvasPlacement(args: &args, session: &session, path: &path)
-	            guard let path else { throw CLIError.help }
-	            return ParsedCLIRequest(
-	                request: .canvasGoto(session: session, path: path, placement: placement),
-	                kind: .generic
-	            )
-	        case "eval":
-	            var session = "main"
-	            var js: String?
-	            while !args.isEmpty {
-	                let arg = args.removeFirst()
-	                switch arg {
-	                case "--session": session = args.popFirst() ?? session
-	                case "--js": js = args.popFirst()
-	                default: break
-	                }
-	            }
-	            guard let js else { throw CLIError.help }
-	            return ParsedCLIRequest(request: .canvasEval(session: session, javaScript: js), kind: .generic)
-	        case "snapshot":
-	            var session = "main"
-	            var outPath: String?
-	            while !args.isEmpty {
-	                let arg = args.removeFirst()
-	                switch arg {
-	                case "--session": session = args.popFirst() ?? session
-	                case "--out": outPath = args.popFirst()
-	                default: break
-	                }
-	            }
-	            return ParsedCLIRequest(request: .canvasSnapshot(session: session, outPath: outPath), kind: .generic)
-	        default:
-	            throw CLIError.help
-	        }
-	    }
+    private static func parseCanvas(args: inout [String]) throws -> ParsedCLIRequest {
+        guard let sub = args.popFirst() else { throw CLIError.help }
+        switch sub {
+        case "show":
+            var session = "main"
+            var path: String?
+            let placement = self.parseCanvasPlacement(args: &args, session: &session, path: &path)
+            return ParsedCLIRequest(
+                request: .canvasShow(session: session, path: path, placement: placement),
+                kind: .generic)
+        case "hide":
+            var session = "main"
+            while !args.isEmpty {
+                let arg = args.removeFirst()
+                switch arg {
+                case "--session": session = args.popFirst() ?? session
+                default: break
+                }
+            }
+            return ParsedCLIRequest(request: .canvasHide(session: session), kind: .generic)
+        case "goto":
+            var session = "main"
+            var path: String?
+            let placement = self.parseCanvasPlacement(args: &args, session: &session, path: &path)
+            guard let path else { throw CLIError.help }
+            return ParsedCLIRequest(
+                request: .canvasGoto(session: session, path: path, placement: placement),
+                kind: .generic)
+        case "eval":
+            var session = "main"
+            var js: String?
+            while !args.isEmpty {
+                let arg = args.removeFirst()
+                switch arg {
+                case "--session": session = args.popFirst() ?? session
+                case "--js": js = args.popFirst()
+                default: break
+                }
+            }
+            guard let js else { throw CLIError.help }
+            return ParsedCLIRequest(request: .canvasEval(session: session, javaScript: js), kind: .generic)
+        case "snapshot":
+            var session = "main"
+            var outPath: String?
+            while !args.isEmpty {
+                let arg = args.removeFirst()
+                switch arg {
+                case "--session": session = args.popFirst() ?? session
+                case "--out": outPath = args.popFirst()
+                default: break
+                }
+            }
+            return ParsedCLIRequest(request: .canvasSnapshot(session: session, outPath: outPath), kind: .generic)
+        default:
+            throw CLIError.help
+        }
+    }
 
-	    private static func parseCanvasPlacement(
-	        args: inout [String],
-	        session: inout String,
-	        path: inout String?
-	    ) -> CanvasPlacement? {
-	        var x: Double?
-	        var y: Double?
-	        var width: Double?
-	        var height: Double?
-	        while !args.isEmpty {
-	            let arg = args.removeFirst()
-	            switch arg {
-	            case "--session": session = args.popFirst() ?? session
-	            case "--path": path = args.popFirst()
-	            case "--x": x = args.popFirst().flatMap(Double.init)
-	            case "--y": y = args.popFirst().flatMap(Double.init)
-	            case "--width": width = args.popFirst().flatMap(Double.init)
-	            case "--height": height = args.popFirst().flatMap(Double.init)
-	            default: break
-	            }
-	        }
-	        if x == nil, y == nil, width == nil, height == nil { return nil }
-	        return CanvasPlacement(x: x, y: y, width: width, height: height)
-	    }
+    private static func parseCanvasPlacement(
+        args: inout [String],
+        session: inout String,
+        path: inout String?) -> CanvasPlacement?
+    {
+        var x: Double?
+        var y: Double?
+        var width: Double?
+        var height: Double?
+        while !args.isEmpty {
+            let arg = args.removeFirst()
+            switch arg {
+            case "--session": session = args.popFirst() ?? session
+            case "--path": path = args.popFirst()
+            case "--x": x = args.popFirst().flatMap(Double.init)
+            case "--y": y = args.popFirst().flatMap(Double.init)
+            case "--width": width = args.popFirst().flatMap(Double.init)
+            case "--height": height = args.popFirst().flatMap(Double.init)
+            default: break
+            }
+        }
+        if x == nil, y == nil, width == nil, height == nil { return nil }
+        return CanvasPlacement(x: x, y: y, width: width, height: height)
+    }
 
     private static func printText(parsed: ParsedCLIRequest, response: Response) throws {
         guard response.ok else {
@@ -506,13 +499,13 @@ struct ClawdisCLI {
                 _NSGetExecutablePath(ptr.baseAddress, &size)
             }
             guard result2 == 0 else { return nil }
-	        }
+        }
 
-	        let nulIndex = buffer.firstIndex(of: 0) ?? buffer.count
-	        let bytes = buffer.prefix(nulIndex).map { UInt8(bitPattern: $0) }
-	        guard let path = String(bytes: bytes, encoding: .utf8) else { return nil }
-	        return URL(fileURLWithPath: path).resolvingSymlinksInPath()
-	    }
+        let nulIndex = buffer.firstIndex(of: 0) ?? buffer.count
+        let bytes = buffer.prefix(nulIndex).map { UInt8(bitPattern: $0) }
+        guard let path = String(bytes: bytes, encoding: .utf8) else { return nil }
+        return URL(fileURLWithPath: path).resolvingSymlinksInPath()
+    }
 
     private static func loadPackageJSONVersion() -> String? {
         guard let exeURL = self.resolveExecutableURL() else { return nil }

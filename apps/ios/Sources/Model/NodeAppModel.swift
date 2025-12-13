@@ -42,36 +42,36 @@ final class NodeAppModel: ObservableObject {
         }
     }
 
-	    func setVoiceWakeEnabled(_ enabled: Bool) {
-	        self.voiceWake.setEnabled(enabled)
-	    }
+    func setVoiceWakeEnabled(_ enabled: Bool) {
+        self.voiceWake.setEnabled(enabled)
+    }
 
-	    func connectToBridge(
-	        endpoint: NWEndpoint,
-	        hello: BridgeHello)
-	    {
-	        self.bridgeTask?.cancel()
-	        self.bridgeStatusText = "Connecting…"
-	        self.bridgeServerName = nil
-	        self.bridgeRemoteAddress = nil
-	        self.connectedBridgeID = BridgeEndpointID.stableID(endpoint)
+    func connectToBridge(
+        endpoint: NWEndpoint,
+        hello: BridgeHello)
+    {
+        self.bridgeTask?.cancel()
+        self.bridgeStatusText = "Connecting…"
+        self.bridgeServerName = nil
+        self.bridgeRemoteAddress = nil
+        self.connectedBridgeID = BridgeEndpointID.stableID(endpoint)
 
         self.bridgeTask = Task {
-	            do {
-	                try await self.bridge.connect(
-	                    endpoint: endpoint,
-	                    hello: hello,
-	                    onConnected: { [weak self] serverName in
-	                        guard let self else { return }
-	                        await MainActor.run {
-	                            self.bridgeStatusText = "Connected"
+            do {
+                try await self.bridge.connect(
+                    endpoint: endpoint,
+                    hello: hello,
+                    onConnected: { [weak self] serverName in
+                        guard let self else { return }
+                        await MainActor.run {
+                            self.bridgeStatusText = "Connected"
                             self.bridgeServerName = serverName
                         }
                         if let addr = await self.bridge.currentRemoteAddress() {
                             await MainActor.run {
                                 self.bridgeRemoteAddress = addr
-	        }
-	    }
+                            }
+                        }
                     },
                     onInvoke: { [weak self] req in
                         guard let self else {
@@ -110,20 +110,20 @@ final class NodeAppModel: ObservableObject {
         self.connectedBridgeID = nil
     }
 
-	    func sendVoiceTranscript(text: String, sessionKey: String?) async throws {
-	        struct Payload: Codable {
-	            var text: String
-	            var sessionKey: String?
-	        }
-	        let payload = Payload(text: text, sessionKey: sessionKey)
-	        let data = try JSONEncoder().encode(payload)
-	        guard let json = String(bytes: data, encoding: .utf8) else {
-	            throw NSError(domain: "NodeAppModel", code: 1, userInfo: [
-	                NSLocalizedDescriptionKey: "Failed to encode voice transcript payload as UTF-8",
-	            ])
-	        }
-	        try await self.bridge.sendEvent(event: "voice.transcript", payloadJSON: json)
-	    }
+    func sendVoiceTranscript(text: String, sessionKey: String?) async throws {
+        struct Payload: Codable {
+            var text: String
+            var sessionKey: String?
+        }
+        let payload = Payload(text: text, sessionKey: sessionKey)
+        let data = try JSONEncoder().encode(payload)
+        guard let json = String(bytes: data, encoding: .utf8) else {
+            throw NSError(domain: "NodeAppModel", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to encode voice transcript payload as UTF-8",
+            ])
+        }
+        try await self.bridge.sendEvent(event: "voice.transcript", payloadJSON: json)
+    }
 
     func handleDeepLink(url: URL) async {
         guard let route = DeepLinkParser.parse(url) else { return }
@@ -163,16 +163,16 @@ final class NodeAppModel: ObservableObject {
             ])
         }
 
-	        // iOS bridge forwards to the gateway; no local auth prompts here.
-	        // (Key-based unattended auth is handled on macOS for clawdis:// links.)
-	        let data = try JSONEncoder().encode(link)
-	        guard let json = String(bytes: data, encoding: .utf8) else {
-	            throw NSError(domain: "NodeAppModel", code: 2, userInfo: [
-	                NSLocalizedDescriptionKey: "Failed to encode agent request payload as UTF-8",
-	            ])
-	        }
-	        try await self.bridge.sendEvent(event: "agent.request", payloadJSON: json)
-	    }
+        // iOS bridge forwards to the gateway; no local auth prompts here.
+        // (Key-based unattended auth is handled on macOS for clawdis:// links.)
+        let data = try JSONEncoder().encode(link)
+        guard let json = String(bytes: data, encoding: .utf8) else {
+            throw NSError(domain: "NodeAppModel", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to encode agent request payload as UTF-8",
+            ])
+        }
+        try await self.bridge.sendEvent(event: "agent.request", payloadJSON: json)
+    }
 
     private func isBridgeConnected() async -> Bool {
         if case .connected = await self.bridge.state { return true }
@@ -243,13 +243,13 @@ final class NodeAppModel: ObservableObject {
         return try JSONDecoder().decode(type, from: data)
     }
 
-	    private static func encodePayload(_ obj: some Encodable) throws -> String {
-	        let data = try JSONEncoder().encode(obj)
-	        guard let json = String(bytes: data, encoding: .utf8) else {
-	            throw NSError(domain: "NodeAppModel", code: 21, userInfo: [
-	                NSLocalizedDescriptionKey: "Failed to encode payload as UTF-8",
-	            ])
-	        }
-	        return json
-	    }
+    private static func encodePayload(_ obj: some Encodable) throws -> String {
+        let data = try JSONEncoder().encode(obj)
+        guard let json = String(bytes: data, encoding: .utf8) else {
+            throw NSError(domain: "NodeAppModel", code: 21, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to encode payload as UTF-8",
+            ])
+        }
+        return json
+    }
 }

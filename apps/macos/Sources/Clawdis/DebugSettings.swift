@@ -141,17 +141,16 @@ struct DebugSettings: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-	                    GridRow {
-	                        self.gridLabel("Attach only")
-		                        Toggle("", isOn: self.$attachExistingGatewayOnly)
-		                            .labelsHidden()
-		                            .toggleStyle(.checkbox)
-		                            .help(
-		                                "When enabled in local mode, the mac app will only connect " +
-		                                    "to an already-running gateway " +
-		                                    "and will not start one itself."
-		                            )
-		                    }
+                    GridRow {
+                        self.gridLabel("Attach only")
+                        Toggle("", isOn: self.$attachExistingGatewayOnly)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                            .help(
+                                "When enabled in local mode, the mac app will only connect " +
+                                    "to an already-running gateway " +
+                                    "and will not start one itself.")
+                    }
                     GridRow {
                         self.gridLabel("Deep links")
                         Toggle("", isOn: self.$deepLinkAgentEnabled)
@@ -232,17 +231,16 @@ struct DebugSettings: View {
 
                 GridRow {
                     self.gridLabel("Diagnostics")
-	                    VStack(alignment: .leading, spacing: 6) {
-	                        Toggle("Write rolling diagnostics log (JSONL)", isOn: self.$diagnosticsFileLogEnabled)
-	                            .toggleStyle(.checkbox)
-	                            .help(
-	                                "Writes a rotating, local-only diagnostics log under ~/Library/Logs/Clawdis/. " +
-	                                    "Enable only while actively debugging."
-	                            )
-	                        HStack(spacing: 8) {
-	                            Button("Open folder") {
-	                                NSWorkspace.shared.open(DiagnosticsFileLog.logDirectoryURL())
-	                            }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle("Write rolling diagnostics log (JSONL)", isOn: self.$diagnosticsFileLogEnabled)
+                            .toggleStyle(.checkbox)
+                            .help(
+                                "Writes a rotating, local-only diagnostics log under ~/Library/Logs/Clawdis/. " +
+                                    "Enable only while actively debugging.")
+                        HStack(spacing: 8) {
+                            Button("Open folder") {
+                                NSWorkspace.shared.open(DiagnosticsFileLog.logDirectoryURL())
+                            }
                             .buttonStyle(.bordered)
                             Button("Clear") {
                                 Task { try? await DiagnosticsFileLog.shared.clear() }
@@ -485,13 +483,12 @@ struct DebugSettings: View {
 
     private var canvasSection: some View {
         GroupBox("Canvas") {
-	            VStack(alignment: .leading, spacing: 10) {
-	                Toggle("Allow Canvas (agent)", isOn: self.$canvasEnabled)
-	                    .toggleStyle(.checkbox)
-	                    .help(
-	                        "When off, agent Canvas requests return “Canvas disabled by user”. " +
-	                            "Manual debug actions still work."
-	                    )
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle("Allow Canvas (agent)", isOn: self.$canvasEnabled)
+                    .toggleStyle(.checkbox)
+                    .help(
+                        "When off, agent Canvas requests return “Canvas disabled by user”. " +
+                            "Manual debug actions still work.")
 
                 HStack(spacing: 8) {
                     TextField("Session", text: self.$canvasSessionKey)
@@ -587,18 +584,17 @@ struct DebugSettings: View {
                     .labelsHidden()
                     .frame(maxWidth: 280, alignment: .leading)
                 }
-	                GridRow {
-	                    self.gridLabel("Web chat")
-	                    Toggle("Use SwiftUI web chat (glass)", isOn: self.$webChatSwiftUIEnabled)
-	                        .toggleStyle(.checkbox)
-	                        .help(
-	                            "When enabled, the menu bar chat window/panel uses the native SwiftUI UI instead of the " +
-	                                "bundled WKWebView."
-	                        )
-	                }
-	            }
-	        }
-	    }
+                GridRow {
+                    self.gridLabel("Web chat")
+                    Toggle("Use SwiftUI web chat (glass)", isOn: self.$webChatSwiftUIEnabled)
+                        .toggleStyle(.checkbox)
+                        .help(
+                            "When enabled, the menu bar chat window/panel uses the native SwiftUI UI instead of the " +
+                                "bundled WKWebView.")
+                }
+            }
+        }
+    }
 
     @MainActor
     private func runPortCheck() async {
@@ -752,12 +748,12 @@ struct DebugSettings: View {
         }
     }
 
-	    private func configURL() -> URL {
-	        FileManager.default.homeDirectoryForCurrentUser
-	            .appendingPathComponent(".clawdis")
-	            .appendingPathComponent("clawdis.json")
-	    }
-	}
+    private func configURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".clawdis")
+            .appendingPathComponent("clawdis.json")
+    }
+}
 
 extension DebugSettings {
     // MARK: - Canvas debug actions
@@ -854,8 +850,7 @@ extension DebugSettings {
             let session = self.canvasSessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
             let result = try await CanvasManager.shared.eval(
                 sessionKey: session.isEmpty ? "main" : session,
-                javaScript: self.canvasEvalJS
-            )
+                javaScript: self.canvasEvalJS)
             self.canvasEvalResult = result
         } catch {
             self.canvasError = error.localizedDescription
@@ -870,8 +865,7 @@ extension DebugSettings {
             let session = self.canvasSessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
             let path = try await CanvasManager.shared.snapshot(
                 sessionKey: session.isEmpty ? "main" : session,
-                outPath: nil
-            )
+                outPath: nil)
             self.canvasSnapshotPath = path
         } catch {
             self.canvasError = error.localizedDescription
@@ -879,22 +873,22 @@ extension DebugSettings {
     }
 }
 
-	private struct PlainSettingsGroupBoxStyle: GroupBoxStyle {
-	    func makeBody(configuration: Configuration) -> some View {
-	        VStack(alignment: .leading, spacing: 10) {
-	            configuration.label
-	                .font(.caption.weight(.semibold))
-	                .foregroundStyle(.secondary)
-	            configuration.content
-	        }
-	        .frame(maxWidth: .infinity, alignment: .leading)
-	    }
-	}
+private struct PlainSettingsGroupBoxStyle: GroupBoxStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            configuration.label
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            configuration.content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
 
-	#if DEBUG
-	struct DebugSettings_Previews: PreviewProvider {
-	    static var previews: some View {
-	        DebugSettings()
+#if DEBUG
+struct DebugSettings_Previews: PreviewProvider {
+    static var previews: some View {
+        DebugSettings()
             .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
     }
 }

@@ -451,8 +451,7 @@ struct WebChatView: View {
                             Text(
                                 self.viewModel.healthOK
                                     ? "This is the native SwiftUI debug chat."
-                                    : "Connecting to the gateway…"
-                            )
+                                    : "Connecting to the gateway…")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }

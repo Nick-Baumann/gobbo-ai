@@ -45,16 +45,16 @@ struct OnboardingView: View {
     @State private var cliStatus: String?
     @State private var copied = false
     @State private var monitoringPermissions = false
-	    @State private var monitoringDiscovery = false
-	    @State private var cliInstalled = false
-	    @State private var cliInstallLocation: String?
-	    @State private var gatewayStatus: GatewayEnvironmentStatus = .checking
-	    @State private var gatewayInstalling = false
-	    @State private var gatewayInstallMessage: String?
-	    // swiftlint:disable:next inclusive_language
-	    @StateObject private var masterDiscovery = MasterDiscoveryModel()
-	    @ObservedObject private var state = AppStateStore.shared
-	    @ObservedObject private var permissionMonitor = PermissionMonitor.shared
+    @State private var monitoringDiscovery = false
+    @State private var cliInstalled = false
+    @State private var cliInstallLocation: String?
+    @State private var gatewayStatus: GatewayEnvironmentStatus = .checking
+    @State private var gatewayInstalling = false
+    @State private var gatewayInstallMessage: String?
+    // swiftlint:disable:next inclusive_language
+    @StateObject private var masterDiscovery = MasterDiscoveryModel()
+    @ObservedObject private var state = AppStateStore.shared
+    @ObservedObject private var permissionMonitor = PermissionMonitor.shared
 
     private let pageWidth: CGFloat = 680
     private let contentHeight: CGFloat = 520
@@ -116,17 +116,16 @@ struct OnboardingView: View {
     }
 
     private func welcomePage() -> some View {
-	        self.onboardingPage {
-	            Text("Welcome to Clawdis")
-	                .font(.largeTitle.weight(.semibold))
-	            Text(
-	                "Your macOS menu bar companion for notifications, screenshots, and agent automation — " +
-	                    "setup takes just a few minutes."
-	            )
-	                .font(.body)
-	                .foregroundStyle(.secondary)
-	                .multilineTextAlignment(.center)
-	                .lineLimit(2)
+        self.onboardingPage {
+            Text("Welcome to Clawdis")
+                .font(.largeTitle.weight(.semibold))
+            Text(
+                "Your macOS menu bar companion for notifications, screenshots, and agent automation — " +
+                    "setup takes just a few minutes.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
                 .frame(maxWidth: 560)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -141,16 +140,16 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Security notice")
                             .font(.headline)
-	                        Text(
-	                            """
-	                            The connected AI agent (e.g. Claude) can trigger powerful actions on your Mac,
-	                            including running
-	                            commands, reading/writing files, and capturing screenshots — depending on the
-	                            permissions you grant.
+                        Text(
+                            """
+                            The connected AI agent (e.g. Claude) can trigger powerful actions on your Mac,
+                            including running
+                            commands, reading/writing files, and capturing screenshots — depending on the
+                            permissions you grant.
 
-	                            Only enable Clawdis if you understand the risks and trust the prompts
-	                            and integrations you use.
-	                            """)
+                            Only enable Clawdis if you understand the risks and trust the prompts
+                            and integrations you use.
+                            """)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -162,17 +161,16 @@ struct OnboardingView: View {
     }
 
     private func connectionPage() -> some View {
-	        self.onboardingPage {
-	            Text("Where Clawdis runs")
-	                .font(.largeTitle.weight(.semibold))
-	            Text(
-	                "Clawdis has one primary Gateway (“master”) that runs continuously. " +
-	                    "Connect locally or over SSH/Tailscale so the agent can work on any Mac."
-	            )
-	                .font(.body)
-	                .foregroundStyle(.secondary)
-	                .multilineTextAlignment(.center)
-	                .lineLimit(2)
+        self.onboardingPage {
+            Text("Where Clawdis runs")
+                .font(.largeTitle.weight(.semibold))
+            Text(
+                "Clawdis has one primary Gateway (“master”) that runs continuously. " +
+                    "Connect locally or over SSH/Tailscale so the agent can work on any Mac.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
                 .frame(maxWidth: 520)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -300,26 +298,25 @@ struct OnboardingView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
-	                    } else {
-		                        Text(
-		                            "Uses \"npm install -g clawdis@<version>\" on your PATH. " +
-		                                "We keep the gateway on port 18789."
-		                        )
-	                            .font(.caption)
-	                            .foregroundStyle(.secondary)
-	                            .lineLimit(2)
+                    } else {
+                        Text(
+                            "Uses \"npm install -g clawdis@<version>\" on your PATH. " +
+                                "We keep the gateway on port 18789.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
                 }
             }
         }
     }
 
-	    // swiftlint:disable:next inclusive_language
-	    private func applyDiscoveredMaster(_ master: MasterDiscoveryModel.DiscoveredMaster) {
-	        let host = master.tailnetDns ?? master.lanHost
-	        guard let host else { return }
-	        let user = NSUserName()
-	        var target = "\(user)@\(host)"
+    // swiftlint:disable:next inclusive_language
+    private func applyDiscoveredMaster(_ master: MasterDiscoveryModel.DiscoveredMaster) {
+        let host = master.tailnetDns ?? master.lanHost
+        guard let host else { return }
+        let user = NSUserName()
+        var target = "\(user)@\(host)"
         if master.sshPort != 22 {
             target += ":\(master.sshPort)"
         }
@@ -460,13 +457,13 @@ struct OnboardingView: View {
 
                 Text("Telegram")
                     .font(.headline)
-	                self.featureRow(
-	                    title: "Set `TELEGRAM_BOT_TOKEN`",
-	                    subtitle: """
-	                    Create a bot with @BotFather and set the token as an env var
-	                    (or `telegram.botToken` in `~/.clawdis/clawdis.json`).
-	                    """,
-	                    systemImage: "key")
+                self.featureRow(
+                    title: "Set `TELEGRAM_BOT_TOKEN`",
+                    subtitle: """
+                    Create a bot with @BotFather and set the token as an env var
+                    (or `telegram.botToken` in `~/.clawdis/clawdis.json`).
+                    """,
+                    systemImage: "key")
                 self.featureRow(
                     title: "Verify with `clawdis status --deep`",
                     subtitle: "This probes both WhatsApp and the Telegram API and prints what’s configured.",
@@ -491,11 +488,11 @@ struct OnboardingView: View {
                     title: "Try Voice Wake",
                     subtitle: "Enable Voice Wake in Settings for hands-free commands with a live transcript overlay.",
                     systemImage: "waveform.circle")
-		                self.featureRow(
-		                    title: "Use the panel + Canvas",
-		                    subtitle: "Open the menu bar panel for quick chat; the agent can show previews " +
-		                        "and richer visuals in Canvas.",
-		                    systemImage: "rectangle.inset.filled.and.person.filled")
+                self.featureRow(
+                    title: "Use the panel + Canvas",
+                    subtitle: "Open the menu bar panel for quick chat; the agent can show previews " +
+                        "and richer visuals in Canvas.",
+                    systemImage: "rectangle.inset.filled.and.person.filled")
                 self.featureRow(
                     title: "Test a notification",
                     subtitle: "Send a quick notify via the menu bar to confirm sounds and permissions.",

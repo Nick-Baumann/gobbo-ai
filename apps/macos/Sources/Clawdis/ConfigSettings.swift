@@ -4,6 +4,11 @@ import SwiftUI
 struct ConfigSettings: View {
     private let isPreview = ProcessInfo.processInfo.isPreview
     private let labelColumnWidth: CGFloat = 120
+    private static let browserAttachOnlyHelp =
+        "When enabled, the browser server will only connect if the clawd browser is already running."
+    private static let browserProfileNote =
+        "Clawd uses a separate Chrome profile and ports (default 18791/18792) "
+            + "so it won’t interfere with your daily browser."
     @State private var configModel: String = ""
     @State private var customModel: String = ""
     @State private var configSaving = false
@@ -203,16 +208,12 @@ struct ConfigSettings: View {
                                 .toggleStyle(.checkbox)
                                 .disabled(!self.browserEnabled)
                                 .onChange(of: self.browserAttachOnly) { _, _ in self.autosaveConfig() }
-                                .help(
-                                    "When enabled, the browser server will only connect if the clawd browser is already running."
-                                )
+                                .help(Self.browserAttachOnlyHelp)
                         }
                         GridRow {
                             Color.clear
                                 .frame(width: self.labelColumnWidth, height: 1)
-                            Text(
-                                "Clawd uses a separate Chrome profile and ports (default 18791/18792) so it won’t interfere with your daily browser."
-                            )
+                            Text(Self.browserProfileNote)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)

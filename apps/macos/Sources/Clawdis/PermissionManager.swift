@@ -9,109 +9,110 @@ import Speech
 import UserNotifications
 
 enum PermissionManager {
-	static func ensure(_ caps: [Capability], interactive: Bool) async -> [Capability: Bool] {
-	    var results: [Capability: Bool] = [:]
-	    for cap in caps {
-	        results[cap] = await self.ensureCapability(cap, interactive: interactive)
-	    }
-	    return results
-	}
+    static func ensure(_ caps: [Capability], interactive: Bool) async -> [Capability: Bool] {
+        var results: [Capability: Bool] = [:]
+        for cap in caps {
+            results[cap] = await self.ensureCapability(cap, interactive: interactive)
+        }
+        return results
+    }
 
-	private static func ensureCapability(_ cap: Capability, interactive: Bool) async -> Bool {
-	    switch cap {
-	    case .notifications:
-	        return await self.ensureNotifications(interactive: interactive)
-	    case .appleScript:
-	        return await self.ensureAppleScript(interactive: interactive)
-	    case .accessibility:
-	        return await self.ensureAccessibility(interactive: interactive)
-	    case .screenRecording:
-	        return await self.ensureScreenRecording(interactive: interactive)
-	    case .microphone:
-	        return await self.ensureMicrophone(interactive: interactive)
-	    case .speechRecognition:
-	        return await self.ensureSpeechRecognition(interactive: interactive)
-	    }
-	}
+    private static func ensureCapability(_ cap: Capability, interactive: Bool) async -> Bool {
+        switch cap {
+        case .notifications:
+            await self.ensureNotifications(interactive: interactive)
+        case .appleScript:
+            await self.ensureAppleScript(interactive: interactive)
+        case .accessibility:
+            await self.ensureAccessibility(interactive: interactive)
+        case .screenRecording:
+            await self.ensureScreenRecording(interactive: interactive)
+        case .microphone:
+            await self.ensureMicrophone(interactive: interactive)
+        case .speechRecognition:
+            await self.ensureSpeechRecognition(interactive: interactive)
+        }
+    }
 
-	private static func ensureNotifications(interactive: Bool) async -> Bool {
-	    let center = UNUserNotificationCenter.current()
-	    let settings = await center.notificationSettings()
+    private static func ensureNotifications(interactive: Bool) async -> Bool {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
 
-	    switch settings.authorizationStatus {
-	    case .authorized, .provisional, .ephemeral:
-	        return true
-	    case .notDetermined:
-	        guard interactive else { return false }
-	        let granted = await (try? center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-	        let updated = await center.notificationSettings()
-	        return granted && (updated.authorizationStatus == .authorized || updated.authorizationStatus == .provisional)
-	    case .denied:
-	        if interactive {
-	            NotificationPermissionHelper.openSettings()
-	        }
-	        return false
-	    @unknown default:
-	        return false
-	    }
-	}
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .notDetermined:
+            guard interactive else { return false }
+            let granted = await (try? center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            let updated = await center.notificationSettings()
+            return granted &&
+                (updated.authorizationStatus == .authorized || updated.authorizationStatus == .provisional)
+        case .denied:
+            if interactive {
+                NotificationPermissionHelper.openSettings()
+            }
+            return false
+        @unknown default:
+            return false
+        }
+    }
 
-	private static func ensureAppleScript(interactive: Bool) async -> Bool {
-	    let granted = await MainActor.run { AppleScriptPermission.isAuthorized() }
-	    if interactive, !granted {
-	        await AppleScriptPermission.requestAuthorization()
-	    }
-	    return await MainActor.run { AppleScriptPermission.isAuthorized() }
-	}
+    private static func ensureAppleScript(interactive: Bool) async -> Bool {
+        let granted = await MainActor.run { AppleScriptPermission.isAuthorized() }
+        if interactive, !granted {
+            await AppleScriptPermission.requestAuthorization()
+        }
+        return await MainActor.run { AppleScriptPermission.isAuthorized() }
+    }
 
-	private static func ensureAccessibility(interactive: Bool) async -> Bool {
-	    let trusted = await MainActor.run { AXIsProcessTrusted() }
-	    if interactive, !trusted {
-	        await MainActor.run {
-	            let opts: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
-	            _ = AXIsProcessTrustedWithOptions(opts)
-	        }
-	    }
-	    return await MainActor.run { AXIsProcessTrusted() }
-	}
+    private static func ensureAccessibility(interactive: Bool) async -> Bool {
+        let trusted = await MainActor.run { AXIsProcessTrusted() }
+        if interactive, !trusted {
+            await MainActor.run {
+                let opts: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
+                _ = AXIsProcessTrustedWithOptions(opts)
+            }
+        }
+        return await MainActor.run { AXIsProcessTrusted() }
+    }
 
-	private static func ensureScreenRecording(interactive: Bool) async -> Bool {
-	    let granted = ScreenRecordingProbe.isAuthorized()
-	    if interactive, !granted {
-	        await ScreenRecordingProbe.requestAuthorization()
-	    }
-	    return ScreenRecordingProbe.isAuthorized()
-	}
+    private static func ensureScreenRecording(interactive: Bool) async -> Bool {
+        let granted = ScreenRecordingProbe.isAuthorized()
+        if interactive, !granted {
+            await ScreenRecordingProbe.requestAuthorization()
+        }
+        return ScreenRecordingProbe.isAuthorized()
+    }
 
-	private static func ensureMicrophone(interactive: Bool) async -> Bool {
-	    let status = AVCaptureDevice.authorizationStatus(for: .audio)
-	    switch status {
-	    case .authorized:
-	        return true
-	    case .notDetermined:
-	        guard interactive else { return false }
-	        return await AVCaptureDevice.requestAccess(for: .audio)
-	    case .denied, .restricted:
-	        if interactive {
-	            MicrophonePermissionHelper.openSettings()
-	        }
-	        return false
-	    @unknown default:
-	        return false
-	    }
-	}
+    private static func ensureMicrophone(interactive: Bool) async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        switch status {
+        case .authorized:
+            return true
+        case .notDetermined:
+            guard interactive else { return false }
+            return await AVCaptureDevice.requestAccess(for: .audio)
+        case .denied, .restricted:
+            if interactive {
+                MicrophonePermissionHelper.openSettings()
+            }
+            return false
+        @unknown default:
+            return false
+        }
+    }
 
-	private static func ensureSpeechRecognition(interactive: Bool) async -> Bool {
-	    let status = SFSpeechRecognizer.authorizationStatus()
-	    if status == .notDetermined, interactive {
-	        await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
-	            SFSpeechRecognizer.requestAuthorization { _ in
-	                DispatchQueue.main.async { cont.resume() }
-	            }
-	        }
-	    }
-	    return SFSpeechRecognizer.authorizationStatus() == .authorized
-	}
+    private static func ensureSpeechRecognition(interactive: Bool) async -> Bool {
+        let status = SFSpeechRecognizer.authorizationStatus()
+        if status == .notDetermined, interactive {
+            await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
+                SFSpeechRecognizer.requestAuthorization { _ in
+                    DispatchQueue.main.async { cont.resume() }
+                }
+            }
+        }
+        return SFSpeechRecognizer.authorizationStatus() == .authorized
+    }
 
     static func voiceWakePermissionsGranted() -> Bool {
         let mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized

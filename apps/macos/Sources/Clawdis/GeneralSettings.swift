@@ -1,15 +1,15 @@
 import AppKit
 import SwiftUI
 
-	struct GeneralSettings: View {
-	    @ObservedObject var state: AppState
-	    @ObservedObject private var healthStore = HealthStore.shared
-	    @ObservedObject private var gatewayManager = GatewayProcessManager.shared
-	    // swiftlint:disable:next inclusive_language
-	    @StateObject private var masterDiscovery = MasterDiscoveryModel()
-	    @State private var isInstallingCLI = false
-	    @State private var cliStatus: String?
-	    @State private var cliInstalled = false
+struct GeneralSettings: View {
+    @ObservedObject var state: AppState
+    @ObservedObject private var healthStore = HealthStore.shared
+    @ObservedObject private var gatewayManager = GatewayProcessManager.shared
+    // swiftlint:disable:next inclusive_language
+    @StateObject private var masterDiscovery = MasterDiscoveryModel()
+    @State private var isInstallingCLI = false
+    @State private var cliStatus: String?
+    @State private var cliInstalled = false
     @State private var cliInstallLocation: String?
     @State private var gatewayStatus: GatewayEnvironmentStatus = .checking
     @State private var gatewayInstallMessage: String?
@@ -577,12 +577,12 @@ extension GeneralSettings {
         alert.runModal()
     }
 
-	    // swiftlint:disable:next inclusive_language
-	    private func applyDiscoveredMaster(_ master: MasterDiscoveryModel.DiscoveredMaster) {
-	        let host = master.tailnetDns ?? master.lanHost
-	        guard let host else { return }
-	        let user = NSUserName()
-	        var target = "\(user)@\(host)"
+    // swiftlint:disable:next inclusive_language
+    private func applyDiscoveredMaster(_ master: MasterDiscoveryModel.DiscoveredMaster) {
+        let host = master.tailnetDns ?? master.lanHost
+        guard let host else { return }
+        let user = NSUserName()
+        var target = "\(user)@\(host)"
         if master.sshPort != 22 {
             target += ":\(master.sshPort)"
         }
