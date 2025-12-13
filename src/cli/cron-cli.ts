@@ -163,7 +163,6 @@ export function registerCronCli(program: Command) {
         "Do not fail the job if delivery fails",
         false,
       )
-      .option("--post-to-main", "Deprecated (no-op)", false)
       .option(
         "--post-prefix <prefix>",
         "Prefix for summary system event",
@@ -261,14 +260,15 @@ export function registerCronCli(program: Command) {
             };
           })();
 
+          if (sessionTarget === "main" && payload.kind !== "systemEvent") {
+            throw new Error("Main jobs require --system-event (systemEvent).");
+          }
           if (sessionTarget === "isolated" && payload.kind !== "agentTurn") {
-            throw new Error(
-              "Isolated jobs require --message (agentTurn payload).",
-            );
+            throw new Error("Isolated jobs require --message (agentTurn).");
           }
 
           const isolation =
-            payload.kind === "agentTurn"
+            sessionTarget === "isolated"
               ? {
                   postToMainPrefix:
                     typeof opts.postPrefix === "string" &&
@@ -320,6 +320,71 @@ export function registerCronCli(program: Command) {
 
   addGatewayClientOptions(
     cron
+      .command("enable")
+      .description("Enable a cron job")
+      .argument("<id>", "Job id")
+      .action(async (id, opts) => {
+        try {
+          const res = await callGatewayFromCli("cron.update", opts, {
+            id,
+            patch: { enabled: true },
+          });
+          defaultRuntime.log(JSON.stringify(res, null, 2));
+          await warnIfCronSchedulerDisabled(opts);
+        } catch (err) {
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
+        }
+      }),
+  );
+
+  addGatewayClientOptions(
+    cron
+      .command("disable")
+      .description("Disable a cron job")
+      .argument("<id>", "Job id")
+      .action(async (id, opts) => {
+        try {
+          const res = await callGatewayFromCli("cron.update", opts, {
+            id,
+            patch: { enabled: false },
+          });
+          defaultRuntime.log(JSON.stringify(res, null, 2));
+          await warnIfCronSchedulerDisabled(opts);
+        } catch (err) {
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
+        }
+      }),
+  );
+
+  addGatewayClientOptions(
+    cron
+      .command("runs")
+      .description("Show cron run history (JSONL-backed)")
+      .option("--id <id>", "Job id (required when store is jobs.json)")
+      .option("--limit <n>", "Max entries (default 50)", "50")
+      .action(async (opts) => {
+        try {
+          const limitRaw = Number.parseInt(String(opts.limit ?? "50"), 10);
+          const limit =
+            Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 50;
+          const id =
+            typeof opts.id === "string" && opts.id.trim() ? opts.id : undefined;
+          const res = await callGatewayFromCli("cron.runs", opts, {
+            id,
+            limit,
+          });
+          defaultRuntime.log(JSON.stringify(res, null, 2));
+        } catch (err) {
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
+        }
+      }),
+  );
+
+  addGatewayClientOptions(
+    cron
       .command("edit")
       .description("Edit a cron job (patch fields)")
       .argument("<id>", "Job id")
@@ -347,10 +412,23 @@ export function registerCronCli(program: Command) {
         "Do not fail job if delivery fails",
         false,
       )
-      .option("--post-to-main", "Deprecated (no-op)", false)
       .option("--post-prefix <prefix>", "Prefix for summary system event")
       .action(async (id, opts) => {
         try {
+          if (opts.session === "main" && opts.message) {
+            throw new Error(
+              "Main jobs cannot use --message; use --system-event or --session isolated.",
+            );
+          }
+          if (opts.session === "isolated" && opts.systemEvent) {
+            throw new Error(
+              "Isolated jobs cannot use --system-event; use --message or --session main.",
+            );
+          }
+          if (opts.session === "main" && typeof opts.postPrefix === "string") {
+            throw new Error("--post-prefix only applies to isolated jobs.");
+          }
+
           const patch: Record<string, unknown> = {};
           if (typeof opts.name === "string") patch.name = opts.name;
           if (opts.enable && opts.disable)

@@ -76,8 +76,7 @@ Each job is a JSON object with stable keys (unknown keys ignored for forward com
   - `{"kind":"systemEvent","text":string}` (enqueue as `System:`)
   - `{"kind":"agentTurn","message":string,"deliver"?:boolean,"channel"?: "last"|"whatsapp"|"telegram","to"?:string,"timeoutSeconds"?:number}`
 - `isolation` (optional; only meaningful for isolated jobs)
-  - `{"postToMain"?: boolean, "postToMainPrefix"?: string}`
-  - Note: `postToMain` is deprecated (no-op). Isolated jobs always post a summary; only the prefix is configurable.
+  - `{"postToMainPrefix"?: string}`
 - `runtime` (optional)
   - `{"maxAttempts"?:number,"retryBackoffMs"?:number}` (best-effort retries; defaults off)
 - `state` (runtime-maintained)
@@ -177,6 +176,7 @@ When due:
 - Optionally deliver output (`payload.deliver === true`) to the configured channel/to.
 - Isolated jobs always enqueue a summary system event to the main session when they finish (derived from the last agent text output).
   - Prefix defaults to `Cron`, and can be customized via `isolation.postToMainPrefix`.
+- If `deliver` is omitted/false, nothing is sent to external providers; you still get the main-session summary and can inspect the full isolated transcript in `cron:<jobId>`.
 
 ### “Run in parallel to main”
 
@@ -214,6 +214,8 @@ Path rules:
 
 Retention:
 - Best-effort pruning when the file grows beyond ~2MB; keep the newest ~2000 lines.
+
+Each log line includes (at minimum) job id, status/error, timing, and a `summary` string (systemEvent text for main jobs, and the last agent text output for isolated jobs).
 
 ## Gateway API
 
@@ -269,6 +271,7 @@ Add a `cron` command group (all commands should also support `--json` where sens
 - `clawdis cron rm <id>`
 - `clawdis cron enable <id>` / `clawdis cron disable <id>`
 - `clawdis cron run <id> [--force]` (debug)
+- `clawdis cron runs [--id <id>] [--limit <n>]` (run history)
 - `clawdis cron status` (scheduler enabled + next wake)
 
 Additionally:
