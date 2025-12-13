@@ -2,7 +2,7 @@ import AVFAudio
 import Foundation
 import Speech
 
-private func makeAudioTapEnqueueCallback(queue: AudioBufferQueue) -> AVAudioNodeTapBlock {
+private func makeAudioTapEnqueueCallback(queue: AudioBufferQueue) -> @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void {
     { buffer, _ in
         // This callback is invoked on a realtime audio thread/queue. Keep it tiny and nonisolated.
         queue.enqueueCopy(of: buffer)
@@ -183,11 +183,12 @@ final class VoiceWakeManager: NSObject, ObservableObject {
 
         let queue = AudioBufferQueue()
         self.tapQueue = queue
+        let tapBlock: @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void = makeAudioTapEnqueueCallback(queue: queue)
         inputNode.installTap(
             onBus: 0,
             bufferSize: 1024,
             format: recordingFormat,
-            block: makeAudioTapEnqueueCallback(queue: queue))
+            block: tapBlock)
 
         self.audioEngine.prepare()
         try self.audioEngine.start()
