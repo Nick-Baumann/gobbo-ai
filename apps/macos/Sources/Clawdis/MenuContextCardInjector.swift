@@ -70,17 +70,22 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
             self.adoptMenuWidthIfAvailable(for: menu, hosting: hosting)
         }
 
-        self.loadTask = Task { [weak hosting] in
-            await self.refreshCache(force: initialIsLoading)
-            guard let hosting else { return }
-            let view = self.cachedView()
-            await MainActor.run {
-                hosting.rootView = view
-                hosting.invalidateIntrinsicContentSize()
-                self.adoptMenuWidthIfAvailable(for: menu, hosting: hosting)
-                let size = hosting.fittingSize
-                hosting.frame.size.height = size.height
+        if initialIsLoading {
+            self.loadTask = Task { [weak hosting] in
+                await self.refreshCache(force: true)
+                guard let hosting else { return }
+                let view = self.cachedView()
+                await MainActor.run {
+                    hosting.rootView = view
+                    hosting.invalidateIntrinsicContentSize()
+                    self.adoptMenuWidthIfAvailable(for: menu, hosting: hosting)
+                    let size = hosting.fittingSize
+                    hosting.frame.size.height = size.height
+                }
             }
+        } else {
+            // Keep the menu stable while it's open; refresh in the background for next open.
+            self.loadTask = Task { await self.refreshCache(force: false) }
         }
     }
 

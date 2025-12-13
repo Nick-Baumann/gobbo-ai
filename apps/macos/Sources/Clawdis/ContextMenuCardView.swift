@@ -6,7 +6,10 @@ struct ContextMenuCardView: View {
     private let rows: [SessionRow]
     private let statusText: String?
     private let isLoading: Bool
-    private let padding: CGFloat = 10
+    private let paddingTop: CGFloat = 6
+    private let paddingBottom: CGFloat = 6
+    private let paddingTrailing: CGFloat = 16
+    private let paddingLeading: CGFloat = 22
     private let barHeight: CGFloat = 3
 
     init(
@@ -20,7 +23,7 @@ struct ContextMenuCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Context")
                     .font(.caption.weight(.semibold))
@@ -53,7 +56,10 @@ struct ContextMenuCardView: View {
                 }
             }
         }
-        .padding(self.padding)
+        .padding(.top, self.paddingTop)
+        .padding(.bottom, self.paddingBottom)
+        .padding(.leading, self.paddingLeading)
+        .padding(.trailing, self.paddingTrailing)
         .frame(minWidth: 300, maxWidth: .infinity, alignment: .leading)
         .transaction { txn in txn.animation = nil }
     }
