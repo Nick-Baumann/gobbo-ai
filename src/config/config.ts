@@ -51,7 +51,7 @@ export type WebChatConfig = {
 
 export type BrowserConfig = {
   enabled?: boolean;
-  /** Base URL of the clawd browser control server. Default: http://127.0.0.1:18790 */
+  /** Base URL of the clawd browser control server. Default: http://127.0.0.1:18791 */
   controlUrl?: string;
   /** Accent color for the clawd browser profile (hex). Default: #FF4500 */
   color?: string;

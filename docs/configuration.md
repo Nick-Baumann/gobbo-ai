@@ -109,14 +109,14 @@ Clawdis can start a **dedicated, isolated** Chrome/Chromium instance for clawd a
 
 Defaults:
 - enabled: `true`
-- control URL: `http://127.0.0.1:18790` (CDP uses `18791`)
+- control URL: `http://127.0.0.1:18791` (CDP uses `18792`)
 - profile color: `#FF4500` (lobster-orange)
 
 ```json5
 {
   browser: {
     enabled: true,
-    controlUrl: "http://127.0.0.1:18790",
+    controlUrl: "http://127.0.0.1:18791",
     color: "#FF4500",
     // Advanced:
     // headless: false,

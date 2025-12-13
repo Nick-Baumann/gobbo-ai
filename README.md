@@ -118,7 +118,7 @@ Optional: enable/configure clawd’s dedicated browser control (defaults are alr
 {
   browser: {
     enabled: true,
-    controlUrl: "http://127.0.0.1:18790",
+    controlUrl: "http://127.0.0.1:18791",
     color: "#FF4500"
   }
 }
