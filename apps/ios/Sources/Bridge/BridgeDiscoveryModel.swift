@@ -52,8 +52,9 @@ final class BridgeDiscoveryModel: ObservableObject {
                     switch result.endpoint {
                     case let .service(name, _, _, _):
                         let decodedName = BonjourEscapes.decode(name)
+                        let prettyName = Self.prettifyInstanceName(decodedName)
                         return DiscoveredBridge(
-                            name: decodedName,
+                            name: prettyName,
                             endpoint: result.endpoint,
                             stableID: BridgeEndpointID.stableID(result.endpoint),
                             debugID: BridgeEndpointID.prettyDescription(result.endpoint))
@@ -74,5 +75,11 @@ final class BridgeDiscoveryModel: ObservableObject {
         self.browser = nil
         self.bridges = []
         self.statusText = "Stopped"
+    }
+
+    private static func prettifyInstanceName(_ decodedName: String) -> String {
+        let normalized = decodedName.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let stripped = normalized.replacingOccurrences(of: " (Clawdis)", with: "")
+        return stripped.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

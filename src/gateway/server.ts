@@ -47,6 +47,7 @@ import {
   getLastHeartbeatEvent,
   onHeartbeatEvent,
 } from "../infra/heartbeat-events.js";
+import { getMachineDisplayName } from "../infra/machine-name.js";
 import {
   approveNodePairing,
   listNodePairing,
@@ -117,6 +118,13 @@ type Client = {
   connId: string;
   presenceKey?: string;
 };
+
+function formatBonjourInstanceName(displayName: string) {
+  const trimmed = displayName.trim();
+  if (!trimmed) return "Clawdis";
+  if (/clawdis/i.test(trimmed)) return trimmed;
+  return `${trimmed} (Clawdis)`;
+}
 
 type GatewaySessionsDefaults = {
   model: string | null;
@@ -797,11 +805,14 @@ export async function startGatewayServer(
     }
   };
 
+  const machineDisplayName = await getMachineDisplayName();
+
   if (bridgeEnabled && bridgePort > 0) {
     try {
       const started = await startNodeBridgeServer({
         host: bridgeHost,
         port: bridgePort,
+        serverName: machineDisplayName,
         onAuthenticated: (node) => {
           const host = node.displayName?.trim() || node.nodeId;
           const ip = node.remoteIp?.trim();
@@ -887,6 +898,7 @@ export async function startGatewayServer(
       tailnetDnsEnv && tailnetDnsEnv.length > 0 ? tailnetDnsEnv : undefined;
 
     const bonjour = await startGatewayBonjourAdvertiser({
+      instanceName: formatBonjourInstanceName(machineDisplayName),
       gatewayPort: port,
       bridgePort: bridge?.port,
       sshPort,

@@ -6,9 +6,10 @@ struct SettingsTab: View {
     @AppStorage("node.displayName") private var displayName: String = "iOS Node"
     @AppStorage("node.instanceId") private var instanceId: String = UUID().uuidString
     @AppStorage("voiceWake.enabled") private var voiceWakeEnabled: Bool = false
+    @AppStorage("bridge.preferredStableID") private var preferredBridgeStableID: String = ""
     @StateObject private var discovery = BridgeDiscoveryModel()
     @State private var connectStatus: String?
-    @State private var isConnecting = false
+    @State private var connectingBridgeID: String?
     @State private var didAutoConnect = false
 
     var body: some View {
@@ -74,11 +75,12 @@ struct SettingsTab: View {
                     service: "com.steipete.clawdis.bridge",
                     account: self.keychainAccount())
                 guard let existing, !existing.isEmpty else { return }
-                guard let first = newValue.first else { return }
+                guard let target = self.pickAutoConnectBridge(from: newValue) else { return }
 
                 self.didAutoConnect = true
+                self.preferredBridgeStableID = target.stableID
                 self.appModel.connectToBridge(
-                    endpoint: first.endpoint,
+                    endpoint: target.endpoint,
                     token: existing,
                     nodeId: self.instanceId,
                     displayName: self.displayName,
@@ -120,10 +122,17 @@ struct SettingsTab: View {
                         }
                         Spacer()
 
-                        Button(self.isConnecting ? "…" : "Connect") {
+                        Button {
                             Task { await self.connect(bridge) }
+                        } label: {
+                            if self.connectingBridgeID == bridge.id {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                            } else {
+                                Text("Connect")
+                            }
                         }
-                        .disabled(self.isConnecting)
+                        .disabled(self.connectingBridgeID != nil)
                     }
                 }
             }
@@ -149,31 +158,36 @@ struct SettingsTab: View {
     }
 
     private func connect(_ bridge: BridgeDiscoveryModel.DiscoveredBridge) async {
-        self.isConnecting = true
-        defer { self.isConnecting = false }
+        self.connectingBridgeID = bridge.id
+        self.preferredBridgeStableID = bridge.stableID
+        defer { self.connectingBridgeID = nil }
 
-        let existing = KeychainStore.loadString(service: "com.steipete.clawdis.bridge", account: self.keychainAccount())
         do {
-            let token: String
-            if let existing, !existing.isEmpty {
-                token = existing
-            } else {
-                let newToken = try await BridgeClient().pairAndHello(
-                    endpoint: bridge.endpoint,
-                    nodeId: self.instanceId,
-                    displayName: self.displayName,
-                    platform: self.platformString(),
-                    version: self.appVersion(),
-                    existingToken: nil)
-                guard !newToken.isEmpty else {
-                    self.connectStatus = "Pairing failed: empty token"
-                    return
-                }
+            let existing = KeychainStore.loadString(
+                service: "com.steipete.clawdis.bridge",
+                account: self.keychainAccount())
+            let existingToken = (existing?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ?
+                existing :
+                nil
+
+            let token = try await BridgeClient().pairAndHello(
+                endpoint: bridge.endpoint,
+                nodeId: self.instanceId,
+                displayName: self.displayName,
+                platform: self.platformString(),
+                version: self.appVersion(),
+                existingToken: existingToken,
+                onStatus: { status in
+                    Task { @MainActor in
+                        self.connectStatus = status
+                    }
+                })
+
+            if !token.isEmpty, token != existingToken {
                 _ = KeychainStore.saveString(
-                    newToken,
+                    token,
                     service: "com.steipete.clawdis.bridge",
                     account: self.keychainAccount())
-                token = newToken
             }
 
             self.appModel.connectToBridge(
@@ -184,9 +198,18 @@ struct SettingsTab: View {
                 platform: self.platformString(),
                 version: self.appVersion())
 
-            self.connectStatus = "Connected"
         } catch {
             self.connectStatus = "Failed: \(error.localizedDescription)"
         }
+    }
+
+    private func pickAutoConnectBridge(from bridges: [BridgeDiscoveryModel.DiscoveredBridge]) -> BridgeDiscoveryModel
+    .DiscoveredBridge? {
+        if !self.preferredBridgeStableID.isEmpty,
+           let match = bridges.first(where: { $0.stableID == self.preferredBridgeStableID })
+        {
+            return match
+        }
+        return bridges.first
     }
 }
