@@ -89,12 +89,11 @@ Each job is a JSON object with stable keys (unknown keys ignored for forward com
 
 ## Storage location
 
-We can store this directly under `~/.clawdis` without a subfolder, but a folder gives us room for future artifacts (per-job state, migration backups, run history).
+Cron persists everything under `~/.clawdis/cron/`:
+- Job store: `~/.clawdis/cron/jobs.json`
+- Run history: `~/.clawdis/cron/runs/<jobId>.jsonl`
 
-Current behavior (v1):
-- Default store: `~/.clawdis/cron.json`
-- If `~/.clawdis/cron/jobs.json` exists, it is preferred (and is a good location for future per-cron artifacts).
-- Any path can be forced via `cron.store` in config.
+You can override the job store path via `cron.store` in config.
 
 The scheduler should never require additional configuration for the base directory (Clawdis already treats `~/.clawdis` as fixed).
 
@@ -109,7 +108,7 @@ To disable it, set:
   cron: {
     enabled: false,
     // optional:
-    store: "~/.clawdis/cron.json",
+    store: "~/.clawdis/cron/jobs.json",
     maxConcurrentRuns: 1
   }
 }
@@ -209,8 +208,7 @@ Design:
 In addition to normal structured logs, the Gateway writes an append-only run history “ledger” (JSONL) whenever a job finishes. This is intended for quick debugging (“did the job run, when, and what happened?”).
 
 Path rules:
-- If the cron store path basename is `jobs.json` (e.g. `~/.clawdis/cron/jobs.json`), logs go to `.../runs/<jobId>.jsonl` (e.g. `~/.clawdis/cron/runs/<jobId>.jsonl`).
-- Otherwise logs go to `<storeBase>.runs.jsonl` in the same directory (e.g. `~/.clawdis/cron.json` → `~/.clawdis/cron.runs.jsonl`).
+- Run logs are stored per job next to the store: `.../runs/<jobId>.jsonl`.
 
 Retention:
 - Best-effort pruning when the file grows beyond ~2MB; keep the newest ~2000 lines.
@@ -242,9 +240,9 @@ New methods (names can be bikeshed; `cron.*` is suggested):
   - params: `{ id: string, mode?: "due" | "force" }` (debugging; does not change schedule unless `force` requires it)
 
 - `cron.runs`
-  - params: `{ id?: string, limit?: number }`
+  - params: `{ id: string, limit?: number }`
   - returns: `{ entries: CronRunLogEntry[] }`
-  - note: if the store layout is `.../jobs.json`, `id` is required (runs are stored per-job).
+  - note: `id` is required (runs are stored per-job).
 
 The Gateway should broadcast a `cron` event for UI/debug:
 - event: `cron`
@@ -271,7 +269,7 @@ Add a `cron` command group (all commands should also support `--json` where sens
 - `clawdis cron rm <id>`
 - `clawdis cron enable <id>` / `clawdis cron disable <id>`
 - `clawdis cron run <id> [--force]` (debug)
-- `clawdis cron runs [--id <id>] [--limit <n>]` (run history)
+- `clawdis cron runs --id <id> [--limit <n>]` (run history)
 - `clawdis cron status` (scheduler enabled + next wake)
 
 Additionally:
