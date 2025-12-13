@@ -37,7 +37,7 @@ Important nuance:
 ### Namespacing
 Add new automation commands behind a `ui` prefix:
 - `clawdis-mac ui …` for UI automation + visualization-related actions.
-- Keep existing top-level commands (`notify`, `run`, `canvas …`, etc.) for compatibility, but `screenshot` should become an alias of `ui screenshot` once Peekaboo takes it over.
+- Keep existing top-level commands (`notify`, `run`, `canvas …`, etc.) for compatibility, but do a clean cutover for screenshots: remove the legacy top-level `screenshot` command and ship only `clawdis-mac ui screenshot`.
 
 ### Output format
 Change `clawdis-mac` to default to human text output:
@@ -111,6 +111,7 @@ Migration plan:
   - window/app targeting
   - visual feedback (flash / watch HUD) when enabled
 - Prefer writing images to a file path on the app side and returning the path (text-friendly), with `--json` providing the structured metadata.
+- No aliases: remove the old `Request.screenshot` and introduce a new `Request.uiScreenshot` (or similar) so the new behavior is explicit and there’s no “legacy mode” to maintain.
 
 ## Permissions behavior
 If required permissions are missing:
