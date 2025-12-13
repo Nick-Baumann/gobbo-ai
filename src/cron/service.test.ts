@@ -148,6 +148,7 @@ describe("CronService", () => {
 
     vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
     await vi.runOnlyPendingTimersAsync();
+    await cron.list({ includeDisabled: true });
 
     expect(enqueueSystemEvent).toHaveBeenCalledWith(
       "Cron (error): last output",

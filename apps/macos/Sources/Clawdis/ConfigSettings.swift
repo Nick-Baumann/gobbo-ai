@@ -20,7 +20,7 @@ struct ConfigSettings: View {
 
     // clawd browser settings (stored in ~/.clawdis/clawdis.json under "browser")
     @State private var browserEnabled: Bool = true
-    @State private var browserControlUrl: String = "http://127.0.0.1:18790"
+    @State private var browserControlUrl: String = "http://127.0.0.1:18791"
     @State private var browserColorHex: String = "#FF4500"
     @State private var browserAttachOnly: Bool = false
 
@@ -137,7 +137,7 @@ struct ConfigSettings: View {
 
                     HStack(spacing: 8) {
                         Text("Control URL")
-                        TextField("http://127.0.0.1:18790", text: self.$browserControlUrl)
+                        TextField("http://127.0.0.1:18791", text: self.$browserControlUrl)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 320)
                             .disabled(!self.browserEnabled)
@@ -168,7 +168,7 @@ struct ConfigSettings: View {
                         .help("When enabled, the browser server will only connect if the clawd browser is already running.")
 
                     Text(
-                        "Clawd uses a separate Chrome profile and ports (default 18790/18791) so it won’t interfere with your daily browser."
+                        "Clawd uses a separate Chrome profile and ports (default 18791/18792) so it won’t interfere with your daily browser."
                     )
                     .font(.footnote)
                     .foregroundStyle(.secondary)

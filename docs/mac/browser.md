@@ -23,7 +23,7 @@ Add a dedicated settings section (preferably under **Tools** or its own “Brows
 
 - **Enable clawd browser** (`default: on`)
   - When off: no browser is launched, and browser tools return “disabled”.
-- **Browser control URL** (`default: http://127.0.0.1:18790`)
+- **Browser control URL** (`default: http://127.0.0.1:18791`)
   - Interpreted as the base URL of the local/remote browser-control server.
   - If the URL host is not loopback, Clawdis must **not** attempt to launch a local browser; it only connects.
 - **Accent color** (`default: #FF4500`, “lobster-orange”)
@@ -38,12 +38,13 @@ Optional (advanced, can be hidden behind Debug initially):
 Clawdis already uses:
 - Gateway WebSocket: `18789`
 - WebChat HTTP: `18788`
+- Bridge (voice/iris): `18790`
 
 For the clawd browser-control server, use “family” ports:
-- Browser control HTTP API: `18790` (gateway + 1)
-- Browser CDP/debugging port: `18791` (control + 1)
+- Browser control HTTP API: `18791` (bridge + 1)
+- Browser CDP/debugging port: `18792` (control + 1)
 
-The user usually only configures the **control URL** (port `18790`). CDP is an internal detail.
+The user usually only configures the **control URL** (port `18791`). CDP is an internal detail.
 
 ## Browser isolation guarantees (non-negotiable)
 
@@ -55,7 +56,7 @@ The user usually only configures the **control URL** (port `18790`). CDP is an i
 
 2) **Dedicated ports**
    - Never use `9222` (reserved for ad-hoc dev workflows; avoids colliding with `agent-tools/browser-tools`).
-   - Default ports are `18790/18791` unless overridden.
+   - Default ports are `18791/18792` unless overridden.
 
 3) **Named tab/page management**
    - The agent must be able to enumerate and target tabs deterministically (by stable `targetId` or equivalent), not “last tab”.
@@ -147,4 +148,3 @@ The agent should not assume tabs are ephemeral. It should:
 - Cross-device “sync” of tabs between Mac and Pi.
 - Sharing the user’s logged-in Chrome sessions automatically.
 - General-purpose web scraping; this is primarily for “close-the-loop” verification and interaction.
-
