@@ -1,6 +1,5 @@
 import type { BrowserConfig } from "../config/config.js";
 import {
-  DEFAULT_CLAWD_BROWSER_CDP_PORT,
   DEFAULT_CLAWD_BROWSER_COLOR,
   DEFAULT_CLAWD_BROWSER_CONTROL_URL,
   DEFAULT_CLAWD_BROWSER_ENABLED,
@@ -55,7 +54,12 @@ export function resolveBrowserConfig(
     throw new Error(`browser.controlUrl has invalid port: ${parsed.port}`);
   }
 
-  const cdpPort = DEFAULT_CLAWD_BROWSER_CDP_PORT;
+  const cdpPort = port + 1;
+  if (cdpPort > 65535) {
+    throw new Error(
+      `browser.controlUrl port (${port}) is too high; cannot derive CDP port (${cdpPort})`,
+    );
+  }
   if (port === cdpPort) {
     throw new Error(
       `browser.controlUrl port (${port}) must not equal CDP port (${cdpPort})`,

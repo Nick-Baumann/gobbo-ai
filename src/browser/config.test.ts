@@ -38,6 +38,14 @@ describe("browser config", () => {
     expect(shouldStartLocalBrowserServer(resolved)).toBe(false);
   });
 
+  it("derives CDP port as control port + 1", () => {
+    const resolved = resolveBrowserConfig({
+      controlUrl: "http://127.0.0.1:19000",
+    });
+    expect(resolved.controlPort).toBe(19000);
+    expect(resolved.cdpPort).toBe(19001);
+  });
+
   it("rejects unsupported protocols", () => {
     expect(() =>
       resolveBrowserConfig({ controlUrl: "ws://127.0.0.1:18790" }),
