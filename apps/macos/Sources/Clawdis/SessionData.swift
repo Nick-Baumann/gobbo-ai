@@ -257,7 +257,7 @@ enum SessionLoader {
     }
 
     static func loadRows(at path: String, defaults: SessionDefaults) async throws -> [SessionRow] {
-        try await Task.detached(priority: .utility) {
+        try await Task.detached(priority: .userInitiated) {
             guard FileManager.default.fileExists(atPath: path) else {
                 throw SessionLoadError.missingStore(path)
             }

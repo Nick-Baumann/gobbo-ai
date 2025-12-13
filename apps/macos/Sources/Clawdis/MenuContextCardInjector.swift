@@ -9,7 +9,13 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
     private let fallbackCardWidth: CGFloat = 320
     private weak var originalDelegate: NSMenuDelegate?
     private var loadTask: Task<Void, Never>?
+    private var warmTask: Task<Void, Never>?
+    private var cachedRows: [SessionRow] = []
+    private var cacheErrorText: String?
+    private var cacheUpdatedAt: Date?
     private let activeWindowSeconds: TimeInterval = 24 * 60 * 60
+    private let refreshIntervalSeconds: TimeInterval = 15
+    private var isMenuOpen = false
 
     func install(into statusItem: NSStatusItem) {
         // SwiftUI owns the menu, but we can inject a custom NSMenuItem.view right before display.
@@ -19,10 +25,15 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
             self.originalDelegate = menu.delegate
             menu.delegate = self
         }
+
+        if self.warmTask == nil {
+            self.warmTask = Task { await self.refreshCache(force: true) }
+        }
     }
 
     func menuWillOpen(_ menu: NSMenu) {
         self.originalDelegate?.menuWillOpen?(menu)
+        self.isMenuOpen = true
 
         // Remove any previous injected card items.
         for item in menu.items where item.tag == self.tag {
@@ -33,11 +44,16 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
 
         self.loadTask?.cancel()
 
-        let placeholder = AnyView(ContextMenuCardView(
-            rows: [],
-            statusText: "Loading sessions…"))
+        let initialRows = self.cachedRows
+        let initialIsLoading = initialRows.isEmpty
+        let initialStatusText = initialIsLoading ? self.cacheErrorText : nil
 
-        let hosting = NSHostingView(rootView: placeholder)
+        let initial = AnyView(ContextMenuCardView(
+            rows: initialRows,
+            statusText: initialStatusText,
+            isLoading: initialIsLoading))
+
+        let hosting = NSHostingView(rootView: initial)
         let size = hosting.fittingSize
         hosting.frame = NSRect(origin: .zero, size: NSSize(width: self.initialCardWidth(for: menu), height: size.height))
 
@@ -55,21 +71,22 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
         }
 
         self.loadTask = Task { [weak hosting] in
-            let view = await self.makeCardView()
+            await self.refreshCache(force: initialIsLoading)
+            guard let hosting else { return }
+            let view = self.cachedView()
             await MainActor.run {
-                hosting?.rootView = view
-                hosting?.invalidateIntrinsicContentSize()
-                if let hosting {
-                    self.adoptMenuWidthIfAvailable(for: menu, hosting: hosting)
-                    let size = hosting.fittingSize
-                    hosting.frame.size.height = size.height
-                }
+                hosting.rootView = view
+                hosting.invalidateIntrinsicContentSize()
+                self.adoptMenuWidthIfAvailable(for: menu, hosting: hosting)
+                let size = hosting.fittingSize
+                hosting.frame.size.height = size.height
             }
         }
     }
 
     func menuDidClose(_ menu: NSMenu) {
         self.originalDelegate?.menuDidClose?(menu)
+        self.isMenuOpen = false
         self.loadTask?.cancel()
     }
 
@@ -84,31 +101,49 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
         return NSRect.zero
     }
 
-    private func makeCardView() async -> AnyView {
+    private func refreshCache(force: Bool) async {
+        if !force, let cacheUpdatedAt, Date().timeIntervalSince(cacheUpdatedAt) < self.refreshIntervalSeconds {
+            return
+        }
+
+        do {
+            let rows = try await self.loadCurrentRows()
+            self.cachedRows = rows
+            self.cacheErrorText = nil
+            self.cacheUpdatedAt = Date()
+        } catch {
+            if self.cachedRows.isEmpty {
+                self.cacheErrorText = "Could not load sessions"
+            }
+            self.cacheUpdatedAt = Date()
+        }
+    }
+
+    private func cachedView() -> AnyView {
+        let rows = self.cachedRows
+        let isLoading = rows.isEmpty && self.cacheErrorText == nil
+        return AnyView(ContextMenuCardView(rows: rows, statusText: self.cacheErrorText, isLoading: isLoading))
+    }
+
+    private func loadCurrentRows() async throws -> [SessionRow] {
         let hints = SessionLoader.configHints()
         let store = SessionLoader.resolveStorePath(override: hints.storePath)
         let defaults = SessionDefaults(
             model: hints.model ?? SessionLoader.fallbackModel,
             contextTokens: hints.contextTokens ?? SessionLoader.fallbackContextTokens)
 
-        do {
-            let loaded = try await SessionLoader.loadRows(at: store, defaults: defaults)
-            let now = Date()
-            let current = loaded.filter { row in
-                if row.key == "main" { return true }
-                guard let updatedAt = row.updatedAt else { return false }
-                return now.timeIntervalSince(updatedAt) <= self.activeWindowSeconds
-            }
+        let loaded = try await SessionLoader.loadRows(at: store, defaults: defaults)
+        let now = Date()
+        let current = loaded.filter { row in
+            if row.key == "main" { return true }
+            guard let updatedAt = row.updatedAt else { return false }
+            return now.timeIntervalSince(updatedAt) <= self.activeWindowSeconds
+        }
 
-            let sorted = current.sorted { lhs, rhs in
-                if lhs.key == "main" { return true }
-                if rhs.key == "main" { return false }
-                return (lhs.updatedAt ?? .distantPast) > (rhs.updatedAt ?? .distantPast)
-            }
-
-            return AnyView(ContextMenuCardView(rows: sorted))
-        } catch {
-            return AnyView(ContextMenuCardView(rows: [], statusText: "Could not load sessions"))
+        return current.sorted { lhs, rhs in
+            if lhs.key == "main" { return true }
+            if rhs.key == "main" { return false }
+            return (lhs.updatedAt ?? .distantPast) > (rhs.updatedAt ?? .distantPast)
         }
     }
 

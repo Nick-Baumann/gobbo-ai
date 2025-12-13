@@ -5,15 +5,18 @@ import SwiftUI
 struct ContextMenuCardView: View {
     private let rows: [SessionRow]
     private let statusText: String?
+    private let isLoading: Bool
     private let padding: CGFloat = 10
     private let barHeight: CGFloat = 3
 
     init(
         rows: [SessionRow],
-        statusText: String? = nil
+        statusText: String? = nil,
+        isLoading: Bool = false
     ) {
         self.rows = rows
         self.statusText = statusText
+        self.isLoading = isLoading
     }
 
     var body: some View {
@@ -32,28 +35,27 @@ struct ContextMenuCardView: View {
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if self.rows.isEmpty {
+            } else if self.rows.isEmpty, !self.isLoading {
                 Text("No active sessions")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(self.rows) { row in
-                        self.sessionRow(row)
+                    if self.rows.isEmpty, self.isLoading {
+                        ForEach(0..<2, id: \.self) { _ in
+                            self.placeholderRow
+                        }
+                    } else {
+                        ForEach(self.rows) { row in
+                            self.sessionRow(row)
+                        }
                     }
                 }
             }
         }
         .padding(self.padding)
         .frame(minWidth: 300, maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.04))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
-                }
-        }
+        .transaction { txn in txn.animation = nil }
     }
 
     private var subtitle: String {
@@ -84,6 +86,29 @@ struct ContextMenuCardView: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(2)
             }
+        }
+    }
+
+    private var placeholderRow: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ContextUsageBar(
+                usedTokens: 0,
+                contextTokens: 200_000,
+                height: self.barHeight)
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("main")
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                Spacer(minLength: 8)
+                Text("000k/000k")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(2)
+            }
+            .redacted(reason: .placeholder)
         }
     }
 }
