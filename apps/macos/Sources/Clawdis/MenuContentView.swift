@@ -22,7 +22,7 @@ struct MenuContent: View {
 
     private let activeSessionWindowSeconds: TimeInterval = 24 * 60 * 60
     private let contextCardPadding: CGFloat = 10
-    private let contextPillHeight: CGFloat = 16
+    private let contextBarHeight: CGFloat = 6
     private let contextFallbackWidth: CGFloat = 280
 
     var body: some View {
@@ -260,25 +260,19 @@ struct MenuContent: View {
     @ViewBuilder
     private var contextCardRow: some View {
         Button(action: {}, label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Context")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 10)
-                    Text(self.contextSubtitle)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Context")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                if self.contextSessions.isEmpty {
+                    Text("No active sessions")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    if self.contextSessions.isEmpty {
-                        Text("No sessions yet")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
                         ForEach(self.contextSessions) { row in
-                            self.contextSessionPill(row)
+                            self.contextSessionRow(row)
                         }
                     }
                 }
@@ -304,46 +298,33 @@ struct MenuContent: View {
         .disabled(true)
     }
 
-    private var contextSubtitle: String {
-        let count = self.contextActiveCount
-        if count == 0 { return "Main session" }
-        if count == 1 { return "1 active session" }
-        return "\(count) active sessions"
-    }
-
     private var contextPillWidth: CGFloat {
         let base = self.contextCardWidth > 0 ? self.contextCardWidth : self.contextFallbackWidth
         return max(1, base - (self.contextCardPadding * 2))
     }
 
     @ViewBuilder
-    private func contextSessionPill(_ row: SessionRow) -> some View {
-        let label = row.key
-        let summary = row.tokens.contextSummaryShort
-
+    private func contextSessionRow(_ row: SessionRow) -> some View {
         let width = self.contextPillWidth
-        ZStack(alignment: .center) {
+        VStack(alignment: .leading, spacing: 4) {
             ContextUsageBar(
                 usedTokens: row.tokens.total,
                 contextTokens: row.tokens.contextTokens,
                 width: width,
-                height: self.contextPillHeight)
-
+                height: self.contextBarHeight)
             HStack(spacing: 8) {
-                Text(label)
-                    .font(.caption.weight(row.key == "main" ? .semibold : .regular))
+                Text(row.key)
+                    .font(.caption2.weight(row.key == "main" ? .semibold : .regular))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .layoutPriority(1)
                 Spacer(minLength: 8)
-                Text(summary)
-                    .font(.caption.monospacedDigit())
+                Text(row.tokens.contextSummaryShort)
+                    .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 1)
         }
-        .frame(width: width, height: self.contextPillHeight)
+        .frame(width: width)
     }
 
     private var heartbeatStatusRow: some View {
@@ -516,14 +497,8 @@ struct MenuContent: View {
         }
 
         let activeCount = active.count
-        let main = rows.first(where: { $0.key == "main" })
-        var merged = active
-        if let main, !merged.contains(where: { $0.key == "main" }) {
-            merged.insert(main, at: 0)
-        }
-
         // Keep stable ordering: main first, then most recent.
-        let sorted = merged.sorted { lhs, rhs in
+        let sorted = active.sorted { lhs, rhs in
             if lhs.key == "main" { return true }
             if rhs.key == "main" { return false }
             return (lhs.updatedAt ?? .distantPast) > (rhs.updatedAt ?? .distantPast)
