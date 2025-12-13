@@ -55,6 +55,7 @@ struct DebugSettings: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
             .padding(.vertical, 18)
+            .groupBoxStyle(PlainSettingsGroupBoxStyle())
         }
         .task {
             guard !self.isPreview else { return }
@@ -142,15 +143,17 @@ struct DebugSettings: View {
                     }
                     GridRow {
                         self.gridLabel("Attach only")
-                        Toggle("Only attach (don’t spawn locally)", isOn: self.$attachExistingGatewayOnly)
-                            .toggleStyle(.switch)
+                        Toggle("", isOn: self.$attachExistingGatewayOnly)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
                             .help(
                                 "When enabled in local mode, the mac app will only connect to an already-running gateway and will not start one itself.")
                     }
                     GridRow {
                         self.gridLabel("Deep links")
-                        Toggle("Allow URL scheme (agent)", isOn: self.$deepLinkAgentEnabled)
-                            .toggleStyle(.switch)
+                        Toggle("", isOn: self.$deepLinkAgentEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
                             .help("Enables handling of clawdis://agent?... deep links to trigger an agent run.")
                     }
                 }
@@ -228,7 +231,7 @@ struct DebugSettings: View {
                     self.gridLabel("Diagnostics")
                     VStack(alignment: .leading, spacing: 6) {
                         Toggle("Write rolling diagnostics log (JSONL)", isOn: self.$diagnosticsFileLogEnabled)
-                            .toggleStyle(.switch)
+                            .toggleStyle(.checkbox)
                             .help(
                                 "Writes a rotating, local-only diagnostics log under ~/Library/Logs/Clawdis/. Enable only while actively debugging.")
                         HStack(spacing: 8) {
@@ -479,7 +482,7 @@ struct DebugSettings: View {
         GroupBox("Canvas") {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Allow Canvas (agent)", isOn: self.$canvasEnabled)
-                    .toggleStyle(.switch)
+                    .toggleStyle(.checkbox)
                     .help(
                         "When off, agent Canvas requests return “Canvas disabled by user”. Manual debug actions still work.")
 
@@ -580,11 +583,23 @@ struct DebugSettings: View {
                 GridRow {
                     self.gridLabel("Web chat")
                     Toggle("Use SwiftUI web chat (glass)", isOn: self.$webChatSwiftUIEnabled)
-                        .toggleStyle(.switch)
+                        .toggleStyle(.checkbox)
                         .help(
                             "When enabled, the menu bar chat window/panel uses the native SwiftUI UI instead of the bundled WKWebView.")
                 }
             }
+        }
+    }
+
+    private struct PlainSettingsGroupBoxStyle: GroupBoxStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            VStack(alignment: .leading, spacing: 10) {
+                configuration.label
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                configuration.content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
