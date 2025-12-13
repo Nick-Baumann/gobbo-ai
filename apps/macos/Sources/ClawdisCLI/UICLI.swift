@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PeekabooAutomationKit
 import PeekabooBridge
 import PeekabooFoundation
@@ -94,7 +94,7 @@ enum UICLI {
 
     private static func runPermissions(args: [String], jsonOutput: Bool, context: Context) async throws -> Int32 {
         let sub = args.first ?? "status"
-        if sub != "status" && sub != "--help" && sub != "-h" && sub != "help" {
+        if sub != "status", sub != "--help", sub != "-h", sub != "help" {
             self.printHelp()
             return 1
         }
@@ -103,7 +103,7 @@ enum UICLI {
             try self.writeJSON([
                 "ok": true,
                 "host": context.hostDescription,
-                "result": try self.toJSONObject(status),
+                "result": self.toJSONObject(status),
             ])
         } else {
             FileHandle.standardOutput.write(Data((self.formatPermissions(status) + "\n").utf8))
@@ -123,7 +123,7 @@ enum UICLI {
             try self.writeJSON([
                 "ok": true,
                 "host": context.hostDescription,
-                "app": try self.toJSONObject(app),
+                "app": self.toJSONObject(app),
                 "window": windowObject,
             ])
         } else {
@@ -131,7 +131,7 @@ enum UICLI {
             let line = "\(bundle) (pid \(app.processIdentifier))"
             FileHandle.standardOutput.write(Data((line + "\n").utf8))
             if let window {
-                FileHandle.standardOutput.write(Data(("window \(window.windowID): \(window.title)\n").utf8))
+                FileHandle.standardOutput.write(Data("window \(window.windowID): \(window.title)\n".utf8))
             }
         }
         return 0
@@ -143,12 +143,12 @@ enum UICLI {
             try self.writeJSON([
                 "ok": true,
                 "host": context.hostDescription,
-                "result": try self.toJSONObject(apps),
+                "result": self.toJSONObject(apps),
             ])
         } else {
             for app in apps {
                 let bundle = app.bundleIdentifier ?? "<unknown>"
-                FileHandle.standardOutput.write(Data(("\(bundle)\t\(app.name)\n").utf8))
+                FileHandle.standardOutput.write(Data("\(bundle)\t\(app.name)\n".utf8))
             }
         }
         return 0
@@ -176,11 +176,11 @@ enum UICLI {
             try self.writeJSON([
                 "ok": true,
                 "host": context.hostDescription,
-                "result": try self.toJSONObject(windows),
+                "result": self.toJSONObject(windows),
             ])
         } else {
             for window in windows {
-                FileHandle.standardOutput.write(Data(("\(window.windowID)\t\(window.title)\n").utf8))
+                FileHandle.standardOutput.write(Data("\(window.windowID)\t\(window.title)\n".utf8))
             }
         }
         return 0
@@ -217,20 +217,19 @@ enum UICLI {
             }
         }
 
-        let capture: CaptureResult
-        if let bundleId, !bundleId.isEmpty {
-            capture = try await context.client.captureWindow(
+        let capture: CaptureResult = if let bundleId, !bundleId.isEmpty {
+            try await context.client.captureWindow(
                 appIdentifier: bundleId,
                 windowIndex: windowIndex,
                 visualizerMode: mode,
                 scale: scale)
         } else if displayIndex != nil {
-            capture = try await context.client.captureScreen(
+            try await context.client.captureScreen(
                 displayIndex: displayIndex,
                 visualizerMode: mode,
                 scale: scale)
         } else {
-            capture = try await context.client.captureFrontmost(visualizerMode: mode, scale: scale)
+            try await context.client.captureFrontmost(visualizerMode: mode, scale: scale)
         }
 
         let path = try self.writeTempPNG(capture.imageData)
@@ -240,7 +239,7 @@ enum UICLI {
                 "ok": true,
                 "host": context.hostDescription,
                 "path": path,
-                "metadata": try self.toJSONObject(capture.metadata),
+                "metadata": self.toJSONObject(capture.metadata),
                 "warning": capture.warning ?? "",
             ])
         } else {
@@ -287,7 +286,8 @@ enum UICLI {
         let resolvedSnapshotId: String = if let snapshotId, !snapshotId.isEmpty {
             snapshotId
         } else if let bundleId, !bundleId.isEmpty, let existing = try? await context.client
-            .getMostRecentSnapshot(applicationBundleId: bundleId) {
+            .getMostRecentSnapshot(applicationBundleId: bundleId)
+        {
             existing
         } else {
             try await context.client.createSnapshot()
@@ -321,7 +321,7 @@ enum UICLI {
                 "host": context.hostDescription,
                 "snapshotId": resolvedSnapshotId,
                 "screenshotPath": screenshotPath,
-                "result": try self.toJSONObject(detection),
+                "result": self.toJSONObject(detection),
             ])
         } else {
             FileHandle.standardOutput.write(Data((screenshotPath + "\n").utf8))
@@ -494,7 +494,7 @@ enum UICLI {
             try self.writeJSON([
                 "ok": true,
                 "host": context.hostDescription,
-                "result": try self.toJSONObject(result),
+                "result": self.toJSONObject(result),
             ])
         } else {
             FileHandle.standardOutput.write(Data((result.found ? "found\n" : "not found\n").utf8))
@@ -549,7 +549,7 @@ enum UICLI {
         return "\(sr) \(ax) \(ascr)"
     }
 
-    private static func toJSONObject<T: Encodable>(_ value: T) throws -> Any {
+    private static func toJSONObject(_ value: some Encodable) throws -> Any {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(value)

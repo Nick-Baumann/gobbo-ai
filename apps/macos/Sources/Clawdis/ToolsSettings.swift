@@ -224,25 +224,25 @@ struct ToolsSettings: View {
             EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.callout.weight(.semibold))
-                .padding(.top, 6)
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                    .padding(.top, 6)
 
-            VStack(spacing: 8) {
-                ForEach(filtered) { tool in
-                    ToolRow(
-                        tool: tool,
-                        state: self.binding(for: tool),
-                        packageManager: self.packageManager,
-                        refreshState: { await self.refresh(tool: tool) })
-                        .padding(10)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.secondary.opacity(0.15), lineWidth: 1))
+                VStack(spacing: 8) {
+                    ForEach(filtered) { tool in
+                        ToolRow(
+                            tool: tool,
+                            state: self.binding(for: tool),
+                            packageManager: self.packageManager,
+                            refreshState: { await self.refresh(tool: tool) })
+                            .padding(10)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.secondary.opacity(0.15), lineWidth: 1))
+                    }
                 }
-            }
             }
         }
     }

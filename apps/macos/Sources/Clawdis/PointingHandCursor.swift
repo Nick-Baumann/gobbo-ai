@@ -28,4 +28,3 @@ extension View {
         self.modifier(PointingHandCursorModifier())
     }
 }
-
