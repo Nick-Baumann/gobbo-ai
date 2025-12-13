@@ -24,21 +24,19 @@ struct ContextUsageBar: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let fillWidth = proxy.size.width * self.clampedFractionUsed
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.25))
-                Capsule()
-                    .fill(self.tint)
-                    .frame(width: max(1, fillWidth))
-            }
+        // Prefer the native progress indicator in menus; `GeometryReader` can get wonky
+        // inside `MenuBarExtra`-backed menus (often receiving zero width).
+        ZStack {
+            Capsule()
+                .fill(Color.secondary.opacity(0.25))
+            ProgressView(value: self.clampedFractionUsed, total: 1)
+                .progressViewStyle(.linear)
+                .tint(self.tint)
+                .clipShape(Capsule())
         }
-        .frame(maxWidth: .infinity)
         .frame(height: self.height)
         .accessibilityLabel("Context usage")
         .accessibilityValue(self.accessibilityValue)
-        .drawingGroup()
     }
 
     private var accessibilityValue: String {

@@ -321,26 +321,7 @@ enum SessionLoader {
             return nil
         }
 
-        guard let text = try? String(contentsOf: logURL, encoding: .utf8) else { return nil }
-        var lastUsage: [String: Any]?
-
-        for line in text.split(whereSeparator: \.isNewline) {
-            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedLine.isEmpty { continue }
-            guard let data = trimmedLine.data(using: .utf8) else { continue }
-            guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
-
-            if let message = obj["message"] as? [String: Any], let usage = message["usage"] as? [String: Any] {
-                lastUsage = usage
-                continue
-            }
-            if let usage = obj["usage"] as? [String: Any] {
-                lastUsage = usage
-                continue
-            }
-        }
-
-        guard let lastUsage else { return nil }
+        guard let lastUsage = self.readLastUsageFromJsonl(logURL) else { return nil }
 
         let input = self.number(from: lastUsage["input"]) ?? 0
         let output = self.number(from: lastUsage["output"]) ?? 0
@@ -351,6 +332,55 @@ enum SessionLoader {
         let prompt = input + cacheRead + cacheWrite
         if prompt > 0 { return prompt }
         if let totalTokens, totalTokens > output { return totalTokens - output }
+        return nil
+    }
+
+    private static func readLastUsageFromJsonl(_ url: URL) -> [String: Any]? {
+        // Logs can contain huge toolResult payloads (base64 images). Avoid parsing the whole file:
+        // read a tail window and scan backwards for the last JSON line that contains a usage blob.
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forReadingFrom: url)
+        } catch {
+            return nil
+        }
+        defer { try? handle.close() }
+
+        let fileSize: UInt64
+        do {
+            fileSize = try handle.seekToEnd()
+        } catch {
+            return nil
+        }
+
+        let window: UInt64 = 512 * 1024
+        let start = fileSize > window ? fileSize - window : 0
+        do {
+            try handle.seek(toOffset: start)
+        } catch {
+            return nil
+        }
+
+        let data = (try? handle.readToEnd()) ?? Data()
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+
+        let lines = text.split(whereSeparator: \.isNewline)
+        for line in lines.reversed() {
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedLine.isEmpty { continue }
+            // Cheap prefilter before JSON parsing.
+            if !trimmedLine.contains("\"usage\"") { continue }
+            guard let lineData = trimmedLine.data(using: .utf8) else { continue }
+            guard let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
+
+            if let message = obj["message"] as? [String: Any], let usage = message["usage"] as? [String: Any] {
+                return usage
+            }
+            if let usage = obj["usage"] as? [String: Any] {
+                return usage
+            }
+        }
+
         return nil
     }
 
