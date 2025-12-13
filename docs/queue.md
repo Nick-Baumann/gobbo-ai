@@ -19,7 +19,8 @@ We now serialize all command-based auto-replies (WhatsApp Web listener) through 
 
 ## Scope and guarantees
 - Applies only to config-driven command replies; plain text replies are unaffected.
-- Queue is process-wide, so the web inbox listener (and any future entrypoints) all respect the same lock.
+- Default lane (`main`) is process-wide for inbound + main heartbeats to keep the primary workflow serialized.
+- Additional lanes may exist (e.g. `cron`) so background jobs can run in parallel without blocking inbound replies.
 - No external dependencies or background worker threads; pure TypeScript + promises.
 
 ## Troubleshooting

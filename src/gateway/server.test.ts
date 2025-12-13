@@ -14,6 +14,7 @@ import { startGatewayServer } from "./server.js";
 
 let testSessionStorePath: string | undefined;
 let testAllowFrom: string[] | undefined;
+let testCronStorePath: string | undefined;
 vi.mock("../config/config.js", () => ({
   loadConfig: () => ({
     inbound: {
@@ -24,6 +25,7 @@ vi.mock("../config/config.js", () => ({
         session: { mainKey: "main", store: testSessionStorePath },
       },
     },
+    cron: { enabled: false, store: testCronStorePath },
   }),
 }));
 
@@ -173,6 +175,273 @@ async function connectOk(
 }
 
 describe("gateway server", () => {
+  test("supports cron.add and cron.list", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-gw-cron-"));
+    testCronStorePath = path.join(dir, "cron.json");
+    await fs.writeFile(
+      testCronStorePath,
+      JSON.stringify({ version: 1, jobs: [] }),
+    );
+
+    const { server, ws } = await startServerWithClient();
+    await connectOk(ws);
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-add-1",
+        method: "cron.add",
+        params: {
+          name: "daily",
+          enabled: true,
+          schedule: { kind: "every", everyMs: 60_000 },
+          sessionTarget: "main",
+          wakeMode: "next-heartbeat",
+          payload: { kind: "systemEvent", text: "hello" },
+        },
+      }),
+    );
+    const addRes = await onceMessage<{
+      type: "res";
+      ok: boolean;
+      payload?: unknown;
+    }>(ws, (o) => o.type === "res" && o.id === "cron-add-1");
+    expect(addRes.ok).toBe(true);
+    expect(typeof (addRes.payload as { id?: unknown } | null)?.id).toBe(
+      "string",
+    );
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-list-1",
+        method: "cron.list",
+        params: { includeDisabled: true },
+      }),
+    );
+    const listRes = await onceMessage<{
+      type: "res";
+      ok: boolean;
+      payload?: unknown;
+    }>(ws, (o) => o.type === "res" && o.id === "cron-list-1");
+    expect(listRes.ok).toBe(true);
+    const jobs = (listRes.payload as { jobs?: unknown } | null)?.jobs;
+    expect(Array.isArray(jobs)).toBe(true);
+    expect((jobs as unknown[]).length).toBe(1);
+    expect(((jobs as Array<{ name?: unknown }>)[0]?.name as string) ?? "").toBe(
+      "daily",
+    );
+
+    ws.close();
+    await server.close();
+    await fs.rm(dir, { recursive: true, force: true });
+    testCronStorePath = undefined;
+  });
+
+  test("writes cron run history for flat store paths", async () => {
+    const dir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "clawdis-gw-cron-log-"),
+    );
+    testCronStorePath = path.join(dir, "cron.json");
+    await fs.writeFile(
+      testCronStorePath,
+      JSON.stringify({ version: 1, jobs: [] }),
+    );
+
+    const { server, ws } = await startServerWithClient();
+    await connectOk(ws);
+
+    const atMs = Date.now() - 1;
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-add-log-1",
+        method: "cron.add",
+        params: {
+          enabled: true,
+          schedule: { kind: "at", atMs },
+          sessionTarget: "main",
+          wakeMode: "next-heartbeat",
+          payload: { kind: "systemEvent", text: "hello" },
+        },
+      }),
+    );
+
+    const addRes = await onceMessage<{
+      type: "res";
+      ok: boolean;
+      payload?: unknown;
+    }>(ws, (o) => o.type === "res" && o.id === "cron-add-log-1");
+    expect(addRes.ok).toBe(true);
+    const jobId = String((addRes.payload as { id?: unknown } | null)?.id ?? "");
+    expect(jobId.length > 0).toBe(true);
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-run-log-1",
+        method: "cron.run",
+        params: { id: jobId, mode: "force" },
+      }),
+    );
+    const runRes = await onceMessage<{ type: "res"; ok: boolean }>(
+      ws,
+      (o) => o.type === "res" && o.id === "cron-run-log-1",
+      8000,
+    );
+    expect(runRes.ok).toBe(true);
+
+    const logPath = path.join(dir, "cron.runs.jsonl");
+    const waitForLog = async () => {
+      for (let i = 0; i < 200; i++) {
+        const raw = await fs.readFile(logPath, "utf-8").catch(() => "");
+        if (raw.trim().length > 0) return raw;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      throw new Error("timeout waiting for cron run log");
+    };
+
+    const raw = await waitForLog();
+    const lines = raw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    expect(lines.length).toBeGreaterThan(0);
+    const last = JSON.parse(lines.at(-1) ?? "{}") as {
+      jobId?: unknown;
+      action?: unknown;
+      status?: unknown;
+    };
+    expect(last.action).toBe("finished");
+    expect(last.jobId).toBe(jobId);
+    expect(last.status).toBe("ok");
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-runs-1",
+        method: "cron.runs",
+        params: { id: jobId, limit: 50 },
+      }),
+    );
+    const runsRes = await onceMessage<{
+      type: "res";
+      ok: boolean;
+      payload?: unknown;
+    }>(ws, (o) => o.type === "res" && o.id === "cron-runs-1", 8000);
+    expect(runsRes.ok).toBe(true);
+    const entries = (runsRes.payload as { entries?: unknown } | null)?.entries;
+    expect(Array.isArray(entries)).toBe(true);
+    expect((entries as Array<{ jobId?: unknown }>).at(-1)?.jobId).toBe(jobId);
+
+    ws.close();
+    await server.close();
+    await fs.rm(dir, { recursive: true, force: true });
+    testCronStorePath = undefined;
+  });
+
+  test("writes cron run history to per-job runs/ when store is jobs.json", async () => {
+    const dir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "clawdis-gw-cron-log-jobs-"),
+    );
+    const cronDir = path.join(dir, "cron");
+    testCronStorePath = path.join(cronDir, "jobs.json");
+    await fs.mkdir(cronDir, { recursive: true });
+    await fs.writeFile(
+      testCronStorePath,
+      JSON.stringify({ version: 1, jobs: [] }),
+    );
+
+    const { server, ws } = await startServerWithClient();
+    await connectOk(ws);
+
+    const atMs = Date.now() - 1;
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-add-log-2",
+        method: "cron.add",
+        params: {
+          enabled: true,
+          schedule: { kind: "at", atMs },
+          sessionTarget: "main",
+          wakeMode: "next-heartbeat",
+          payload: { kind: "systemEvent", text: "hello" },
+        },
+      }),
+    );
+
+    const addRes = await onceMessage<{
+      type: "res";
+      ok: boolean;
+      payload?: unknown;
+    }>(ws, (o) => o.type === "res" && o.id === "cron-add-log-2");
+    expect(addRes.ok).toBe(true);
+    const jobId = String((addRes.payload as { id?: unknown } | null)?.id ?? "");
+    expect(jobId.length > 0).toBe(true);
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-run-log-2",
+        method: "cron.run",
+        params: { id: jobId, mode: "force" },
+      }),
+    );
+    const runRes = await onceMessage<{ type: "res"; ok: boolean }>(
+      ws,
+      (o) => o.type === "res" && o.id === "cron-run-log-2",
+      8000,
+    );
+    expect(runRes.ok).toBe(true);
+
+    const logPath = path.join(cronDir, "runs", `${jobId}.jsonl`);
+    const waitForLog = async () => {
+      for (let i = 0; i < 200; i++) {
+        const raw = await fs.readFile(logPath, "utf-8").catch(() => "");
+        if (raw.trim().length > 0) return raw;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      throw new Error("timeout waiting for per-job cron run log");
+    };
+
+    const raw = await waitForLog();
+    const line = raw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .at(-1);
+    const last = JSON.parse(line ?? "{}") as {
+      jobId?: unknown;
+      action?: unknown;
+    };
+    expect(last.action).toBe("finished");
+    expect(last.jobId).toBe(jobId);
+
+    ws.send(
+      JSON.stringify({
+        type: "req",
+        id: "cron-runs-2",
+        method: "cron.runs",
+        params: { id: jobId, limit: 20 },
+      }),
+    );
+    const runsRes = await onceMessage<{
+      type: "res";
+      ok: boolean;
+      payload?: unknown;
+    }>(ws, (o) => o.type === "res" && o.id === "cron-runs-2", 8000);
+    expect(runsRes.ok).toBe(true);
+    const entries = (runsRes.payload as { entries?: unknown } | null)?.entries;
+    expect(Array.isArray(entries)).toBe(true);
+    expect((entries as Array<{ jobId?: unknown }>).at(-1)?.jobId).toBe(jobId);
+
+    ws.close();
+    await server.close();
+    await fs.rm(dir, { recursive: true, force: true });
+    testCronStorePath = undefined;
+  });
+
   test("broadcasts heartbeat events and serves last-heartbeat", async () => {
     type HeartbeatPayload = {
       ts: number;
@@ -196,16 +465,7 @@ describe("gateway server", () => {
     };
 
     const { server, ws } = await startServerWithClient();
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        minProtocol: 1,
-        maxProtocol: 1,
-        client: { name: "test", version: "1", platform: "test", mode: "test" },
-        caps: [],
-      }),
-    );
-    await onceMessage(ws, (o) => o.type === "hello-ok");
+    await connectOk(ws);
 
     const waitHeartbeat = onceMessage<EventFrame>(
       ws,
@@ -631,13 +891,18 @@ describe("gateway server", () => {
     await connectOk(ws);
 
     // Emit a fake agent event directly through the shared emitter.
+    const runId = randomUUID();
     const evtPromise = onceMessage(
       ws,
-      (o) => o.type === "event" && o.event === "agent",
+      (o) =>
+        o.type === "event" &&
+        o.event === "agent" &&
+        o.payload?.runId === runId &&
+        o.payload?.stream === "job",
     );
-    emitAgentEvent({ runId: "run-1", stream: "job", data: { msg: "hi" } });
+    emitAgentEvent({ runId, stream: "job", data: { msg: "hi" } });
     const evt = await evtPromise;
-    expect(evt.payload.runId).toBe("run-1");
+    expect(evt.payload.runId).toBe(runId);
     expect(typeof evt.seq).toBe("number");
     expect(evt.payload.data.msg).toBe("hi");
 

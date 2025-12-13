@@ -49,6 +49,12 @@ export type WebChatConfig = {
   port?: number;
 };
 
+export type CronConfig = {
+  enabled?: boolean;
+  store?: string;
+  maxConcurrentRuns?: number;
+};
+
 export type TelegramConfig = {
   botToken?: string;
   requireMention?: boolean;
@@ -107,6 +113,7 @@ export type ClawdisConfig = {
   web?: WebConfig;
   telegram?: TelegramConfig;
   webchat?: WebChatConfig;
+  cron?: CronConfig;
 };
 
 // New branding path (preferred)
@@ -216,6 +223,13 @@ const ClawdisSchema = z.object({
         })
         .optional(),
       reply: ReplySchema.optional(),
+    })
+    .optional(),
+  cron: z
+    .object({
+      enabled: z.boolean().optional(),
+      store: z.string().optional(),
+      maxConcurrentRuns: z.number().int().positive().optional(),
     })
     .optional(),
   web: z

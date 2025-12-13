@@ -32,6 +32,8 @@ import {
   resolveReconnectPolicy,
   sleepWithAbort,
 } from "./reconnect.js";
+import type { ReplyHeartbeatWakeResult } from "./reply-heartbeat-wake.js";
+import { setReplyHeartbeatWakeHandler } from "./reply-heartbeat-wake.js";
 import { formatError, getWebAuthAgeMs, readWebSelfId } from "./session.js";
 
 const WEB_TEXT_LIMIT = 4000;
@@ -379,21 +381,24 @@ export async function runWebHeartbeatOnce(opts: {
 }
 
 function getFallbackRecipient(cfg: ReturnType<typeof loadConfig>) {
-  const storePath = resolveStorePath(cfg.inbound?.reply?.session?.store);
+  const sessionCfg = cfg.inbound?.reply?.session;
+  const storePath = resolveStorePath(sessionCfg?.store);
   const store = loadSessionStore(storePath);
-  const candidates = Object.entries(store).filter(([key]) => key !== "global");
-  if (candidates.length === 0) {
-    const allowFrom =
-      Array.isArray(cfg.inbound?.allowFrom) && cfg.inbound.allowFrom.length > 0
-        ? cfg.inbound.allowFrom.filter((v) => v !== "*")
-        : [];
-    if (allowFrom.length === 0) return null;
-    return allowFrom[0] ? normalizeE164(allowFrom[0]) : null;
+  const mainKey = (sessionCfg?.mainKey ?? "main").trim() || "main";
+  const main = store[mainKey];
+  const lastTo = typeof main?.lastTo === "string" ? main.lastTo.trim() : "";
+  const lastChannel = main?.lastChannel;
+
+  if (lastChannel === "whatsapp" && lastTo) {
+    return normalizeE164(lastTo);
   }
-  const mostRecent = candidates.sort(
-    (a, b) => (b[1]?.updatedAt ?? 0) - (a[1]?.updatedAt ?? 0),
-  )[0];
-  return mostRecent ? normalizeE164(mostRecent[0]) : null;
+
+  const allowFrom =
+    Array.isArray(cfg.inbound?.allowFrom) && cfg.inbound.allowFrom.length > 0
+      ? cfg.inbound.allowFrom.filter((v) => v !== "*")
+      : [];
+  if (allowFrom.length === 0) return null;
+  return allowFrom[0] ? normalizeE164(allowFrom[0]) : null;
 }
 
 function getSessionRecipients(cfg: ReturnType<typeof loadConfig>) {
@@ -402,14 +407,30 @@ function getSessionRecipients(cfg: ReturnType<typeof loadConfig>) {
   if (scope === "global") return [];
   const storePath = resolveStorePath(cfg.inbound?.reply?.session?.store);
   const store = loadSessionStore(storePath);
-  return Object.entries(store)
+  const isGroupKey = (key: string) =>
+    key.startsWith("group:") || key.includes("@g.us");
+  const isCronKey = (key: string) => key.startsWith("cron:");
+
+  const recipients = Object.entries(store)
     .filter(([key]) => key !== "global" && key !== "unknown")
-    .map(([key, entry]) => ({
-      to: normalizeE164(key),
+    .filter(([key]) => !isGroupKey(key) && !isCronKey(key))
+    .map(([_, entry]) => ({
+      to:
+        entry?.lastChannel === "whatsapp" && entry?.lastTo
+          ? normalizeE164(entry.lastTo)
+          : "",
       updatedAt: entry?.updatedAt ?? 0,
     }))
-    .filter(({ to }) => Boolean(to))
+    .filter(({ to }) => to.length > 1)
     .sort((a, b) => b.updatedAt - a.updatedAt);
+
+  // Dedupe while preserving recency ordering.
+  const seen = new Set<string>();
+  return recipients.filter((r) => {
+    if (seen.has(r.to)) return false;
+    seen.add(r.to);
+    return true;
+  });
 }
 
 export function resolveHeartbeatRecipients(
@@ -1055,6 +1076,7 @@ export async function monitorWebProvider(
 
     const closeListener = async () => {
       setActiveWebListener(null);
+      setReplyHeartbeatWakeHandler(null);
       if (heartbeat) clearInterval(heartbeat);
       if (replyHeartbeatTimer) clearInterval(replyHeartbeatTimer);
       if (watchdogTimer) clearInterval(watchdogTimer);
@@ -1126,8 +1148,11 @@ export async function monitorWebProvider(
       }, WATCHDOG_CHECK_MS);
     }
 
-    const runReplyHeartbeat = async () => {
-      if (!heartbeatsEnabled) return;
+    const runReplyHeartbeat = async (): Promise<ReplyHeartbeatWakeResult> => {
+      const started = Date.now();
+      if (!heartbeatsEnabled) {
+        return { status: "skipped", reason: "disabled" };
+      }
       const queued = getQueueSize();
       if (queued > 0) {
         heartbeatLogger.info(
@@ -1135,16 +1160,18 @@ export async function monitorWebProvider(
           "reply heartbeat skipped",
         );
         console.log(success("heartbeat: skipped (requests in flight)"));
-        return;
+        return { status: "skipped", reason: "requests-in-flight" };
       }
-      if (!replyHeartbeatMinutes) return;
+      if (!replyHeartbeatMinutes) {
+        return { status: "skipped", reason: "disabled" };
+      }
       if (lastInboundMsg?.chatType === "group") {
         heartbeatLogger.info(
           { connectionId, reason: "last-inbound-group" },
           "reply heartbeat skipped",
         );
         console.log(success("heartbeat: skipped (group chat)"));
-        return;
+        return { status: "skipped", reason: "group-chat" };
       }
       const tickStart = Date.now();
       if (!lastInboundMsg) {
@@ -1159,7 +1186,7 @@ export async function monitorWebProvider(
             "reply heartbeat skipped",
           );
           console.log(success("heartbeat: skipped (no recent inbound)"));
-          return;
+          return { status: "skipped", reason: "no-recent-inbound" };
         }
         const snapshot = getSessionSnapshot(cfg, fallbackTo, true);
         if (!snapshot.entry) {
@@ -1168,7 +1195,7 @@ export async function monitorWebProvider(
             "reply heartbeat skipped",
           );
           console.log(success("heartbeat: skipped (no session to resume)"));
-          return;
+          return { status: "skipped", reason: "no-session-for-fallback" };
         }
         if (isVerbose()) {
           heartbeatLogger.info(
@@ -1199,7 +1226,7 @@ export async function monitorWebProvider(
           },
           "reply heartbeat sent (fallback session)",
         );
-        return;
+        return { status: "ran", durationMs: Date.now() - started };
       }
 
       try {
@@ -1252,7 +1279,7 @@ export async function monitorWebProvider(
             "reply heartbeat skipped",
           );
           console.log(success("heartbeat: ok (empty reply)"));
-          return;
+          return { status: "ran", durationMs: Date.now() - started };
         }
 
         const stripped = stripHeartbeatToken(replyPayload.text);
@@ -1270,7 +1297,7 @@ export async function monitorWebProvider(
             "reply heartbeat skipped",
           );
           console.log(success("heartbeat: ok (HEARTBEAT_OK)"));
-          return;
+          return { status: "ran", durationMs: Date.now() - started };
         }
 
         // Apply response prefix if configured (same as regular messages)
@@ -1310,6 +1337,7 @@ export async function monitorWebProvider(
           },
           "reply heartbeat sent",
         );
+        return { status: "ran", durationMs: Date.now() - started };
       } catch (err) {
         const durationMs = Date.now() - tickStart;
         heartbeatLogger.warn(
@@ -1323,8 +1351,11 @@ export async function monitorWebProvider(
         console.log(
           danger(`heartbeat: failed (${formatDuration(durationMs)})`),
         );
+        return { status: "failed", reason: String(err) };
       }
     };
+
+    setReplyHeartbeatWakeHandler(async () => runReplyHeartbeat());
 
     if (replyHeartbeatMinutes && !replyHeartbeatTimer) {
       const intervalMs = replyHeartbeatMinutes * 60_000;

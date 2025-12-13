@@ -1,0 +1,431 @@
+import crypto from "node:crypto";
+
+import { computeNextRunAtMs } from "./schedule.js";
+import { loadCronStore, saveCronStore } from "./store.js";
+import type {
+  CronJob,
+  CronJobCreate,
+  CronJobPatch,
+  CronPayload,
+  CronStoreFile,
+} from "./types.js";
+
+export type CronEvent = {
+  jobId: string;
+  action: "added" | "updated" | "removed" | "started" | "finished";
+  runAtMs?: number;
+  durationMs?: number;
+  status?: "ok" | "error" | "skipped";
+  error?: string;
+  nextRunAtMs?: number;
+};
+
+type Logger = {
+  debug: (obj: unknown, msg?: string) => void;
+  info: (obj: unknown, msg?: string) => void;
+  warn: (obj: unknown, msg?: string) => void;
+  error: (obj: unknown, msg?: string) => void;
+};
+
+export type CronServiceDeps = {
+  nowMs?: () => number;
+  log: Logger;
+  storePath: string;
+  cronEnabled: boolean;
+  enqueueSystemEvent: (text: string) => void;
+  requestReplyHeartbeatNow: (opts?: { reason?: string }) => void;
+  runIsolatedAgentJob: (params: {
+    job: CronJob;
+    message: string;
+  }) => Promise<{ status: "ok" | "error" | "skipped"; summary?: string }>;
+  onEvent?: (evt: CronEvent) => void;
+};
+
+const STUCK_RUN_MS = 2 * 60 * 60 * 1000;
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function normalizePayloadToSystemText(payload: CronPayload) {
+  if (payload.kind === "systemEvent") return payload.text.trim();
+  return payload.message.trim();
+}
+
+export class CronService {
+  private readonly deps: Required<Omit<CronServiceDeps, "onEvent">> &
+    Pick<CronServiceDeps, "onEvent">;
+  private store: CronStoreFile | null = null;
+  private timer: NodeJS.Timeout | null = null;
+  private running = false;
+  private op: Promise<unknown> = Promise.resolve();
+
+  constructor(deps: CronServiceDeps) {
+    this.deps = {
+      ...deps,
+      nowMs: deps.nowMs ?? (() => Date.now()),
+      onEvent: deps.onEvent,
+    };
+  }
+
+  async start() {
+    await this.locked(async () => {
+      if (!this.deps.cronEnabled) {
+        this.deps.log.info({ enabled: false }, "cron: disabled");
+        return;
+      }
+      await this.ensureLoaded();
+      this.recomputeNextRuns();
+      await this.persist();
+      this.armTimer();
+      this.deps.log.info(
+        {
+          enabled: true,
+          jobs: this.store?.jobs.length ?? 0,
+          nextWakeAtMs: this.nextWakeAtMs() ?? null,
+        },
+        "cron: started",
+      );
+    });
+  }
+
+  stop() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  async list(opts?: { includeDisabled?: boolean }) {
+    return await this.locked(async () => {
+      await this.ensureLoaded();
+      const includeDisabled = opts?.includeDisabled === true;
+      const jobs = (this.store?.jobs ?? []).filter(
+        (j) => includeDisabled || j.enabled,
+      );
+      return jobs.sort(
+        (a, b) => (a.state.nextRunAtMs ?? 0) - (b.state.nextRunAtMs ?? 0),
+      );
+    });
+  }
+
+  async add(input: CronJobCreate) {
+    return await this.locked(async () => {
+      await this.ensureLoaded();
+      const now = this.deps.nowMs();
+      const id = crypto.randomUUID();
+      const job: CronJob = {
+        id,
+        name: input.name?.trim() || undefined,
+        enabled: input.enabled !== false,
+        createdAtMs: now,
+        updatedAtMs: now,
+        schedule: input.schedule,
+        sessionTarget: input.sessionTarget,
+        wakeMode: input.wakeMode,
+        payload: input.payload,
+        isolation: input.isolation,
+        state: {
+          ...input.state,
+        },
+      };
+      job.state.nextRunAtMs = this.computeJobNextRunAtMs(job, now);
+      this.store?.jobs.push(job);
+      await this.persist();
+      this.armTimer();
+      this.emit({
+        jobId: id,
+        action: "added",
+        nextRunAtMs: job.state.nextRunAtMs,
+      });
+      return job;
+    });
+  }
+
+  async update(id: string, patch: CronJobPatch) {
+    return await this.locked(async () => {
+      await this.ensureLoaded();
+      const job = this.findJobOrThrow(id);
+      const now = this.deps.nowMs();
+
+      if (isNonEmptyString(patch.name)) job.name = patch.name.trim();
+      if (patch.name === null || patch.name === "") job.name = undefined;
+      if (typeof patch.enabled === "boolean") job.enabled = patch.enabled;
+      if (patch.schedule) job.schedule = patch.schedule;
+      if (patch.sessionTarget) job.sessionTarget = patch.sessionTarget;
+      if (patch.wakeMode) job.wakeMode = patch.wakeMode;
+      if (patch.payload) job.payload = patch.payload;
+      if (patch.isolation) job.isolation = patch.isolation;
+      if (patch.state) job.state = { ...job.state, ...patch.state };
+
+      job.updatedAtMs = now;
+      if (job.enabled) {
+        job.state.nextRunAtMs = this.computeJobNextRunAtMs(job, now);
+      } else {
+        job.state.nextRunAtMs = undefined;
+        job.state.runningAtMs = undefined;
+      }
+      await this.persist();
+      this.armTimer();
+      this.emit({
+        jobId: id,
+        action: "updated",
+        nextRunAtMs: job.state.nextRunAtMs,
+      });
+      return job;
+    });
+  }
+
+  async remove(id: string) {
+    return await this.locked(async () => {
+      await this.ensureLoaded();
+      const before = this.store?.jobs.length ?? 0;
+      if (!this.store) return { ok: false, removed: false };
+      this.store.jobs = this.store.jobs.filter((j) => j.id !== id);
+      const removed = (this.store.jobs.length ?? 0) !== before;
+      await this.persist();
+      this.armTimer();
+      if (removed) this.emit({ jobId: id, action: "removed" });
+      return { ok: true, removed };
+    });
+  }
+
+  async run(id: string, mode?: "due" | "force") {
+    return await this.locked(async () => {
+      await this.ensureLoaded();
+      const job = this.findJobOrThrow(id);
+      const now = this.deps.nowMs();
+      const due =
+        mode === "force" ||
+        (job.enabled &&
+          typeof job.state.nextRunAtMs === "number" &&
+          now >= job.state.nextRunAtMs);
+      if (!due) return { ok: true, ran: false, reason: "not-due" as const };
+      await this.executeJob(job, now, { forced: mode === "force" });
+      await this.persist();
+      this.armTimer();
+      return { ok: true, ran: true };
+    });
+  }
+
+  wake(opts: { mode: "now" | "next-heartbeat"; text: string }) {
+    const text = opts.text.trim();
+    if (!text) return { ok: false };
+    this.deps.enqueueSystemEvent(text);
+    if (opts.mode === "now") {
+      this.deps.requestReplyHeartbeatNow({ reason: "wake" });
+    }
+    return { ok: true };
+  }
+
+  private async locked<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.op.then(fn, fn);
+    // Keep the chain alive even when the operation fails.
+    this.op = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return (await next) as T;
+  }
+
+  private async ensureLoaded() {
+    if (this.store) return;
+    const loaded = await loadCronStore(this.deps.storePath);
+    this.store = { version: 1, jobs: loaded.jobs ?? [] };
+  }
+
+  private async persist() {
+    if (!this.store) return;
+    await saveCronStore(this.deps.storePath, this.store);
+  }
+
+  private findJobOrThrow(id: string) {
+    const job = this.store?.jobs.find((j) => j.id === id);
+    if (!job) throw new Error(`unknown cron job id: ${id}`);
+    return job;
+  }
+
+  private computeJobNextRunAtMs(job: CronJob, nowMs: number) {
+    if (!job.enabled) return undefined;
+    if (job.schedule.kind === "at") {
+      // One-shot jobs stay due until they successfully finish.
+      if (job.state.lastStatus === "ok" && job.state.lastRunAtMs)
+        return undefined;
+      return job.schedule.atMs;
+    }
+    return computeNextRunAtMs(job.schedule, nowMs);
+  }
+
+  private recomputeNextRuns() {
+    if (!this.store) return;
+    const now = this.deps.nowMs();
+    for (const job of this.store.jobs) {
+      if (!job.state) job.state = {};
+      if (!job.enabled) {
+        job.state.nextRunAtMs = undefined;
+        job.state.runningAtMs = undefined;
+        continue;
+      }
+      const runningAt = job.state.runningAtMs;
+      if (typeof runningAt === "number" && now - runningAt > STUCK_RUN_MS) {
+        this.deps.log.warn(
+          { jobId: job.id, runningAtMs: runningAt },
+          "cron: clearing stuck running marker",
+        );
+        job.state.runningAtMs = undefined;
+      }
+      job.state.nextRunAtMs = this.computeJobNextRunAtMs(job, now);
+    }
+  }
+
+  private nextWakeAtMs() {
+    const jobs = this.store?.jobs ?? [];
+    const enabled = jobs.filter(
+      (j) => j.enabled && typeof j.state.nextRunAtMs === "number",
+    );
+    if (enabled.length === 0) return undefined;
+    return enabled.reduce(
+      (min, j) => Math.min(min, j.state.nextRunAtMs as number),
+      enabled[0].state.nextRunAtMs as number,
+    );
+  }
+
+  private armTimer() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    if (!this.deps.cronEnabled) return;
+    const nextAt = this.nextWakeAtMs();
+    if (!nextAt) return;
+    const delay = Math.max(nextAt - this.deps.nowMs(), 0);
+    this.timer = setTimeout(() => {
+      void this.onTimer().catch((err) => {
+        this.deps.log.error({ err: String(err) }, "cron: timer tick failed");
+      });
+    }, delay);
+    this.timer.unref?.();
+  }
+
+  private async onTimer() {
+    if (this.running) return;
+    this.running = true;
+    try {
+      await this.locked(async () => {
+        await this.ensureLoaded();
+        await this.runDueJobs();
+        await this.persist();
+        this.armTimer();
+      });
+    } finally {
+      this.running = false;
+    }
+  }
+
+  private async runDueJobs() {
+    if (!this.store) return;
+    const now = this.deps.nowMs();
+    const due = this.store.jobs.filter((j) => {
+      if (!j.enabled) return false;
+      if (typeof j.state.runningAtMs === "number") return false;
+      const next = j.state.nextRunAtMs;
+      return typeof next === "number" && now >= next;
+    });
+    for (const job of due) {
+      await this.executeJob(job, now, { forced: false });
+    }
+  }
+
+  private async executeJob(
+    job: CronJob,
+    nowMs: number,
+    opts: { forced: boolean },
+  ) {
+    const startedAt = this.deps.nowMs();
+    job.state.runningAtMs = startedAt;
+    job.state.lastError = undefined;
+    this.emit({ jobId: job.id, action: "started", runAtMs: startedAt });
+
+    const finish = async (
+      status: "ok" | "error" | "skipped",
+      err?: string,
+      summary?: string,
+    ) => {
+      const endedAt = this.deps.nowMs();
+      job.state.runningAtMs = undefined;
+      job.state.lastRunAtMs = startedAt;
+      job.state.lastStatus = status;
+      job.state.lastDurationMs = Math.max(0, endedAt - startedAt);
+      job.state.lastError = err;
+
+      if (job.schedule.kind === "at" && status === "ok") {
+        // One-shot job completed successfully; disable it.
+        job.enabled = false;
+        job.state.nextRunAtMs = undefined;
+      } else if (job.enabled) {
+        job.state.nextRunAtMs = this.computeJobNextRunAtMs(job, endedAt);
+      } else {
+        job.state.nextRunAtMs = undefined;
+      }
+
+      this.emit({
+        jobId: job.id,
+        action: "finished",
+        status,
+        error: err,
+        runAtMs: startedAt,
+        durationMs: job.state.lastDurationMs,
+        nextRunAtMs: job.state.nextRunAtMs,
+      });
+
+      if (summary && job.isolation?.postToMain) {
+        const prefix = job.isolation.postToMainPrefix?.trim() || "Cron";
+        this.deps.enqueueSystemEvent(`${prefix}: ${summary}`);
+        if (job.wakeMode === "now") {
+          this.deps.requestReplyHeartbeatNow({ reason: `cron:${job.id}:post` });
+        }
+      }
+    };
+
+    try {
+      if (job.sessionTarget === "main") {
+        const text = normalizePayloadToSystemText(job.payload);
+        this.deps.enqueueSystemEvent(text);
+        if (job.wakeMode === "now") {
+          this.deps.requestReplyHeartbeatNow({ reason: `cron:${job.id}` });
+        }
+        await finish("ok");
+        return;
+      }
+
+      if (job.payload.kind !== "agentTurn") {
+        await finish("skipped", "isolated job requires payload.kind=agentTurn");
+        return;
+      }
+
+      const res = await this.deps.runIsolatedAgentJob({
+        job,
+        message: job.payload.message,
+      });
+      if (res.status === "ok") await finish("ok", undefined, res.summary);
+      else if (res.status === "skipped")
+        await finish("skipped", undefined, res.summary);
+      else await finish("error", res.summary ?? "cron job failed");
+    } catch (err) {
+      await finish("error", String(err));
+    } finally {
+      job.updatedAtMs = nowMs;
+      if (!opts.forced && job.enabled) {
+        // Keep nextRunAtMs in sync in case the schedule advanced during a long run.
+        job.state.nextRunAtMs = this.computeJobNextRunAtMs(
+          job,
+          this.deps.nowMs(),
+        );
+      }
+    }
+  }
+
+  private emit(evt: CronEvent) {
+    try {
+      this.deps.onEvent?.(evt);
+    } catch {
+      /* ignore */
+    }
+  }
+}

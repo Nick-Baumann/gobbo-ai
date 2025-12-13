@@ -112,6 +112,30 @@ Array of E.164 phone numbers allowed to trigger the AI. Use `["*"]` to allow eve
 
 > Quick start: If you omit `inbound.reply`, CLAWDIS falls back to the bundled `@mariozechner/pi-coding-agent` with `--mode rpc`, per-sender sessions, and a 200k-token window. No extra install or config needed to get a reply.
 
+### `cron`
+
+Cron is a Gateway-owned scheduler for wakeups and scheduled jobs. See `docs/cron.md` for the full RFC and CLI examples.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable the cron scheduler inside the Gateway |
+| `store` | string | *(auto)* | Override the cron job store path (defaults to `~/.clawdis/cron/jobs.json` if present, otherwise `~/.clawdis/cron.json`) |
+| `maxConcurrentRuns` | number | `1` | Max concurrent isolated cron runs (command-queue lane `"cron"`) |
+
+Run history:
+- The Gateway appends a JSONL run ledger on each job completion (see `docs/cron.md`). Location is derived from `cron.store` / the resolved store path.
+
+Example:
+
+```json5
+{
+  cron: {
+    enabled: true,
+    maxConcurrentRuns: 2
+  }
+}
+```
+
 ### Template Variables
 
 Use these in your command:

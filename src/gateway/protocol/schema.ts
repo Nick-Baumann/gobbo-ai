@@ -203,6 +203,185 @@ export const AgentParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const WakeParamsSchema = Type.Object(
+  {
+    mode: Type.Union([Type.Literal("now"), Type.Literal("next-heartbeat")]),
+    text: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const CronScheduleSchema = Type.Union([
+  Type.Object(
+    {
+      kind: Type.Literal("at"),
+      atMs: Type.Integer({ minimum: 0 }),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal("every"),
+      everyMs: Type.Integer({ minimum: 1 }),
+      anchorMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal("cron"),
+      expr: NonEmptyString,
+      tz: Type.Optional(Type.String()),
+    },
+    { additionalProperties: false },
+  ),
+]);
+
+export const CronPayloadSchema = Type.Union([
+  Type.Object(
+    {
+      kind: Type.Literal("systemEvent"),
+      text: NonEmptyString,
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal("agentTurn"),
+      message: NonEmptyString,
+      thinking: Type.Optional(Type.String()),
+      timeoutSeconds: Type.Optional(Type.Integer({ minimum: 1 })),
+      deliver: Type.Optional(Type.Boolean()),
+      channel: Type.Optional(
+        Type.Union([
+          Type.Literal("last"),
+          Type.Literal("whatsapp"),
+          Type.Literal("telegram"),
+        ]),
+      ),
+      to: Type.Optional(Type.String()),
+      bestEffortDeliver: Type.Optional(Type.Boolean()),
+    },
+    { additionalProperties: false },
+  ),
+]);
+
+export const CronIsolationSchema = Type.Object(
+  {
+    postToMain: Type.Optional(Type.Boolean()),
+    postToMainPrefix: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export const CronJobStateSchema = Type.Object(
+  {
+    nextRunAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    runningAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    lastRunAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    lastStatus: Type.Optional(
+      Type.Union([
+        Type.Literal("ok"),
+        Type.Literal("error"),
+        Type.Literal("skipped"),
+      ]),
+    ),
+    lastError: Type.Optional(Type.String()),
+    lastDurationMs: Type.Optional(Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);
+
+export const CronJobSchema = Type.Object(
+  {
+    id: NonEmptyString,
+    name: Type.Optional(Type.String()),
+    enabled: Type.Boolean(),
+    createdAtMs: Type.Integer({ minimum: 0 }),
+    updatedAtMs: Type.Integer({ minimum: 0 }),
+    schedule: CronScheduleSchema,
+    sessionTarget: Type.Union([Type.Literal("main"), Type.Literal("isolated")]),
+    wakeMode: Type.Union([Type.Literal("next-heartbeat"), Type.Literal("now")]),
+    payload: CronPayloadSchema,
+    isolation: Type.Optional(CronIsolationSchema),
+    state: CronJobStateSchema,
+  },
+  { additionalProperties: false },
+);
+
+export const CronListParamsSchema = Type.Object(
+  {
+    includeDisabled: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
+
+export const CronAddParamsSchema = Type.Object(
+  {
+    name: Type.Optional(Type.String()),
+    enabled: Type.Optional(Type.Boolean()),
+    schedule: CronScheduleSchema,
+    sessionTarget: Type.Union([Type.Literal("main"), Type.Literal("isolated")]),
+    wakeMode: Type.Union([Type.Literal("next-heartbeat"), Type.Literal("now")]),
+    payload: CronPayloadSchema,
+    isolation: Type.Optional(CronIsolationSchema),
+  },
+  { additionalProperties: false },
+);
+
+export const CronUpdateParamsSchema = Type.Object(
+  {
+    id: NonEmptyString,
+    patch: Type.Partial(CronAddParamsSchema),
+  },
+  { additionalProperties: false },
+);
+
+export const CronRemoveParamsSchema = Type.Object(
+  {
+    id: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const CronRunParamsSchema = Type.Object(
+  {
+    id: NonEmptyString,
+    mode: Type.Optional(
+      Type.Union([Type.Literal("due"), Type.Literal("force")]),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export const CronRunsParamsSchema = Type.Object(
+  {
+    id: Type.Optional(NonEmptyString),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 5000 })),
+  },
+  { additionalProperties: false },
+);
+
+export const CronRunLogEntrySchema = Type.Object(
+  {
+    ts: Type.Integer({ minimum: 0 }),
+    jobId: NonEmptyString,
+    action: Type.Literal("finished"),
+    status: Type.Optional(
+      Type.Union([
+        Type.Literal("ok"),
+        Type.Literal("error"),
+        Type.Literal("skipped"),
+      ]),
+    ),
+    error: Type.Optional(Type.String()),
+    runAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    durationMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    nextRunAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);
+
 // WebChat/WebSocket-native chat methods
 export const ChatHistoryParamsSchema = Type.Object(
   {
@@ -256,6 +435,15 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   AgentEvent: AgentEventSchema,
   SendParams: SendParamsSchema,
   AgentParams: AgentParamsSchema,
+  WakeParams: WakeParamsSchema,
+  CronJob: CronJobSchema,
+  CronListParams: CronListParamsSchema,
+  CronAddParams: CronAddParamsSchema,
+  CronUpdateParams: CronUpdateParamsSchema,
+  CronRemoveParams: CronRemoveParamsSchema,
+  CronRunParams: CronRunParamsSchema,
+  CronRunsParams: CronRunsParamsSchema,
+  CronRunLogEntry: CronRunLogEntrySchema,
   ChatHistoryParams: ChatHistoryParamsSchema,
   ChatSendParams: ChatSendParamsSchema,
   ChatEvent: ChatEventSchema,
@@ -276,6 +464,15 @@ export type PresenceEntry = Static<typeof PresenceEntrySchema>;
 export type ErrorShape = Static<typeof ErrorShapeSchema>;
 export type StateVersion = Static<typeof StateVersionSchema>;
 export type AgentEvent = Static<typeof AgentEventSchema>;
+export type WakeParams = Static<typeof WakeParamsSchema>;
+export type CronJob = Static<typeof CronJobSchema>;
+export type CronListParams = Static<typeof CronListParamsSchema>;
+export type CronAddParams = Static<typeof CronAddParamsSchema>;
+export type CronUpdateParams = Static<typeof CronUpdateParamsSchema>;
+export type CronRemoveParams = Static<typeof CronRemoveParamsSchema>;
+export type CronRunParams = Static<typeof CronRunParamsSchema>;
+export type CronRunsParams = Static<typeof CronRunsParamsSchema>;
+export type CronRunLogEntry = Static<typeof CronRunLogEntrySchema>;
 export type ChatEvent = Static<typeof ChatEventSchema>;
 export type TickEvent = Static<typeof TickEventSchema>;
 export type ShutdownEvent = Static<typeof ShutdownEventSchema>;

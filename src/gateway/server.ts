@@ -19,6 +19,15 @@ import {
   type SessionEntry,
   saveSessionStore,
 } from "../config/sessions.js";
+import { runCronIsolatedAgentTurn } from "../cron/isolated-agent.js";
+import {
+  appendCronRunLog,
+  readCronRunLogEntries,
+  resolveCronRunLogPath,
+} from "../cron/run-log.js";
+import { CronService } from "../cron/service.js";
+import { resolveCronStorePath } from "../cron/store.js";
+import type { CronJobCreate, CronJobPatch } from "../cron/types.js";
 import { isVerbose } from "../globals.js";
 import { onAgentEvent } from "../infra/agent-events.js";
 import { GatewayLockError } from "../infra/gateway-lock.js";
@@ -33,7 +42,12 @@ import {
   upsertPresence,
 } from "../infra/system-presence.js";
 import { logError, logInfo, logWarn } from "../logger.js";
-import { getLogger, getResolvedLoggerSettings } from "../logging.js";
+import {
+  getChildLogger,
+  getLogger,
+  getResolvedLoggerSettings,
+} from "../logging.js";
+import { setCommandLaneConcurrency } from "../process/command-queue.js";
 import { monitorWebProvider, webAuthExists } from "../providers/web/index.js";
 import { defaultRuntime } from "../runtime.js";
 import { monitorTelegramProvider } from "../telegram/monitor.js";
@@ -41,6 +55,7 @@ import { sendMessageTelegram } from "../telegram/send.js";
 import { normalizeE164 } from "../utils.js";
 import { setHeartbeatsEnabled } from "../web/auto-reply.js";
 import { sendMessageWhatsApp } from "../web/outbound.js";
+import { requestReplyHeartbeatNow } from "../web/reply-heartbeat-wake.js";
 import { ensureWebChatServerFromConfig } from "../webchat/server.js";
 import { buildMessageWithAttachments } from "./chat-attachments.js";
 import {
@@ -56,8 +71,15 @@ import {
   validateChatHistoryParams,
   validateChatSendParams,
   validateConnectParams,
+  validateCronAddParams,
+  validateCronListParams,
+  validateCronRemoveParams,
+  validateCronRunParams,
+  validateCronRunsParams,
+  validateCronUpdateParams,
   validateRequestFrame,
   validateSendParams,
+  validateWakeParams,
 } from "./protocol/index.js";
 
 type Client = {
@@ -72,6 +94,13 @@ const METHODS = [
   "status",
   "last-heartbeat",
   "set-heartbeats",
+  "wake",
+  "cron.list",
+  "cron.add",
+  "cron.update",
+  "cron.remove",
+  "cron.run",
+  "cron.runs",
   "system-presence",
   "system-event",
   "send",
@@ -89,6 +118,7 @@ const EVENTS = [
   "shutdown",
   "health",
   "heartbeat",
+  "cron",
 ];
 
 export type GatewayServer = {
@@ -322,6 +352,59 @@ export async function startGatewayServer(
   const providerAbort = new AbortController();
   const providerTasks: Array<Promise<unknown>> = [];
   const clients = new Set<Client>();
+  const cfgAtStart = loadConfig();
+  setCommandLaneConcurrency("cron", cfgAtStart.cron?.maxConcurrentRuns ?? 1);
+
+  const cronStorePath = resolveCronStorePath(cfgAtStart.cron?.store);
+  const cronLogger = getChildLogger({
+    module: "cron",
+    storePath: cronStorePath,
+  });
+  const cronDeps = createDefaultDeps();
+  const cronEnabled =
+    process.env.CLAWDIS_SKIP_CRON !== "1" && cfgAtStart.cron?.enabled === true;
+  const cron = new CronService({
+    storePath: cronStorePath,
+    cronEnabled,
+    enqueueSystemEvent,
+    requestReplyHeartbeatNow,
+    runIsolatedAgentJob: async ({ job, message }) => {
+      const cfg = loadConfig();
+      return await runCronIsolatedAgentTurn({
+        cfg,
+        deps: cronDeps,
+        job,
+        message,
+        sessionKey: `cron:${job.id}`,
+        lane: "cron",
+      });
+    },
+    log: cronLogger,
+    onEvent: (evt) => {
+      broadcast("cron", evt, { dropIfSlow: true });
+      if (evt.action === "finished") {
+        const logPath = resolveCronRunLogPath({
+          storePath: cronStorePath,
+          jobId: evt.jobId,
+        });
+        void appendCronRunLog(logPath, {
+          ts: Date.now(),
+          jobId: evt.jobId,
+          action: "finished",
+          status: evt.status,
+          error: evt.error,
+          runAtMs: evt.runAtMs,
+          durationMs: evt.durationMs,
+          nextRunAtMs: evt.nextRunAtMs,
+        }).catch((err) => {
+          cronLogger.warn(
+            { err: String(err), logPath },
+            "cron: run log append failed",
+          );
+        });
+      }
+    },
+  });
 
   const startProviders = async () => {
     const cfg = loadConfig();
@@ -512,6 +595,10 @@ export async function startGatewayServer(
   const heartbeatUnsub = onHeartbeatEvent((evt) => {
     broadcast("heartbeat", evt, { dropIfSlow: true });
   });
+
+  void cron
+    .start()
+    .catch((err) => logError(`cron failed to start: ${String(err)}`));
 
   wss.on("connection", (socket) => {
     let client: Client | null = null;
@@ -988,6 +1075,157 @@ export async function startGatewayServer(
             }
             break;
           }
+          case "wake": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateWakeParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid wake params: ${formatValidationErrors(validateWakeParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const p = params as {
+              mode: "now" | "next-heartbeat";
+              text: string;
+            };
+            const result = cron.wake({ mode: p.mode, text: p.text });
+            respond(true, result, undefined);
+            break;
+          }
+          case "cron.list": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateCronListParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid cron.list params: ${formatValidationErrors(validateCronListParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const p = params as { includeDisabled?: boolean };
+            const jobs = await cron.list({
+              includeDisabled: p.includeDisabled,
+            });
+            respond(true, { jobs }, undefined);
+            break;
+          }
+          case "cron.add": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateCronAddParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid cron.add params: ${formatValidationErrors(validateCronAddParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const job = await cron.add(params as unknown as CronJobCreate);
+            respond(true, job, undefined);
+            break;
+          }
+          case "cron.update": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateCronUpdateParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid cron.update params: ${formatValidationErrors(validateCronUpdateParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const p = params as { id: string; patch: Record<string, unknown> };
+            const job = await cron.update(
+              p.id,
+              p.patch as unknown as CronJobPatch,
+            );
+            respond(true, job, undefined);
+            break;
+          }
+          case "cron.remove": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateCronRemoveParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid cron.remove params: ${formatValidationErrors(validateCronRemoveParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const p = params as { id: string };
+            const result = await cron.remove(p.id);
+            respond(true, result, undefined);
+            break;
+          }
+          case "cron.run": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateCronRunParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid cron.run params: ${formatValidationErrors(validateCronRunParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const p = params as { id: string; mode?: "due" | "force" };
+            const result = await cron.run(p.id, p.mode);
+            respond(true, result, undefined);
+            break;
+          }
+          case "cron.runs": {
+            const params = (req.params ?? {}) as Record<string, unknown>;
+            if (!validateCronRunsParams(params)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  `invalid cron.runs params: ${formatValidationErrors(validateCronRunsParams.errors)}`,
+                ),
+              );
+              break;
+            }
+            const p = params as { id?: string; limit?: number };
+            if (!p.id && cronStorePath.endsWith(`${path.sep}jobs.json`)) {
+              respond(
+                false,
+                undefined,
+                errorShape(
+                  ErrorCodes.INVALID_REQUEST,
+                  "cron.runs requires id when using jobs.json store layout",
+                ),
+              );
+              break;
+            }
+            const logPath = resolveCronRunLogPath({
+              storePath: cronStorePath,
+              jobId: p.id ?? "all",
+            });
+            const entries = await readCronRunLogEntries(logPath, {
+              limit: p.limit,
+              jobId: p.id,
+            });
+            respond(true, { entries }, undefined);
+            break;
+          }
           case "status": {
             const status = await getStatusSummary();
             respond(true, status, undefined);
@@ -1426,6 +1664,7 @@ export async function startGatewayServer(
   return {
     close: async () => {
       providerAbort.abort();
+      cron.stop();
       broadcast("shutdown", {
         reason: "gateway stopping",
         restartExpectedMs: null,

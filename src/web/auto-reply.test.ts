@@ -115,7 +115,9 @@ describe("heartbeat helpers", () => {
 describe("resolveHeartbeatRecipients", () => {
   it("returns the sole session recipient", async () => {
     const now = Date.now();
-    const store = await makeSessionStore({ "+1000": { updatedAt: now } });
+    const store = await makeSessionStore({
+      main: { updatedAt: now, lastChannel: "whatsapp", lastTo: "+1000" },
+    });
     const cfg: ClawdisConfig = {
       inbound: {
         allowFrom: ["+1999"],
@@ -131,8 +133,8 @@ describe("resolveHeartbeatRecipients", () => {
   it("surfaces ambiguity when multiple sessions exist", async () => {
     const now = Date.now();
     const store = await makeSessionStore({
-      "+1000": { updatedAt: now },
-      "+2000": { updatedAt: now - 10 },
+      main: { updatedAt: now, lastChannel: "whatsapp", lastTo: "+1000" },
+      alt: { updatedAt: now - 10, lastChannel: "whatsapp", lastTo: "+2000" },
     });
     const cfg: ClawdisConfig = {
       inbound: {
@@ -162,7 +164,9 @@ describe("resolveHeartbeatRecipients", () => {
 
   it("merges sessions and allowFrom when --all is set", async () => {
     const now = Date.now();
-    const store = await makeSessionStore({ "+1000": { updatedAt: now } });
+    const store = await makeSessionStore({
+      main: { updatedAt: now, lastChannel: "whatsapp", lastTo: "+1000" },
+    });
     const cfg: ClawdisConfig = {
       inbound: {
         allowFrom: ["+1999"],

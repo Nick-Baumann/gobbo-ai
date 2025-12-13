@@ -9,6 +9,21 @@ import {
   ChatSendParamsSchema,
   type ConnectParams,
   ConnectParamsSchema,
+  type CronAddParams,
+  CronAddParamsSchema,
+  type CronJob,
+  CronJobSchema,
+  type CronListParams,
+  CronListParamsSchema,
+  type CronRemoveParams,
+  CronRemoveParamsSchema,
+  type CronRunLogEntry,
+  type CronRunParams,
+  CronRunParamsSchema,
+  type CronRunsParams,
+  CronRunsParamsSchema,
+  type CronUpdateParams,
+  CronUpdateParamsSchema,
   ErrorCodes,
   type ErrorShape,
   ErrorShapeSchema,
@@ -36,6 +51,8 @@ import {
   StateVersionSchema,
   type TickEvent,
   TickEventSchema,
+  type WakeParams,
+  WakeParamsSchema,
 } from "./schema.js";
 
 const ajv = new (
@@ -54,6 +71,21 @@ export const validateRequestFrame =
   ajv.compile<RequestFrame>(RequestFrameSchema);
 export const validateSendParams = ajv.compile(SendParamsSchema);
 export const validateAgentParams = ajv.compile(AgentParamsSchema);
+export const validateWakeParams = ajv.compile<WakeParams>(WakeParamsSchema);
+export const validateCronListParams =
+  ajv.compile<CronListParams>(CronListParamsSchema);
+export const validateCronAddParams =
+  ajv.compile<CronAddParams>(CronAddParamsSchema);
+export const validateCronUpdateParams = ajv.compile<CronUpdateParams>(
+  CronUpdateParamsSchema,
+);
+export const validateCronRemoveParams = ajv.compile<CronRemoveParams>(
+  CronRemoveParamsSchema,
+);
+export const validateCronRunParams =
+  ajv.compile<CronRunParams>(CronRunParamsSchema);
+export const validateCronRunsParams =
+  ajv.compile<CronRunsParams>(CronRunsParamsSchema);
 export const validateChatHistoryParams = ajv.compile(ChatHistoryParamsSchema);
 export const validateChatSendParams = ajv.compile(ChatSendParamsSchema);
 export const validateChatEvent = ajv.compile(ChatEventSchema);
@@ -80,6 +112,14 @@ export {
   ChatEventSchema,
   SendParamsSchema,
   AgentParamsSchema,
+  WakeParamsSchema,
+  CronJobSchema,
+  CronListParamsSchema,
+  CronAddParamsSchema,
+  CronUpdateParamsSchema,
+  CronRemoveParamsSchema,
+  CronRunParamsSchema,
+  CronRunsParamsSchema,
   ChatHistoryParamsSchema,
   ChatSendParamsSchema,
   TickEventSchema,
@@ -105,4 +145,13 @@ export type {
   ChatEvent,
   TickEvent,
   ShutdownEvent,
+  WakeParams,
+  CronJob,
+  CronListParams,
+  CronAddParams,
+  CronUpdateParams,
+  CronRemoveParams,
+  CronRunParams,
+  CronRunsParams,
+  CronRunLogEntry,
 };
