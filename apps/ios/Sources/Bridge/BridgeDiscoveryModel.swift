@@ -52,7 +52,11 @@ final class BridgeDiscoveryModel: ObservableObject {
                     switch result.endpoint {
                     case let .service(name, _, _, _):
                         let decodedName = BonjourEscapes.decode(name)
-                        let prettyName = Self.prettifyInstanceName(decodedName)
+                        let advertisedName = result.endpoint.txtRecord?.dictionary["displayName"]
+                        let prettyAdvertised = advertisedName
+                            .map(Self.prettifyInstanceName)
+                            .flatMap { $0.isEmpty ? nil : $0 }
+                        let prettyName = prettyAdvertised ?? Self.prettifyInstanceName(decodedName)
                         return DiscoveredBridge(
                             name: prettyName,
                             endpoint: result.endpoint,
@@ -80,6 +84,7 @@ final class BridgeDiscoveryModel: ObservableObject {
     private static func prettifyInstanceName(_ decodedName: String) -> String {
         let normalized = decodedName.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let stripped = normalized.replacingOccurrences(of: " (Clawdis)", with: "")
+            .replacingOccurrences(of: #"\s+\(\d+\)$"#, with: "", options: .regularExpression)
         return stripped.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

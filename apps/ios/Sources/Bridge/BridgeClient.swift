@@ -5,6 +5,7 @@ import Network
 actor BridgeClient {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var lineBuffer = Data()
 
     func pairAndHello(
         endpoint: NWEndpoint,
@@ -15,6 +16,7 @@ actor BridgeClient {
         existingToken: String?,
         onStatus: (@Sendable (String) -> Void)? = nil) async throws -> String
     {
+        self.lineBuffer = Data()
         let connection = NWConnection(to: endpoint, using: .tcp)
         let queue = DispatchQueue(label: "com.steipete.clawdis.ios.bridge-client")
         defer { connection.cancel() }
@@ -32,9 +34,8 @@ actor BridgeClient {
                 version: version),
             over: connection)
 
-        var buffer = Data()
         let first = try await self.withTimeout(seconds: 10, purpose: "hello") { () -> ReceivedFrame in
-            guard let frame = try await self.receiveFrame(over: connection, buffer: &buffer) else {
+            guard let frame = try await self.receiveFrame(over: connection) else {
                 throw NSError(domain: "Bridge", code: 0, userInfo: [
                     NSLocalizedDescriptionKey: "Bridge closed connection during hello",
                 ])
@@ -66,7 +67,7 @@ actor BridgeClient {
 
             onStatus?("Waiting for approval…")
             let ok = try await self.withTimeout(seconds: 60, purpose: "pairing approval") {
-                while let next = try await self.receiveFrame(over: connection, buffer: &buffer) {
+                while let next = try await self.receiveFrame(over: connection) {
                     switch next.base.type {
                     case "pair-ok":
                         return try self.decoder.decode(BridgePairOk.self, from: next.data)
@@ -110,8 +111,8 @@ actor BridgeClient {
         var data: Data
     }
 
-    private func receiveFrame(over connection: NWConnection, buffer: inout Data) async throws -> ReceivedFrame? {
-        guard let lineData = try await self.receiveLineData(over: connection, buffer: &buffer) else {
+    private func receiveFrame(over connection: NWConnection) async throws -> ReceivedFrame? {
+        guard let lineData = try await self.receiveLineData(over: connection) else {
             return nil
         }
         let base = try self.decoder.decode(BridgeBaseFrame.self, from: lineData)
@@ -134,17 +135,17 @@ actor BridgeClient {
         }
     }
 
-    private func receiveLineData(over connection: NWConnection, buffer: inout Data) async throws -> Data? {
+    private func receiveLineData(over connection: NWConnection) async throws -> Data? {
         while true {
-            if let idx = buffer.firstIndex(of: 0x0A) {
-                let line = buffer.prefix(upTo: idx)
-                buffer.removeSubrange(...idx)
+            if let idx = self.lineBuffer.firstIndex(of: 0x0A) {
+                let line = self.lineBuffer.prefix(upTo: idx)
+                self.lineBuffer.removeSubrange(...idx)
                 return Data(line)
             }
 
             let chunk = try await self.receiveChunk(over: connection)
             if chunk.isEmpty { return nil }
-            buffer.append(chunk)
+            self.lineBuffer.append(chunk)
         }
     }
 
@@ -160,7 +161,7 @@ actor BridgeClient {
         }
     }
 
-    private func withTimeout<T>(
+    private func withTimeout<T: Sendable>(
         seconds: Int,
         purpose: String,
         _ op: @escaping @Sendable () async throws -> T) async throws -> T
@@ -181,24 +182,33 @@ actor BridgeClient {
 
     private func startAndWaitForReady(_ connection: NWConnection, queue: DispatchQueue) async throws {
         try await withCheckedThrowingContinuation(isolation: nil) { (cont: CheckedContinuation<Void, Error>) in
-            var didResume = false
+            final class ResumeFlag: @unchecked Sendable {
+                private let lock = NSLock()
+                private var value = false
+
+                func trySet() -> Bool {
+                    self.lock.lock()
+                    defer { self.lock.unlock() }
+                    if self.value { return false }
+                    self.value = true
+                    return true
+                }
+            }
+            let didResume = ResumeFlag()
             connection.stateUpdateHandler = { state in
-                if didResume { return }
                 switch state {
                 case .ready:
-                    didResume = true
-                    cont.resume(returning: ())
+                    if didResume.trySet() { cont.resume(returning: ()) }
                 case let .failed(err):
-                    didResume = true
-                    cont.resume(throwing: err)
+                    if didResume.trySet() { cont.resume(throwing: err) }
                 case let .waiting(err):
-                    didResume = true
-                    cont.resume(throwing: err)
+                    if didResume.trySet() { cont.resume(throwing: err) }
                 case .cancelled:
-                    didResume = true
-                    cont.resume(throwing: NSError(domain: "Bridge", code: 50, userInfo: [
-                        NSLocalizedDescriptionKey: "Connection cancelled",
-                    ]))
+                    if didResume.trySet() {
+                        cont.resume(throwing: NSError(domain: "Bridge", code: 50, userInfo: [
+                            NSLocalizedDescriptionKey: "Connection cancelled",
+                        ]))
+                    }
                 default:
                     break
                 }

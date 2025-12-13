@@ -24,6 +24,11 @@ function safeServiceName(name: string) {
   return trimmed.length > 0 ? trimmed : "Clawdis";
 }
 
+function prettifyInstanceName(name: string) {
+  const normalized = name.trim().replace(/\s+/g, " ");
+  return normalized.replace(/\s+\(Clawdis\)\s*$/i, "").trim() || normalized;
+}
+
 type BonjourService = {
   advertise: () => Promise<void>;
   destroy: () => Promise<void>;
@@ -52,11 +57,13 @@ export async function startGatewayBonjourAdvertiser(
     typeof opts.instanceName === "string" && opts.instanceName.trim()
       ? opts.instanceName.trim()
       : `${hostname} (Clawdis)`;
+  const displayName = prettifyInstanceName(instanceName);
 
   const txtBase: Record<string, string> = {
     role: "master",
     gatewayPort: String(opts.gatewayPort),
     lanHost: `${hostname}.local`,
+    displayName,
   };
   if (typeof opts.bridgePort === "number" && opts.bridgePort > 0) {
     txtBase.bridgePort = String(opts.bridgePort);

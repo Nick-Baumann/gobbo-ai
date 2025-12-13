@@ -10,7 +10,7 @@ enum BridgeEndpointID {
             let normalizedName = Self.normalizeServiceNameForID(name)
             return "\(type)|\(domain)|\(normalizedName)"
         default:
-            String(describing: endpoint)
+            return String(describing: endpoint)
         }
     }
 
