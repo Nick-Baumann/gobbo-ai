@@ -38,6 +38,7 @@ final class OnboardingController {
 }
 
 struct OnboardingView: View {
+    @Environment(\.openSettings) private var openSettings
     @State private var currentPage = 0
     @State private var isRequesting = false
     @State private var installingCLI = false
@@ -474,15 +475,36 @@ struct OnboardingView: View {
                     """,
                     systemImage: "checkmark.seal")
                 self.featureRow(
+                    title: "Try Voice Wake",
+                    subtitle: "Enable Voice Wake in Settings for hands-free commands with a live transcript overlay.",
+                    systemImage: "waveform.circle")
+                self.featureRow(
+                    title: "Use the panel + Canvas",
+                    subtitle: "Open the menu bar panel for quick chat; the agent can show previews and richer visuals in Canvas.",
+                    systemImage: "rectangle.inset.filled.and.person.filled")
+                self.featureRow(
                     title: "Test a notification",
                     subtitle: "Send a quick notify via the menu bar to confirm sounds and permissions.",
                     systemImage: "bell.badge")
+                self.featureActionRow(
+                    title: "Give your agent more powers",
+                    subtitle: "Install optional tools (Peekaboo, oracle, camsnap, …) from Settings → Tools.",
+                    systemImage: "wrench.and.screwdriver")
+                {
+                    self.openSettings(tab: .tools)
+                }
                 Toggle("Launch at login", isOn: self.$state.launchAtLogin)
                     .onChange(of: self.state.launchAtLogin) { _, newValue in
                         AppStateStore.updateLaunchAtLogin(enabled: newValue)
                     }
             }
         }
+    }
+
+    private func openSettings(tab: SettingsTab) {
+        SettingsTabRouter.request(tab)
+        self.openSettings()
+        NotificationCenter.default.post(name: .clawdisSelectSettingsTab, object: tab)
     }
 
     private var navigationBar: some View {
@@ -574,6 +596,30 @@ struct OnboardingView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func featureActionRow(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        action: @escaping () -> Void) -> some View
+    {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.headline)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Open Settings → Tools", action: action)
+                    .buttonStyle(.link)
+                    .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
         }
     }
 
