@@ -6,7 +6,11 @@ import { loadConfig } from "../config/config.js";
 import { logError, logInfo, logWarn } from "../logger.js";
 import { ensureMediaDir, saveMediaBuffer } from "../media/store.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
-import { captureScreenshotPng, createTargetViaCdp } from "./cdp.js";
+import {
+  captureScreenshot,
+  captureScreenshotPng,
+  createTargetViaCdp,
+} from "./cdp.js";
 import {
   isChromeReachable,
   launchClawdChrome,
@@ -17,6 +21,11 @@ import {
   resolveBrowserConfig,
   shouldStartLocalBrowserServer,
 } from "./config.js";
+import {
+  DEFAULT_BROWSER_SCREENSHOT_MAX_BYTES,
+  DEFAULT_BROWSER_SCREENSHOT_MAX_SIDE,
+  normalizeBrowserScreenshot,
+} from "./screenshot.js";
 
 export type BrowserTab = {
   targetId: string;
@@ -299,9 +308,31 @@ export async function startBrowserControlServerFromConfig(
         : tabs.at(0);
       if (!chosen?.wsUrl) return jsonError(res, 404, "tab not found");
 
-      const png = await captureScreenshotPng({ wsUrl: chosen.wsUrl, fullPage });
+      let shot: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+      let contentTypeHint: "image/jpeg" | "image/png" = "image/jpeg";
+      try {
+        shot = await captureScreenshot({
+          wsUrl: chosen.wsUrl,
+          fullPage,
+          format: "jpeg",
+          quality: 85,
+        });
+      } catch {
+        contentTypeHint = "image/png";
+        shot = await captureScreenshotPng({ wsUrl: chosen.wsUrl, fullPage });
+      }
+
+      const normalized = await normalizeBrowserScreenshot(shot, {
+        maxSide: DEFAULT_BROWSER_SCREENSHOT_MAX_SIDE,
+        maxBytes: DEFAULT_BROWSER_SCREENSHOT_MAX_BYTES,
+      });
       await ensureMediaDir();
-      const saved = await saveMediaBuffer(png, "image/png", "browser");
+      const saved = await saveMediaBuffer(
+        normalized.buffer,
+        normalized.contentType ?? contentTypeHint,
+        "browser",
+        DEFAULT_BROWSER_SCREENSHOT_MAX_BYTES,
+      );
       const filePath = path.resolve(saved.path);
       res.json({
         ok: true,

@@ -82,6 +82,19 @@ export async function captureScreenshotPng(opts: {
   wsUrl: string;
   fullPage?: boolean;
 }): Promise<Buffer> {
+  return await captureScreenshot({
+    wsUrl: opts.wsUrl,
+    fullPage: opts.fullPage,
+    format: "png",
+  });
+}
+
+export async function captureScreenshot(opts: {
+  wsUrl: string;
+  fullPage?: boolean;
+  format?: "png" | "jpeg";
+  quality?: number; // jpeg only (0..100)
+}): Promise<Buffer> {
   const ws = new WebSocket(opts.wsUrl, { handshakeTimeout: 5000 });
   const { send, closeWithError } = createCdpSender(ws);
 
@@ -110,8 +123,15 @@ export async function captureScreenshotPng(opts: {
     }
   }
 
+  const format = opts.format ?? "png";
+  const quality =
+    format === "jpeg"
+      ? Math.max(0, Math.min(100, Math.round(opts.quality ?? 85)))
+      : undefined;
+
   const result = (await send("Page.captureScreenshot", {
-    format: "png",
+    format,
+    ...(quality !== undefined ? { quality } : {}),
     fromSurface: true,
     captureBeyondViewport: true,
     ...(clip ? { clip } : {}),
