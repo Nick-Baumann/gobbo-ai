@@ -129,6 +129,31 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 520)
                 .fixedSize(horizontal: false, vertical: true)
+
+            self.onboardingCard(spacing: 10, padding: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Color(nsColor: .systemOrange))
+                        .frame(width: 22)
+                        .padding(.top, 1)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Security notice")
+                            .font(.headline)
+                        Text(
+                            """
+                            The connected AI agent (e.g. Claude) can trigger powerful actions on your Mac, including running commands, reading/writing files, and capturing screenshots — depending on the permissions you grant.
+
+                            Only enable Clawdis if you understand the risks and trust the prompts and integrations you use.
+                            """)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .frame(maxWidth: 520)
         }
     }
 
