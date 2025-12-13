@@ -10,89 +10,87 @@ enum ControlRequestHandler {
     {
         // Keep `status` responsive even if the main actor is busy.
         let paused = UserDefaults.standard.bool(forKey: pauseDefaultsKey)
-        if paused, request != .status {
+        if paused, case .status = request {
+            // allow status through
+        } else if paused {
             return Response(ok: false, message: "clawdis paused")
         }
 
-	        switch request {
-	        case let .notify(title, body, sound, priority, delivery):
-	            let notify = NotifyRequest(
-	                title: title,
-	                body: body,
-	                sound: sound,
-	                priority: priority,
-	                delivery: delivery
-	            )
-	            return await self.handleNotify(notify, notifier: notifier)
+        switch request {
+        case let .notify(title, body, sound, priority, delivery):
+            let notify = NotifyRequest(
+                title: title,
+                body: body,
+                sound: sound,
+                priority: priority,
+                delivery: delivery)
+            return await self.handleNotify(notify, notifier: notifier)
 
-	        case let .ensurePermissions(caps, interactive):
-	            return await self.handleEnsurePermissions(caps: caps, interactive: interactive)
+        case let .ensurePermissions(caps, interactive):
+            return await self.handleEnsurePermissions(caps: caps, interactive: interactive)
 
-	        case .status:
-	            return paused
-	                ? Response(ok: false, message: "clawdis paused")
-	                : Response(ok: true, message: "ready")
+        case .status:
+            return paused
+                ? Response(ok: false, message: "clawdis paused")
+                : Response(ok: true, message: "ready")
 
-	        case .rpcStatus:
-	            return await self.handleRPCStatus()
+        case .rpcStatus:
+            return await self.handleRPCStatus()
 
-	        case let .runShell(command, cwd, env, timeoutSec, needsSR):
-	            return await self.handleRunShell(
-	                command: command,
-	                cwd: cwd,
-	                env: env,
-	                timeoutSec: timeoutSec,
-	                needsSR: needsSR
-	            )
+        case let .runShell(command, cwd, env, timeoutSec, needsSR):
+            return await self.handleRunShell(
+                command: command,
+                cwd: cwd,
+                env: env,
+                timeoutSec: timeoutSec,
+                needsSR: needsSR)
 
-	        case let .agent(message, thinking, session, deliver, to):
-	            return await self.handleAgent(
-	                message: message,
-	                thinking: thinking,
-	                session: session,
-	                deliver: deliver,
-	                to: to
-	            )
+        case let .agent(message, thinking, session, deliver, to):
+            return await self.handleAgent(
+                message: message,
+                thinking: thinking,
+                session: session,
+                deliver: deliver,
+                to: to)
 
-	        case let .canvasShow(session, path, placement):
-	            return await self.handleCanvasShow(session: session, path: path, placement: placement)
+        case let .canvasShow(session, path, placement):
+            return await self.handleCanvasShow(session: session, path: path, placement: placement)
 
-	        case let .canvasHide(session):
-	            return await self.handleCanvasHide(session: session)
+        case let .canvasHide(session):
+            return await self.handleCanvasHide(session: session)
 
-	        case let .canvasGoto(session, path, placement):
-	            return await self.handleCanvasGoto(session: session, path: path, placement: placement)
+        case let .canvasGoto(session, path, placement):
+            return await self.handleCanvasGoto(session: session, path: path, placement: placement)
 
-	        case let .canvasEval(session, javaScript):
-	            return await self.handleCanvasEval(session: session, javaScript: javaScript)
+        case let .canvasEval(session, javaScript):
+            return await self.handleCanvasEval(session: session, javaScript: javaScript)
 
-	        case let .canvasSnapshot(session, outPath):
-	            return await self.handleCanvasSnapshot(session: session, outPath: outPath)
+        case let .canvasSnapshot(session, outPath):
+            return await self.handleCanvasSnapshot(session: session, outPath: outPath)
 
-	        case .nodeList:
-	            return await self.handleNodeList()
+        case .nodeList:
+            return await self.handleNodeList()
 
-	        case let .nodeInvoke(nodeId, command, paramsJSON):
-	            return await self.handleNodeInvoke(
-	                nodeId: nodeId,
-	                command: command,
-	                paramsJSON: paramsJSON,
-	                logger: logger
-	            )
-	        }
-	    }
+        case let .nodeInvoke(nodeId, command, paramsJSON):
+            return await self.handleNodeInvoke(
+                nodeId: nodeId,
+                command: command,
+                paramsJSON: paramsJSON,
+                logger: logger)
+        }
+    }
 
-	    private struct NotifyRequest {
-	        var title: String
-	        var body: String
-	        var sound: String?
-	        var priority: NotificationPriority?
-	        var delivery: NotificationDelivery?
-	    }
+    private struct NotifyRequest {
+        var title: String
+        var body: String
+        var sound: String?
+        var priority: NotificationPriority?
+        var delivery: NotificationDelivery?
+    }
 
-	    private static func handleNotify(_ request: NotifyRequest, notifier: NotificationManager) async -> Response {
-	        let chosenSound = request.sound?.trimmingCharacters(in: .whitespacesAndNewlines)
-	        let chosenDelivery = request.delivery ?? .system
+    private static func handleNotify(_ request: NotifyRequest, notifier: NotificationManager) async -> Response {
+        let chosenSound = request.sound?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chosenDelivery = request.delivery ?? .system
 
         switch chosenDelivery {
         case .system:
@@ -100,8 +98,7 @@ enum ControlRequestHandler {
                 title: request.title,
                 body: request.body,
                 sound: chosenSound,
-                priority: request.priority
-            )
+                priority: request.priority)
             return ok ? Response(ok: true) : Response(ok: false, message: "notification not authorized")
         case .overlay:
             await MainActor.run {
@@ -113,8 +110,7 @@ enum ControlRequestHandler {
                 title: request.title,
                 body: request.body,
                 sound: chosenSound,
-                priority: request.priority
-            )
+                priority: request.priority)
             if ok { return Response(ok: true) }
             await MainActor.run {
                 NotifyOverlayController.shared.present(title: request.title, body: request.body)
@@ -141,8 +137,8 @@ enum ControlRequestHandler {
         cwd: String?,
         env: [String: String]?,
         timeoutSec: Double?,
-        needsSR: Bool
-    ) async -> Response {
+        needsSR: Bool) async -> Response
+    {
         if needsSR {
             let authorized = await PermissionManager
                 .ensure([.screenRecording], interactive: false)[.screenRecording] ?? false
@@ -156,8 +152,8 @@ enum ControlRequestHandler {
         thinking: String?,
         session: String?,
         deliver: Bool,
-        to: String?
-    ) async -> Response {
+        to: String?) async -> Response
+    {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return Response(ok: false, message: "message empty") }
         let sessionKey = session ?? "main"
@@ -167,8 +163,7 @@ enum ControlRequestHandler {
             sessionKey: sessionKey,
             deliver: deliver,
             to: to,
-            channel: nil
-        )
+            channel: nil)
         return rpcResult.ok
             ? Response(ok: true, message: rpcResult.text ?? "sent")
             : Response(ok: false, message: rpcResult.error ?? "failed to send")
@@ -181,8 +176,8 @@ enum ControlRequestHandler {
     private static func handleCanvasShow(
         session: String,
         path: String?,
-        placement: CanvasPlacement?
-    ) async -> Response {
+        placement: CanvasPlacement?) async -> Response
+    {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
         do {
             let dir = try await MainActor.run {
@@ -235,9 +230,8 @@ enum ControlRequestHandler {
         let ids = await BridgeServer.shared.connectedNodeIds()
         let payload = (try? JSONSerialization.data(
             withJSONObject: ["connectedNodeIds": ids],
-            options: [.prettyPrinted]
-        ))
-        .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+            options: [.prettyPrinted]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         return Response(ok: true, payload: Data(payload.utf8))
     }
 
@@ -245,8 +239,8 @@ enum ControlRequestHandler {
         nodeId: String,
         command: String,
         paramsJSON: String?,
-        logger: Logger
-    ) async -> Response {
+        logger: Logger) async -> Response
+    {
         do {
             let res = try await BridgeServer.shared.invoke(nodeId: nodeId, command: command, paramsJSON: paramsJSON)
             if res.ok {

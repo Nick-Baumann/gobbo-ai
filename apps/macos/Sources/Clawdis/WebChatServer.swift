@@ -181,42 +181,41 @@ final class WebChatServer: @unchecked Sendable {
                 status: 403,
                 mime: "text/plain",
                 body: forbidden,
-                contentLength: forbidden.count,
                 includeBody: includeBody,
                 over: connection)
             return
         }
-	        guard let data = try? Data(contentsOf: fileURL) else {
-	            webChatServerLogger.error("WebChatServer 404 missing \(fileURL.lastPathComponent, privacy: .public)")
-	            self.send(
-	                status: 404,
-	                mime: "text/plain",
-	                body: Data("Not Found".utf8),
-	                includeBody: includeBody,
-	                over: connection)
-	            return
-	        }
-	        let mime = self.mimeType(forExtension: fileURL.pathExtension)
-	        self.send(
-	            status: 200,
-	            mime: mime,
-	            body: data,
-	            includeBody: includeBody,
-	            over: connection)
-	    }
+        guard let data = try? Data(contentsOf: fileURL) else {
+            webChatServerLogger.error("WebChatServer 404 missing \(fileURL.lastPathComponent, privacy: .public)")
+            self.send(
+                status: 404,
+                mime: "text/plain",
+                body: Data("Not Found".utf8),
+                includeBody: includeBody,
+                over: connection)
+            return
+        }
+        let mime = self.mimeType(forExtension: fileURL.pathExtension)
+        self.send(
+            status: 200,
+            mime: mime,
+            body: data,
+            includeBody: includeBody,
+            over: connection)
+    }
 
-	    private func send(
-	        status: Int,
-	        mime: String,
-	        body: Data,
-	        includeBody: Bool,
-	        over connection: NWConnection)
-	    {
-	        let contentLength = body.count
-	        let headers = "HTTP/1.1 \(status) \(statusText(status))\r\n" +
-	            "Content-Length: \(contentLength)\r\n" +
-	            "Content-Type: \(mime)\r\n" +
-	            "Connection: close\r\n\r\n"
+    private func send(
+        status: Int,
+        mime: String,
+        body: Data,
+        includeBody: Bool,
+        over connection: NWConnection)
+    {
+        let contentLength = body.count
+        let headers = "HTTP/1.1 \(status) \(statusText(status))\r\n" +
+            "Content-Length: \(contentLength)\r\n" +
+            "Content-Type: \(mime)\r\n" +
+            "Connection: close\r\n\r\n"
         var response = Data(headers.utf8)
         if includeBody {
             response.append(body)
