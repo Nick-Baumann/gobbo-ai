@@ -36,8 +36,8 @@ struct GatewayChatMessage: Codable, Identifiable {
         id: UUID = .init(),
         role: String,
         content: [GatewayChatMessageContent],
-        timestamp: Double?
-    ) {
+        timestamp: Double?)
+    {
         self.id = id
         self.role = role
         self.content = content
@@ -124,6 +124,7 @@ final class WebChatViewModel: ObservableObject {
     private var pendingRuns = Set<String>() {
         didSet { self.pendingRunCount = self.pendingRuns.count }
     }
+
     private var lastHealthPollAt: Date?
 
     init(sessionKey: String) {
@@ -162,7 +163,8 @@ final class WebChatViewModel: ObservableObject {
                 do {
                     let data = try await Task.detached { try Data(contentsOf: url) }.value
                     guard data.count <= 5_000_000 else {
-                        await MainActor.run { self.errorText = "Attachment \(url.lastPathComponent) exceeds 5 MB limit" }
+                        await MainActor
+                            .run { self.errorText = "Attachment \(url.lastPathComponent) exceeds 5 MB limit" }
                         continue
                     }
                     let uti = UTType(filenameExtension: url.pathExtension) ?? .data
@@ -445,7 +447,8 @@ struct WebChatView: View {
                                 .foregroundStyle(Color.accentColor.opacity(0.9))
                             Text("Say hi to Clawd")
                                 .font(.headline)
-                            Text(self.viewModel.healthOK ? "This is the native SwiftUI debug chat." : "Connecting to the gateway…")
+                            Text(self.viewModel
+                                .healthOK ? "This is the native SwiftUI debug chat." : "Connecting to the gateway…")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -458,7 +461,9 @@ struct WebChatView: View {
                     } else {
                         ForEach(self.viewModel.messages) { msg in
                             MessageBubble(message: msg)
-                                .frame(maxWidth: .infinity, alignment: msg.role.lowercased() == "user" ? .trailing : .leading)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: msg.role.lowercased() == "user" ? .trailing : .leading)
                         }
                     }
 
@@ -673,7 +678,7 @@ private struct ChatMessageBody: View {
                 switch block.kind {
                 case .text:
                     MarkdownTextView(text: block.text)
-                case .code(let language):
+                case let .code(language):
                     CodeBlockView(code: block.text, language: language)
                 }
             }
@@ -747,7 +752,7 @@ private struct AttachmentRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "paperclip")
-            Text(att.fileName ?? "Attachment")
+            Text(self.att.fileName ?? "Attachment")
                 .font(.footnote)
                 .lineLimit(1)
             Spacer()

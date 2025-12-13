@@ -45,13 +45,13 @@ struct MenuContent: View {
                     WebChatManager.shared.show(sessionKey: WebChatManager.shared.preferredSessionKey())
                 }
             }
-            Toggle(isOn: Binding(
-                get: { self.browserControlEnabled },
-                set: { enabled in
-                    self.browserControlEnabled = enabled
-                    ClawdisConfigFile.setBrowserControlEnabled(enabled)
-                })
-            ) {
+            Toggle(
+                isOn: Binding(
+                    get: { self.browserControlEnabled },
+                    set: { enabled in
+                        self.browserControlEnabled = enabled
+                        ClawdisConfigFile.setBrowserControlEnabled(enabled)
+                    })) {
                 Text("Browser Control")
             }
             Toggle(isOn: Binding(get: { self.state.canvasEnabled }, set: { self.state.canvasEnabled = $0 })) {
@@ -110,7 +110,9 @@ struct MenuContent: View {
                                             await self.reloadSessionMenu()
                                         }
                                     } label: {
-                                        Label(level.capitalized, systemImage: row.thinkingLevel == normalized ? "checkmark" : "")
+                                        Label(
+                                            level.capitalized,
+                                            systemImage: row.thinkingLevel == normalized ? "checkmark" : "")
                                     }
                                 }
                             }
@@ -126,7 +128,9 @@ struct MenuContent: View {
                                             await self.reloadSessionMenu()
                                         }
                                     } label: {
-                                        Label(level.capitalized, systemImage: row.verboseLevel == normalized ? "checkmark" : "")
+                                        Label(
+                                            level.capitalized,
+                                            systemImage: row.verboseLevel == normalized ? "checkmark" : "")
                                     }
                                 }
                             }

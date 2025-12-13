@@ -53,7 +53,8 @@ final class PeekabooBridgeHostCoordinator {
         self.host = host
 
         await host.start()
-        self.logger.info("PeekabooBridge host started at \(PeekabooBridgeConstants.clawdisSocketPath, privacy: .public)")
+        self.logger
+            .info("PeekabooBridge host started at \(PeekabooBridgeConstants.clawdisSocketPath, privacy: .public)")
     }
 }
 

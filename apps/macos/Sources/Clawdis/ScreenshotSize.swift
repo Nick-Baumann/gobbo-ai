@@ -15,4 +15,3 @@ enum ScreenshotSize {
         return Size(width: width, height: height)
     }
 }
-

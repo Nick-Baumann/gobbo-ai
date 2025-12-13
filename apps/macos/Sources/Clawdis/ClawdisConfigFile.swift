@@ -38,4 +38,3 @@ enum ClawdisConfigFile {
         self.saveDict(root)
     }
 }
-

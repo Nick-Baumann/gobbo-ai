@@ -639,9 +639,9 @@ enum CommandResolver {
         return URL(fileURLWithPath: expanded)
     }
 
-#if SWIFT_PACKAGE
+    #if SWIFT_PACKAGE
     static func _testNodeManagerBinPaths(home: URL) -> [String] {
         self.nodeManagerBinPaths(home: home)
     }
-#endif
+    #endif
 }

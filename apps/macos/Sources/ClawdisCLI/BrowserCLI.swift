@@ -83,25 +83,34 @@ enum BrowserCLI {
         do {
             switch sub {
             case "status":
-                self.printResult(
+                try await self.printResult(
                     jsonOutput: jsonOutput,
-                    res: try await self.httpJSON(method: "GET", url: baseURL.appendingPathComponent("/")))
+                    res: self.httpJSON(method: "GET", url: baseURL.appendingPathComponent("/")))
                 return 0
 
             case "start":
-                self.printResult(
+                try await self.printResult(
                     jsonOutput: jsonOutput,
-                    res: try await self.httpJSON(method: "POST", url: baseURL.appendingPathComponent("/start"), timeoutInterval: 15.0))
+                    res: self.httpJSON(
+                        method: "POST",
+                        url: baseURL.appendingPathComponent("/start"),
+                        timeoutInterval: 15.0))
                 return 0
 
             case "stop":
-                self.printResult(
+                try await self.printResult(
                     jsonOutput: jsonOutput,
-                    res: try await self.httpJSON(method: "POST", url: baseURL.appendingPathComponent("/stop"), timeoutInterval: 15.0))
+                    res: self.httpJSON(
+                        method: "POST",
+                        url: baseURL.appendingPathComponent("/stop"),
+                        timeoutInterval: 15.0))
                 return 0
 
             case "tabs":
-                let res = try await self.httpJSON(method: "GET", url: baseURL.appendingPathComponent("/tabs"), timeoutInterval: 3.0)
+                let res = try await self.httpJSON(
+                    method: "GET",
+                    url: baseURL.appendingPathComponent("/tabs"),
+                    timeoutInterval: 3.0)
                 if jsonOutput {
                     self.printJSON(ok: true, result: res)
                 } else {
@@ -114,9 +123,9 @@ enum BrowserCLI {
                     self.printHelp()
                     return 2
                 }
-                self.printResult(
+                try await self.printResult(
                     jsonOutput: jsonOutput,
-                    res: try await self.httpJSON(
+                    res: self.httpJSON(
                         method: "POST",
                         url: baseURL.appendingPathComponent("/tabs/open"),
                         body: ["url": url],
@@ -128,9 +137,9 @@ enum BrowserCLI {
                     self.printHelp()
                     return 2
                 }
-                self.printResult(
+                try await self.printResult(
                     jsonOutput: jsonOutput,
-                    res: try await self.httpJSON(
+                    res: self.httpJSON(
                         method: "POST",
                         url: baseURL.appendingPathComponent("/tabs/focus"),
                         body: ["targetId": id],
@@ -142,9 +151,9 @@ enum BrowserCLI {
                     self.printHelp()
                     return 2
                 }
-                self.printResult(
+                try await self.printResult(
                     jsonOutput: jsonOutput,
-                    res: try await self.httpJSON(
+                    res: self.httpJSON(
                         method: "DELETE",
                         url: baseURL.appendingPathComponent("/tabs/\(id)"),
                         timeoutInterval: 5.0))
@@ -345,8 +354,8 @@ enum BrowserCLI {
         method: String,
         url: URL,
         body: [String: Any]? = nil,
-        timeoutInterval: TimeInterval = 2.0
-    ) async throws -> [String: Any] {
+        timeoutInterval: TimeInterval = 2.0) async throws -> [String: Any]
+    {
         var req = URLRequest(url: url, timeoutInterval: timeoutInterval)
         req.httpMethod = method
         if let body {
@@ -369,7 +378,7 @@ enum BrowserCLI {
             ])
         }
 
-        if status >= 200 && status < 300 {
+        if status >= 200, status < 300 {
             return obj
         }
 
@@ -517,11 +526,11 @@ enum BrowserCLI {
         }
     }
 
-#if SWIFT_PACKAGE
+    #if SWIFT_PACKAGE
     static func _testFormatTabs(res: [String: Any]) -> [String] {
         self.formatTabs(res: res)
     }
-#endif
+    #endif
 
     private static func printJSON(ok: Bool, result: Any) {
         let obj: [String: Any] = ["ok": ok, "result": result]
