@@ -112,6 +112,8 @@ struct SessionsSettings: View {
                     self.sessionRow(row)
                 }
                 .listStyle(.inset)
+                // The view already applies horizontal padding; keep the list aligned with the text above.
+                .padding(.horizontal, -12)
             }
         }
     }
