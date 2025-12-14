@@ -5,6 +5,26 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const createService = vi.fn();
 const shutdown = vi.fn();
 
+const logWarn = vi.fn();
+const logDebug = vi.fn();
+const getLoggerInfo = vi.fn();
+
+vi.mock("../logger.js", () => {
+  return {
+    logWarn: (message: string) => logWarn(message),
+    logDebug: (message: string) => logDebug(message),
+    logInfo: vi.fn(),
+    logError: vi.fn(),
+    logSuccess: vi.fn(),
+  };
+});
+
+vi.mock("../logging.js", () => {
+  return {
+    getLogger: () => ({ info: (...args: unknown[]) => getLoggerInfo(...args) }),
+  };
+});
+
 vi.mock("@homebridge/ciao", () => {
   return {
     Protocol: { TCP: "tcp" },
@@ -34,8 +54,13 @@ describe("gateway bonjour advertiser", () => {
     for (const [key, value] of Object.entries(prevEnv)) {
       process.env[key] = value;
     }
+
     createService.mockReset();
     shutdown.mockReset();
+    logWarn.mockReset();
+    logDebug.mockReset();
+    getLoggerInfo.mockReset();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -53,7 +78,19 @@ describe("gateway bonjour advertiser", () => {
           setTimeout(resolve, 250);
         }),
     );
-    createService.mockReturnValue({ advertise, destroy });
+
+    createService.mockImplementation((options: Record<string, unknown>) => {
+      return {
+        advertise,
+        destroy,
+        serviceState: "announced",
+        on: vi.fn(),
+        getFQDN: () =>
+          `${String(options.type ?? "service")}.${String(options.domain ?? "local")}.`,
+        getHostname: () => String(options.hostname ?? "unknown"),
+        getPort: () => Number(options.port ?? -1),
+      };
+    });
 
     const started = await startGatewayBonjourAdvertiser({
       gatewayPort: 18789,
@@ -96,6 +133,141 @@ describe("gateway bonjour advertiser", () => {
     expect(shutdown).toHaveBeenCalledTimes(1);
   });
 
+  it("attaches conflict listeners for services", async () => {
+    // Allow advertiser to run in unit tests.
+    delete process.env.VITEST;
+    process.env.NODE_ENV = "development";
+
+    vi.spyOn(os, "hostname").mockReturnValue("test-host");
+
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const advertise = vi.fn().mockResolvedValue(undefined);
+    const onCalls: Array<{ event: string }> = [];
+
+    createService.mockImplementation((options: Record<string, unknown>) => {
+      const on = vi.fn((event: string) => {
+        onCalls.push({ event });
+      });
+      return {
+        advertise,
+        destroy,
+        serviceState: "announced",
+        on,
+        getFQDN: () =>
+          `${String(options.type ?? "service")}.${String(options.domain ?? "local")}.`,
+        getHostname: () => String(options.hostname ?? "unknown"),
+        getPort: () => Number(options.port ?? -1),
+      };
+    });
+
+    const started = await startGatewayBonjourAdvertiser({
+      gatewayPort: 18789,
+      sshPort: 2222,
+      bridgePort: 18790,
+    });
+
+    // 2 services × 2 listeners each
+    expect(onCalls.map((c) => c.event)).toEqual([
+      "name-change",
+      "hostname-change",
+      "name-change",
+      "hostname-change",
+    ]);
+
+    await started.stop();
+  });
+
+  it("logs advertise failures and retries via watchdog", async () => {
+    // Allow advertiser to run in unit tests.
+    delete process.env.VITEST;
+    process.env.NODE_ENV = "development";
+
+    vi.useFakeTimers();
+    vi.spyOn(os, "hostname").mockReturnValue("test-host");
+
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const advertise = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("boom")) // initial advertise fails
+      .mockResolvedValue(undefined); // watchdog retry succeeds
+
+    createService.mockImplementation((options: Record<string, unknown>) => {
+      return {
+        advertise,
+        destroy,
+        serviceState: "unannounced",
+        on: vi.fn(),
+        getFQDN: () =>
+          `${String(options.type ?? "service")}.${String(options.domain ?? "local")}.`,
+        getHostname: () => String(options.hostname ?? "unknown"),
+        getPort: () => Number(options.port ?? -1),
+      };
+    });
+
+    const started = await startGatewayBonjourAdvertiser({
+      gatewayPort: 18789,
+      sshPort: 2222,
+      bridgePort: 0,
+    });
+
+    // initial advertise attempt happens immediately
+    expect(advertise).toHaveBeenCalledTimes(1);
+
+    // allow promise rejection handler to run
+    await Promise.resolve();
+    expect(logWarn).toHaveBeenCalledWith(
+      expect.stringContaining("advertise failed"),
+    );
+
+    // watchdog should attempt re-advertise at the 60s interval tick
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(advertise).toHaveBeenCalledTimes(2);
+
+    await started.stop();
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(advertise).toHaveBeenCalledTimes(2);
+  });
+
+  it("handles advertise throwing synchronously", async () => {
+    // Allow advertiser to run in unit tests.
+    delete process.env.VITEST;
+    process.env.NODE_ENV = "development";
+
+    vi.spyOn(os, "hostname").mockReturnValue("test-host");
+
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const advertise = vi.fn(() => {
+      throw new Error("sync-fail");
+    });
+
+    createService.mockImplementation((options: Record<string, unknown>) => {
+      return {
+        advertise,
+        destroy,
+        serviceState: "unannounced",
+        on: vi.fn(),
+        getFQDN: () =>
+          `${String(options.type ?? "service")}.${String(options.domain ?? "local")}.`,
+        getHostname: () => String(options.hostname ?? "unknown"),
+        getPort: () => Number(options.port ?? -1),
+      };
+    });
+
+    const started = await startGatewayBonjourAdvertiser({
+      gatewayPort: 18789,
+      sshPort: 2222,
+      bridgePort: 0,
+    });
+
+    expect(advertise).toHaveBeenCalledTimes(1);
+    expect(logWarn).toHaveBeenCalledWith(
+      expect.stringContaining("advertise threw"),
+    );
+
+    await started.stop();
+  });
+
   it("normalizes hostnames with domains for service names", async () => {
     // Allow advertiser to run in unit tests.
     delete process.env.VITEST;
@@ -105,7 +277,18 @@ describe("gateway bonjour advertiser", () => {
 
     const destroy = vi.fn().mockResolvedValue(undefined);
     const advertise = vi.fn().mockResolvedValue(undefined);
-    createService.mockReturnValue({ advertise, destroy });
+    createService.mockImplementation((options: Record<string, unknown>) => {
+      return {
+        advertise,
+        destroy,
+        serviceState: "announced",
+        on: vi.fn(),
+        getFQDN: () =>
+          `${String(options.type ?? "service")}.${String(options.domain ?? "local")}.`,
+        getHostname: () => String(options.hostname ?? "unknown"),
+        getPort: () => Number(options.port ?? -1),
+      };
+    });
 
     const started = await startGatewayBonjourAdvertiser({
       gatewayPort: 18789,
