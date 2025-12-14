@@ -115,18 +115,12 @@ struct OnboardingView: View {
 
             GeometryReader { _ in
                 HStack(spacing: 0) {
-                    self.welcomePage().frame(width: self.pageWidth)
-                    self.connectionPage().frame(width: self.pageWidth)
-                    self.anthropicAuthPage().frame(width: self.pageWidth)
-                    self.identityPage().frame(width: self.pageWidth)
-                    self.gatewayPage().frame(width: self.pageWidth)
-                    self.permissionsPage().frame(width: self.pageWidth)
-                    self.cliPage().frame(width: self.pageWidth)
-                    self.workspacePage().frame(width: self.pageWidth)
-                    self.whatsappPage().frame(width: self.pageWidth)
-                    self.readyPage().frame(width: self.pageWidth)
+                    ForEach(self.pageOrder, id: \.self) { pageIndex in
+                        self.pageView(for: pageIndex)
+                            .frame(width: self.pageWidth)
+                    }
                 }
-                .offset(x: CGFloat(-self.activePageIndex) * self.pageWidth)
+                .offset(x: CGFloat(-self.currentPage) * self.pageWidth)
                 .animation(
                     .interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25),
                     value: self.currentPage)
@@ -182,6 +176,34 @@ struct OnboardingView: View {
             return
         }
         withAnimation { self.currentPage = max(0, self.pageOrder.count - 1) }
+    }
+
+    @ViewBuilder
+    private func pageView(for pageIndex: Int) -> some View {
+        switch pageIndex {
+        case 0:
+            self.welcomePage()
+        case 1:
+            self.connectionPage()
+        case 2:
+            self.anthropicAuthPage()
+        case 3:
+            self.identityPage()
+        case 4:
+            self.gatewayPage()
+        case 5:
+            self.permissionsPage()
+        case 6:
+            self.cliPage()
+        case 7:
+            self.workspacePage()
+        case 8:
+            self.whatsappPage()
+        case 9:
+            self.readyPage()
+        default:
+            EmptyView()
+        }
     }
 
     private func welcomePage() -> some View {
