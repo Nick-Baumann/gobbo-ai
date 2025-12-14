@@ -51,4 +51,15 @@ import UIKit
         let root = NavigationStack { VoiceWakeWordsSettingsView() }
         _ = Self.host(root)
     }
+
+    @Test @MainActor func chatSheetBuildsAViewHierarchy() {
+        let bridge = BridgeSession()
+        let root = ChatSheet(bridge: bridge, sessionKey: "test")
+        _ = Self.host(root)
+    }
+
+    @Test @MainActor func voiceWakeToastBuildsAViewHierarchy() {
+        let root = VoiceWakeToast(command: "clawdis: do something")
+        _ = Self.host(root)
+    }
 }
