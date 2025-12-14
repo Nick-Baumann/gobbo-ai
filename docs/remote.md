@@ -1,5 +1,5 @@
 ---
-summary: "Remote mode topology using SSH control channels between gateway and mac app"
+summary: "Remote access using SSH tunnels (Gateway WS) and tailnets"
 read_when:
   - Running or troubleshooting remote gateway setups
 ---
