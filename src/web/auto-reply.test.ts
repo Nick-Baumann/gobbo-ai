@@ -817,15 +817,24 @@ describe("web auto-reply", () => {
       ).toBe(false);
 
       requestReplyHeartbeatNow({ coalesceMs: 0 });
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      controller.abort();
-      await run;
-
-      const heartbeatCall = replyResolver.mock.calls.find(
+      let heartbeatCall = replyResolver.mock.calls.find(
         (call) =>
           call[0]?.Body === HEARTBEAT_PROMPT &&
           call[0]?.MessageSid === "sid-main",
       );
+      const deadline = Date.now() + 1000;
+      while (!heartbeatCall && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        heartbeatCall = replyResolver.mock.calls.find(
+          (call) =>
+            call[0]?.Body === HEARTBEAT_PROMPT &&
+            call[0]?.MessageSid === "sid-main",
+        );
+      }
+      controller.abort();
+      await run;
+
+      expect(heartbeatCall).toBeDefined();
       expect(heartbeatCall?.[0]?.From).toBe("+1555");
       expect(heartbeatCall?.[0]?.To).toBe("+1555");
       expect(heartbeatCall?.[0]?.MessageSid).toBe("sid-main");
