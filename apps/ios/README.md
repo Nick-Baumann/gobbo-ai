@@ -25,4 +25,4 @@ cd apps/ios
 fastlane lanes
 ```
 
-See `apps/ios/fastlane/README.md` for App Store Connect auth + upload lanes.
+See `apps/ios/fastlane/SETUP.md` for App Store Connect auth + upload lanes.

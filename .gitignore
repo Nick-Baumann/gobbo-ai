@@ -17,8 +17,13 @@ apps/ios/*.xcworkspace/
 apps/ios/.swiftpm/
 
 # fastlane (iOS)
+apps/ios/fastlane/README.md
 apps/ios/fastlane/report.xml
 apps/ios/fastlane/Preview.html
 apps/ios/fastlane/screenshots/
 apps/ios/fastlane/test_output/
 apps/ios/fastlane/logs/
+
+# fastlane build artifacts (local)
+apps/ios/*.ipa
+apps/ios/*.dSYM.zip
