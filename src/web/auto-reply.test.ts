@@ -823,7 +823,8 @@ describe("web auto-reply", () => {
 
       const heartbeatCall = replyResolver.mock.calls.find(
         (call) =>
-          call[0]?.Body === HEARTBEAT_PROMPT && call[0]?.MessageSid === "sid-main",
+          call[0]?.Body === HEARTBEAT_PROMPT &&
+          call[0]?.MessageSid === "sid-main",
       );
       expect(heartbeatCall?.[0]?.From).toBe("+1555");
       expect(heartbeatCall?.[0]?.To).toBe("+1555");

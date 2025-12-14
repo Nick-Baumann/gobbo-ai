@@ -242,7 +242,10 @@ struct OnboardingView: View {
                                 .frame(width: fieldWidth)
                         }
 
-                        MasterDiscoveryInlineList(discovery: self.masterDiscovery, currentTarget: self.state.remoteTarget) { master in
+                        MasterDiscoveryInlineList(
+                            discovery: self.masterDiscovery,
+                            currentTarget: self.state.remoteTarget)
+                        { master in
                             self.applyDiscoveredMaster(master)
                         }
                         .frame(width: fieldWidth, alignment: .leading)

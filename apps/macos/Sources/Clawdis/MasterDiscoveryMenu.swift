@@ -27,7 +27,8 @@ struct MasterDiscoveryInlineList: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(self.discovery.masters.prefix(6)) { master in
                         let target = self.suggestedSSHTarget(master)
-                        let selected = target != nil && self.currentTarget?.trimmingCharacters(in: .whitespacesAndNewlines) == target
+                        let selected = target != nil && self.currentTarget?
+                            .trimmingCharacters(in: .whitespacesAndNewlines) == target
 
                         Button {
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
@@ -62,7 +63,9 @@ struct MasterDiscoveryInlineList: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(self.rowBackground(selected: selected, hovered: self.hoveredMasterID == master.id)))
+                                    .fill(self.rowBackground(
+                                        selected: selected,
+                                        hovered: self.hoveredMasterID == master.id)))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .strokeBorder(
@@ -72,7 +75,8 @@ struct MasterDiscoveryInlineList: View {
                         }
                         .buttonStyle(.plain)
                         .onHover { hovering in
-                            self.hoveredMasterID = hovering ? master.id : (self.hoveredMasterID == master.id ? nil : self.hoveredMasterID)
+                            self.hoveredMasterID = hovering ? master
+                                .id : (self.hoveredMasterID == master.id ? nil : self.hoveredMasterID)
                         }
                     }
                 }
