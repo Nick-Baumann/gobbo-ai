@@ -14,38 +14,16 @@ public struct ClawdisChatView: View {
             ClawdisChatTheme.surface
                 .ignoresSafeArea()
 
-            VStack(spacing: 14) {
-                self.header
+            VStack(spacing: 10) {
                 self.messageList
                 ClawdisChatComposer(viewModel: self.viewModel)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .frame(maxWidth: 1040)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear { self.viewModel.load() }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Clawd Chat")
-                    .font(.title2.weight(.semibold))
-                Text("Session \(self.viewModel.sessionKey) · \(self.viewModel.healthOK ? "Connected" : "Connecting…")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button {
-                self.viewModel.refresh()
-            } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            .buttonStyle(.bordered)
-        }
     }
 
     private var messageList: some View {
@@ -68,13 +46,31 @@ public struct ClawdisChatView: View {
                         .frame(height: 1)
                         .id(self.scrollerBottomID)
                 }
-                .padding(.vertical, 10)
+                .padding(.top, 40)
+                .padding(.bottom, 10)
                 .padding(.horizontal, 12)
             }
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(ClawdisChatTheme.card)
                     .shadow(color: .black.opacity(0.05), radius: 12, y: 6))
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(self.viewModel.healthOK ? .green : .orange)
+                        .frame(width: 7, height: 7)
+                    Text(self.viewModel.sessionKey)
+                        .font(.caption.weight(.semibold))
+                    Text(self.viewModel.healthOK ? "Connected" : "Connecting…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(ClawdisChatTheme.subtleCard)
+                .clipShape(Capsule())
+                .padding(10)
+            }
             .onChange(of: self.viewModel.messages.count) { _, _ in
                 withAnimation(.snappy(duration: 0.22)) {
                     proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)

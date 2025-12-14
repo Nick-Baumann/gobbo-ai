@@ -17,7 +17,7 @@ struct ClawdisChatComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            HStack(spacing: 10) {
                 self.thinkingPicker
                 Spacer()
                 self.attachmentPicker
@@ -29,24 +29,14 @@ struct ClawdisChatComposer: View {
 
             self.editor
 
-            HStack {
-                if let error = self.viewModel.errorText {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-                Spacer()
-                Button {
-                    self.viewModel.send()
-                } label: {
-                    Label(self.viewModel.isSending ? "Sending…" : "Send", systemImage: "arrow.up.circle.fill")
-                        .font(.headline)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!self.viewModel.canSend)
+            if let error = self.viewModel.errorText, !error.isEmpty {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
             }
         }
-        .padding(14)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(ClawdisChatTheme.card)
@@ -67,7 +57,8 @@ struct ClawdisChatComposer: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .frame(maxWidth: 200)
+        .controlSize(.small)
+        .frame(maxWidth: 140, alignment: .leading)
     }
 
     @ViewBuilder
@@ -76,14 +67,18 @@ struct ClawdisChatComposer: View {
         Button {
             self.pickFilesMac()
         } label: {
-            Label("Add Image", systemImage: "paperclip")
+            Image(systemName: "paperclip")
         }
+        .help("Add Image")
         .buttonStyle(.bordered)
+        .controlSize(.small)
         #else
         PhotosPicker(selection: self.$pickerItems, maxSelectionCount: 8, matching: .images) {
-            Label("Add Image", systemImage: "paperclip")
+            Image(systemName: "paperclip")
         }
+        .help("Add Image")
         .buttonStyle(.bordered)
+        .controlSize(.small)
         .onChange(of: self.pickerItems) { _, newItems in
             Task { await self.loadPhotosPickerItems(newItems) }
         }
@@ -135,7 +130,7 @@ struct ClawdisChatComposer: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(ClawdisChatTheme.card))
             .overlay(self.editorOverlay)
-            .frame(maxHeight: 180)
+            .frame(maxHeight: 140)
     }
 
     private var editorOverlay: some View {
@@ -143,17 +138,18 @@ struct ClawdisChatComposer: View {
             if self.viewModel.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text("Message Clawd…")
                     .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
             }
 
             #if os(macOS)
             ChatComposerTextView(text: self.$viewModel.input) {
                 self.viewModel.send()
             }
-            .frame(minHeight: 54, maxHeight: 160)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .frame(minHeight: 44, maxHeight: 120)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .padding(.trailing, 44)
             #else
             TextEditor(text: self.$viewModel.input)
                 .font(.system(size: 15))
@@ -162,6 +158,27 @@ struct ClawdisChatComposer: View {
                 .padding(.vertical, 8)
                 .focused(self.$isFocused)
             #endif
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        self.viewModel.send()
+                    } label: {
+                        if self.viewModel.isSending {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(!self.viewModel.canSend)
+                    .padding(8)
+                }
+            }
         }
     }
 
