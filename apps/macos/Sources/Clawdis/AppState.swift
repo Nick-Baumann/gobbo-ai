@@ -6,6 +6,8 @@ import SwiftUI
 @MainActor
 final class AppState: ObservableObject {
     private let isPreview: Bool
+    private var suppressVoiceWakeGlobalSync = false
+    private var voiceWakeGlobalSyncTask: Task<Void, Never>?
 
     private func ifNotPreview(_ action: () -> Void) {
         guard !self.isPreview else { return }
@@ -53,6 +55,7 @@ final class AppState: ObservableObject {
                 if self.swabbleEnabled {
                     Task { await VoiceWakeRuntime.shared.refresh(state: self) }
                 }
+                self.scheduleVoiceWakeGlobalSyncIfNeeded()
             }
         }
     }
@@ -308,6 +311,31 @@ final class AppState: ObservableObject {
         let granted = await PermissionManager.ensureVoiceWakePermissions(interactive: true)
         self.swabbleEnabled = granted
         Task { await VoiceWakeRuntime.shared.refresh(state: self) }
+    }
+
+    // MARK: - Global wake words sync (Gateway-owned)
+
+    func applyGlobalVoiceWakeTriggers(_ triggers: [String]) {
+        self.suppressVoiceWakeGlobalSync = true
+        self.swabbleTriggerWords = triggers
+        self.suppressVoiceWakeGlobalSync = false
+    }
+
+    private func scheduleVoiceWakeGlobalSyncIfNeeded() {
+        guard !self.suppressVoiceWakeGlobalSync else { return }
+        let sanitized = sanitizeVoiceWakeTriggers(self.swabbleTriggerWords)
+        self.voiceWakeGlobalSyncTask?.cancel()
+        self.voiceWakeGlobalSyncTask = Task { [sanitized] in
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            do {
+                _ = try await GatewayConnection.shared.request(
+                    method: "voicewake.set",
+                    params: ["triggers": AnyCodable(sanitized)],
+                    timeoutMs: 10_000)
+            } catch {
+                // Best-effort only.
+            }
+        }
     }
 
     func setWorking(_ working: Bool) {
