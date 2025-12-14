@@ -76,11 +76,19 @@ Pairing details: `docs/gateway/pairing.md`.
 ## 5) Verify the node is connected
 
 - In the macOS app: **Instances** tab should show something like `iOS Node (...)`.
-- Via Gateway presence:
+- Via nodes list (paired + connected):
+  ```bash
+  clawdis nodes list
+  ```
+- Via Gateway (paired + connected):
+  ```bash
+  clawdis gateway call node.list --params "{}"
+  ```
+- Via Gateway presence (legacy-ish, still useful):
   ```bash
   clawdis gateway call system-presence --params "{}"
   ```
-  Look for the node `instanceId` (commonly `ios-node` unless changed in Iris settings).
+  Look for the node `instanceId` (often a UUID).
 
 ## 6) Drive the iOS Canvas (draw / snapshot)
 
@@ -92,7 +100,7 @@ Iris runs a WKWebView “Canvas” scaffold which exposes:
 ### Draw with `screen.eval`
 
 ```bash
-clawdis nodes invoke --node ios-node --command screen.eval --params "$(cat <<'JSON'
+clawdis nodes invoke --node "iOS Node" --command screen.eval --params "$(cat <<'JSON'
 {"javaScript":"(() => { const {ctx,setStatus} = window.__clawdis; setStatus('Drawing','…'); ctx.clearRect(0,0,innerWidth,innerHeight); ctx.lineWidth=6; ctx.strokeStyle='#ff2d55'; ctx.beginPath(); ctx.moveTo(40,40); ctx.lineTo(innerWidth-40, innerHeight-40); ctx.stroke(); setStatus(null,null); return 'ok'; })()"}
 JSON
 )"
@@ -101,7 +109,7 @@ JSON
 ### Snapshot with `screen.snapshot`
 
 ```bash
-clawdis nodes invoke --node ios-node --command screen.snapshot --params '{"maxWidth":900}'
+clawdis nodes invoke --node 192.168.0.88 --command screen.snapshot --params '{"maxWidth":900}'
 ```
 
 The response includes `base64` PNG data (for debugging/verification).
@@ -110,7 +118,7 @@ The response includes `base64` PNG data (for debugging/verification).
 
 - **iOS in background:** all `screen.*` commands fail fast with `NODE_BACKGROUND_UNAVAILABLE` (bring Iris to foreground).
 - **mDNS blocked:** some networks block multicast; use a different LAN or plan a tailnet-capable bridge (see `docs/discovery.md`).
-- **Wrong node id:** `--node` must match the node’s `instanceId` (shown in Instances/presence).
+- **Wrong node selector:** `--node` can be the node id (UUID), display name (e.g. `iOS Node`), IP, or an unambiguous prefix. If it’s ambiguous, the CLI will tell you.
 - **Stale pairing:** if the token is lost, Iris must pair again; approve a new pending request.
 
 ## Related docs
