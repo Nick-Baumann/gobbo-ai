@@ -12,7 +12,7 @@ final class ScreenController {
     var mode: ClawdisScreenMode = .canvas
     var urlString: String = ""
     var errorText: String?
-    
+
     /// Callback invoked when a clawdis:// deep link is tapped in the canvas
     var onDeepLink: ((URL) -> Void)?
 
@@ -252,17 +252,17 @@ final class ScreenController {
 /// Handles navigation policy to intercept clawdis:// deep links from canvas
 private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
     weak var controller: ScreenController?
-    
+
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-    ) {
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void)
+    {
         guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
             return
         }
-        
+
         // Intercept clawdis:// deep links
         if url.scheme == "clawdis" {
             decisionHandler(.cancel)
@@ -271,7 +271,7 @@ private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
             }
             return
         }
-        
+
         decisionHandler(.allow)
     }
 }
