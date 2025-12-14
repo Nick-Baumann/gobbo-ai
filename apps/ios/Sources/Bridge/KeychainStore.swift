@@ -3,14 +3,13 @@ import Security
 
 enum KeychainStore {
     static func loadString(service: String, account: String) -> String? {
-        var query: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
-        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -20,20 +19,20 @@ enum KeychainStore {
 
     static func saveString(_ value: String, service: String, account: String) -> Bool {
         let data = Data(value.utf8)
-        let base: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
 
         let update: [String: Any] = [kSecValueData as String: data]
-        let status = SecItemUpdate(base as CFDictionary, update as CFDictionary)
+        let status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
         if status == errSecSuccess { return true }
         if status != errSecItemNotFound { return false }
 
-        var insert = base
+        var insert = query
         insert[kSecValueData as String] = data
+        insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         return SecItemAdd(insert as CFDictionary, nil) == errSecSuccess
     }
 

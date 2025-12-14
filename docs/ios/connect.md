@@ -54,6 +54,14 @@ More debugging notes: `docs/bonjour.md`.
 In Iris:
 - Pick the discovered bridge (or hit refresh).
 - If not paired yet, Iris will initiate pairing automatically.
+- After the first successful pairing, Iris will auto-reconnect to the **last bridge** on launch (including after reinstall), as long as the iOS Keychain entry is still present.
+
+### Connection indicator (always visible)
+
+The Settings tab icon shows a small status dot:
+- **Green**: connected to the bridge
+- **Yellow**: connecting
+- **Red**: not connected / error
 
 ## 4) Approve pairing (CLI)
 
@@ -119,7 +127,8 @@ The response includes `base64` PNG data (for debugging/verification).
 - **iOS in background:** all `screen.*` commands fail fast with `NODE_BACKGROUND_UNAVAILABLE` (bring Iris to foreground).
 - **mDNS blocked:** some networks block multicast; use a different LAN or plan a tailnet-capable bridge (see `docs/discovery.md`).
 - **Wrong node selector:** `--node` can be the node id (UUID), display name (e.g. `iOS Node`), IP, or an unambiguous prefix. If it’s ambiguous, the CLI will tell you.
-- **Stale pairing:** if the token is lost, Iris must pair again; approve a new pending request.
+- **Stale pairing / Keychain cleared:** if the pairing token is missing (or iOS Keychain was wiped), Iris must pair again; approve a new pending request.
+- **App reinstall but no reconnect:** Iris restores `instanceId` + last bridge preference from Keychain; if it still comes up “unpaired”, verify Keychain persistence on your device/simulator and re-pair once.
 
 ## Related docs
 

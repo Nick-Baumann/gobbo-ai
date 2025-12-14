@@ -2,19 +2,36 @@
 
 ## 2.0.0 — Unreleased
 
-First Clawdis release post rebrand. This is a semver-major because we dropped legacy providers/agents and moved defaults to new paths while adding a full macOS companion app.
+_No changes since 2.0.0-beta1._
+
+## 2.0.0-beta1 — 2025-12-14
+
+First Clawdis release post rebrand. This is a semver-major because we dropped legacy providers/agents and moved defaults to new paths while adding a full macOS companion app, a WebSocket Gateway, and an iOS node (Iris).
 
 ### Breaking
 - Renamed to **Clawdis**: defaults now live under `~/.clawdis` (sessions in `~/.clawdis/sessions/`, IPC at `~/.clawdis/clawdis.sock`, logs in `/tmp/clawdis`). Launchd labels and config filenames follow the new name; legacy stores are copied forward on first run.
 - Pi only: `inbound.reply.agent.kind` accepts only `"pi"`, and the agent CLI/CLI flags for Claude/Codex/Gemini were removed. The Pi CLI runs in RPC mode with a persistent worker.
 - WhatsApp Web is the only transport; Twilio support and related CLI flags/tests were removed.
 - Direct chats now collapse into a single `main` session by default (no config needed); groups stay isolated as `group:<jid>`.
-- Gateway background helpers were removed; run `clawdis gateway --verbose` under your supervisor of choice if you want it detached.
+- Gateway is now a loopback-only WebSocket daemon (`ws://127.0.0.1:18789`) that owns all providers/state; clients (CLI, WebChat, macOS app, nodes) connect to it. Start it explicitly (`clawdis gateway …`) or via Clawdis.app; helper subcommands no longer auto-spawn a gateway.
+
+### Gateway, nodes, and automation
+- New typed Gateway WS protocol (JSON schema validated) with `clawdis gateway {health,status,send,agent,call}` helpers and structured presence/instance updates for all clients.
+- Optional LAN-facing bridge (`tcp://0.0.0.0:18790`) keeps the Gateway loopback-only while enabling direct Bonjour-discovered connections for paired nodes.
+- Node pairing + management via `clawdis nodes {pending,approve,reject,invoke}` (used by the iOS node “Iris” and future remote nodes).
+- Cron jobs are Gateway-owned (`clawdis cron …`) with run history stored as JSONL and support for “isolated summary” posting into the main session.
 
 ### macOS companion app
 - **Clawdis.app menu bar companion**: packaged, signed bundle with gateway start/stop, launchd toggle, project-root and pnpm/node auto-resolution, live log shortcut, restart button, and status/recipient table plus badges/dimming for attention and paused states.
 - **On-device Voice Wake**: Apple speech recognizer with wake-word table, language picker, live mic meter, “hold until silence,” animated ears/legs, and main-session routing that replies on the **last used surface** (WhatsApp/Telegram/WebChat). Delivery failures are logged, and the run remains visible via WebChat/session logs.
 - **WebChat & Debugging**: bundled WebChat UI, Debug tab with heartbeat sliders, session-store picker, log opener (`clawlog`), gateway restart, health probes, and scrollable settings panes.
+- **Browser control**: manage clawd’s dedicated Chrome/Chromium with tab listing/open/focus/close, screenshots, DOM query/dump, and “AI snapshots” (aria/domSnapshot/ai) via `clawdis browser …` and UI controls.
+- **Remote gateway control**: Bonjour discovery for local masters plus SSH-tunnel fallback for remote control when multicast is unavailable.
+
+### iOS node (Iris)
+- New iOS companion app that pairs to the Gateway bridge, reports presence as a node, and exposes a WKWebView “Canvas” for agent-driven UI.
+- `clawdis nodes invoke` supports `screen.eval` and `screen.snapshot` to drive and verify the iOS Canvas (fails fast when Iris is backgrounded).
+- Voice wake words are configurable in-app; Iris reconnects to the last bridge when credentials are still present in Keychain.
 
 ### WhatsApp & agent experience
 - Group chats fully supported: mention-gated triggers (including media-only captions), sender attribution, session primer with subject/member roster, allowlist bypass when you’re @‑mentioned, and safer handling of view-once/ephemeral media.
@@ -36,7 +53,7 @@ First Clawdis release post rebrand. This is a semver-major because we dropped le
 
 ### Docs
 - Added `docs/telegram.md` outlining the Telegram Bot API provider (grammY) and how it shares the `main` session. Default grammY throttler keeps Bot API calls under rate limits.
-- CLI gateway now auto-starts WhatsApp and Telegram when configured (single `gateway` command with `--provider` selector); text/media sends still use `--provider telegram`; webhook/proxy options documented.
+- Gateway can run WhatsApp + Telegram together when configured; `clawdis send --provider telegram …` sends via the Telegram bot (webhook/proxy options documented).
 
 ## 1.5.0 — 2025-12-05
 
