@@ -199,25 +199,35 @@ actor CameraController {
     }
 
     private nonisolated static func exportToMP4(inputURL: URL, outputURL: URL) async throws {
-        let asset = AVAsset(url: inputURL)
+        let asset = AVURLAsset(url: inputURL)
         guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
             throw CameraError.exportFailed("Failed to create export session")
         }
-        exporter.outputURL = outputURL
-        exporter.outputFileType = .mp4
         exporter.shouldOptimizeForNetworkUse = true
 
-        try await withCheckedThrowingContinuation(isolation: nil) { cont in
-            exporter.exportAsynchronously {
-                switch exporter.status {
-                case .completed:
-                    cont.resume(returning: ())
-                case .failed:
-                    cont.resume(throwing: exporter.error ?? CameraError.exportFailed("Export failed"))
-                case .cancelled:
-                    cont.resume(throwing: CameraError.exportFailed("Export cancelled"))
-                default:
-                    cont.resume(throwing: CameraError.exportFailed("Export did not complete"))
+        if #available(iOS 18.0, tvOS 18.0, visionOS 2.0, *) {
+            do {
+                try await exporter.export(to: outputURL, as: .mp4)
+                return
+            } catch {
+                throw CameraError.exportFailed(error.localizedDescription)
+            }
+        } else {
+            exporter.outputURL = outputURL
+            exporter.outputFileType = .mp4
+
+            try await withCheckedThrowingContinuation(isolation: nil) { cont in
+                exporter.exportAsynchronously {
+                    switch exporter.status {
+                    case .completed:
+                        cont.resume(returning: ())
+                    case .failed:
+                        cont.resume(throwing: exporter.error ?? CameraError.exportFailed("Export failed"))
+                    case .cancelled:
+                        cont.resume(throwing: CameraError.exportFailed("Export cancelled"))
+                    default:
+                        cont.resume(throwing: CameraError.exportFailed("Export did not complete"))
+                    }
                 }
             }
         }

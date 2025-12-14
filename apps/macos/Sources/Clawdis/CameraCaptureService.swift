@@ -200,29 +200,39 @@ actor CameraCaptureService {
     }
 
     private nonisolated static func exportToMP4(inputURL: URL, outputURL: URL) async throws {
-        let asset = AVAsset(url: inputURL)
+        let asset = AVURLAsset(url: inputURL)
         guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetMediumQuality) else {
             throw CameraError.exportFailed("Failed to create export session")
         }
-        export.outputURL = outputURL
-        export.outputFileType = .mp4
         export.shouldOptimizeForNetworkUse = true
 
-        await withCheckedContinuation { cont in
-            export.exportAsynchronously {
-                cont.resume()
+        if #available(macOS 15.0, *) {
+            do {
+                try await export.export(to: outputURL, as: .mp4)
+                return
+            } catch {
+                throw CameraError.exportFailed(error.localizedDescription)
             }
-        }
+        } else {
+            export.outputURL = outputURL
+            export.outputFileType = .mp4
 
-        switch export.status {
-        case .completed:
-            return
-        case .failed:
-            throw CameraError.exportFailed(export.error?.localizedDescription ?? "export failed")
-        case .cancelled:
-            throw CameraError.exportFailed("export cancelled")
-        default:
-            throw CameraError.exportFailed("export did not complete (\(export.status.rawValue))")
+            await withCheckedContinuation { cont in
+                export.exportAsynchronously {
+                    cont.resume()
+                }
+            }
+
+            switch export.status {
+            case .completed:
+                return
+            case .failed:
+                throw CameraError.exportFailed(export.error?.localizedDescription ?? "export failed")
+            case .cancelled:
+                throw CameraError.exportFailed("export cancelled")
+            default:
+                throw CameraError.exportFailed("export did not complete (\(export.status.rawValue))")
+            }
         }
     }
 }
