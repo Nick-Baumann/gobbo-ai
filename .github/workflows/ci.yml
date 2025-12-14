@@ -137,12 +137,37 @@ jobs:
           set -euo pipefail
           RESULT_BUNDLE_PATH="$RUNNER_TEMP/Clawdis-iOS.xcresult"
           DEST_ID="$(
-            (
-              xcrun simctl list devices available |
-                grep -m 1 -E 'iPhone 16 .*\\([0-9A-Fa-f-]{36}\\)' ||
-                xcrun simctl list devices available |
-                  grep -m 1 -E 'iPhone.*\\([0-9A-Fa-f-]{36}\\)'
-            ) | sed -E 's/.*\\(([0-9A-Fa-f-]{36})\\).*/\\1/'
+            python3 - <<'PY'
+            import json
+            import re
+            import subprocess
+            import sys
+
+            data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True))
+            runtimes = []
+            for runtime in data.get("devices", {}).keys():
+              m = re.search(r"\\.iOS-(\\d+)-(\\d+)$", runtime)
+              if m:
+                runtimes.append((int(m.group(1)), int(m.group(2)), runtime))
+
+            runtimes.sort(reverse=True)
+
+            def pick_device(devices):
+              iphones = [d for d in devices if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]
+              if not iphones:
+                return None
+              prefer = [d for d in iphones if "iPhone 16" in d.get("name", "")]
+              return (prefer[0] if prefer else iphones[0]).get("udid")
+
+            for _, __, runtime in runtimes:
+              udid = pick_device(data["devices"].get(runtime, []))
+              if udid:
+                print(udid)
+                sys.exit(0)
+
+            print("No available iPhone simulators found.", file=sys.stderr)
+            sys.exit(1)
+            PY
           )"
           echo "Using iOS Simulator id: $DEST_ID"
           xcodebuild test \
