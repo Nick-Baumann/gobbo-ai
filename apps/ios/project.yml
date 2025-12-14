@@ -58,3 +58,21 @@ targets:
         NSCameraUsageDescription: Clawdis can capture photos or short video clips when requested via the bridge.
         NSMicrophoneUsageDescription: Clawdis needs microphone access for voice wake.
         NSSpeechRecognitionUsageDescription: Clawdis uses on-device speech recognition for voice wake.
+
+  ClawdisTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Clawdis
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.steipete.clawdis.ios.tests
+        SWIFT_VERSION: "6.0"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Clawdis.app/Clawdis"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    info:
+      path: Tests/Info.plist
+      properties:
+        CFBundleDisplayName: ClawdisTests
