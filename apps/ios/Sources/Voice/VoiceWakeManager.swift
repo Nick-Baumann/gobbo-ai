@@ -81,6 +81,7 @@ final class VoiceWakeManager: NSObject, ObservableObject {
     @Published var isListening: Bool = false
     @Published var statusText: String = "Off"
     @Published var triggerWords: [String] = VoiceWakePreferences.loadTriggerWords()
+    @Published var lastTriggeredCommand: String?
 
     private let audioEngine = AVAudioEngine()
     private var speechRecognizer: SFSpeechRecognizer?
@@ -314,6 +315,7 @@ final class VoiceWakeManager: NSObject, ObservableObject {
 
         if cmd == self.lastDispatched { return }
         self.lastDispatched = cmd
+        self.lastTriggeredCommand = cmd
         self.statusText = "Triggered"
 
         Task { [weak self] in

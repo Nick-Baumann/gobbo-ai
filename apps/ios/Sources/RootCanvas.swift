@@ -2,7 +2,11 @@ import SwiftUI
 
 struct RootCanvas: View {
     @EnvironmentObject private var appModel: NodeAppModel
+    @EnvironmentObject private var voiceWake: VoiceWakeManager
+    @AppStorage(VoiceWakePreferences.enabledKey) private var voiceWakeEnabled: Bool = false
     @State private var presentedSheet: PresentedSheet?
+    @State private var voiceWakeToastText: String?
+    @State private var toastDismissTask: Task<Void, Never>?
 
     private enum PresentedSheet: Identifiable {
         case settings
@@ -34,6 +38,22 @@ struct RootCanvas: View {
             .padding(.top, 10)
             .padding(.trailing, 10)
         }
+        .overlay(alignment: .topLeading) {
+            StatusPill(
+                bridge: self.bridgeStatus,
+                voiceWakeEnabled: self.voiceWakeEnabled,
+                onTap: { self.presentedSheet = .settings })
+                .padding(.leading, 10)
+                .safeAreaPadding(.top, 10)
+        }
+        .overlay(alignment: .topLeading) {
+            if let voiceWakeToastText, !voiceWakeToastText.isEmpty {
+                VoiceWakeToast(command: voiceWakeToastText)
+                    .padding(.leading, 10)
+                    .safeAreaPadding(.top, 58)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .sheet(item: self.$presentedSheet) { sheet in
             switch sheet {
             case .settings:
@@ -43,6 +63,46 @@ struct RootCanvas: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: self.voiceWake.lastTriggeredCommand) { _, newValue in
+            guard let newValue else { return }
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+
+            self.toastDismissTask?.cancel()
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                self.voiceWakeToastText = trimmed
+            }
+
+            self.toastDismissTask = Task {
+                try? await Task.sleep(nanoseconds: 2_300_000_000)
+                await MainActor.run {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        self.voiceWakeToastText = nil
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            self.toastDismissTask?.cancel()
+            self.toastDismissTask = nil
+        }
+    }
+
+    private var bridgeStatus: StatusPill.BridgeState {
+        if self.appModel.bridgeServerName != nil { return .connected }
+
+        let text = self.appModel.bridgeStatusText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.localizedCaseInsensitiveContains("connecting") ||
+            text.localizedCaseInsensitiveContains("reconnecting")
+        {
+            return .connecting
+        }
+
+        if text.localizedCaseInsensitiveContains("error") {
+            return .error
+        }
+
+        return .disconnected
     }
 }
 
