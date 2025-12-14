@@ -35,6 +35,14 @@ final class NodeAppModel {
 
         let enabled = UserDefaults.standard.bool(forKey: "voiceWake.enabled")
         self.voiceWake.setEnabled(enabled)
+        
+        // Wire up deep links from canvas taps
+        self.screen.onDeepLink = { [weak self] url in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.handleDeepLink(url: url)
+            }
+        }
     }
 
     func setScenePhase(_ phase: ScenePhase) {

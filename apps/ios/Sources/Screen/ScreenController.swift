@@ -7,14 +7,19 @@ import WebKit
 @Observable
 final class ScreenController {
     let webView: WKWebView
+    private let navigationDelegate: ScreenNavigationDelegate
 
     var mode: ClawdisScreenMode = .canvas
     var urlString: String = ""
     var errorText: String?
+    
+    /// Callback invoked when a clawdis:// deep link is tapped in the canvas
+    var onDeepLink: ((URL) -> Void)?
 
     init() {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
+        self.navigationDelegate = ScreenNavigationDelegate()
         self.webView = WKWebView(frame: .zero, configuration: config)
         self.webView.isOpaque = false
         self.webView.backgroundColor = .clear
@@ -23,6 +28,11 @@ final class ScreenController {
         self.webView.scrollView.contentInset = .zero
         self.webView.scrollView.scrollIndicatorInsets = .zero
         self.webView.scrollView.automaticallyAdjustsScrollIndicatorInsets = false
+        // Disable scroll to allow touch events to pass through to canvas
+        self.webView.scrollView.isScrollEnabled = false
+        self.webView.scrollView.bounces = false
+        self.webView.navigationDelegate = self.navigationDelegate
+        self.navigationDelegate.controller = self
         self.reload()
     }
 
@@ -195,6 +205,11 @@ final class ScreenController {
                 statusEl.style.display = 'grid';
                 if (titleEl && typeof title === 'string') titleEl.textContent = title;
                 if (subtitleEl && typeof subtitle === 'string') subtitleEl.textContent = subtitle;
+                // Auto-hide after 3 seconds
+                clearTimeout(window.__statusTimeout);
+                window.__statusTimeout = setTimeout(() => {
+                  statusEl.style.display = 'none';
+                }, 3000);
               }
             };
           })();
@@ -202,4 +217,33 @@ final class ScreenController {
       </body>
     </html>
     """
+}
+
+// MARK: - Navigation Delegate
+
+/// Handles navigation policy to intercept clawdis:// deep links from canvas
+private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
+    weak var controller: ScreenController?
+    
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+        
+        // Intercept clawdis:// deep links
+        if url.scheme == "clawdis" {
+            decisionHandler(.cancel)
+            Task { @MainActor in
+                self.controller?.onDeepLink?(url)
+            }
+            return
+        }
+        
+        decisionHandler(.allow)
+    }
 }
