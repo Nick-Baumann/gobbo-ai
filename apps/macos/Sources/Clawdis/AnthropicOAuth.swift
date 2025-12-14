@@ -119,35 +119,55 @@ enum PiOAuthStore {
     }
 
     static func hasAnthropicOAuth() -> Bool {
-        guard let dict = (try? self.loadStorage()) else { return false }
-        return dict[self.providerKey] != nil
+        let url = self.oauthURL()
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data, options: []),
+              let storage = json as? [String: Any],
+              let entry = storage[self.providerKey] as? [String: Any]
+        else {
+            return false
+        }
+
+        let refresh = entry["refresh"] as? String
+        let access = entry["access"] as? String
+        return (refresh?.isEmpty == false) && (access?.isEmpty == false)
     }
 
     static func saveAnthropicOAuth(_ creds: AnthropicOAuthCredentials) throws {
-        var storage = (try? self.loadStorage()) ?? [:]
-        storage[self.providerKey] = creds
-        try self.saveStorage(storage)
-    }
-
-    private static func loadStorage() throws -> [String: AnthropicOAuthCredentials] {
         let url = self.oauthURL()
-        guard FileManager.default.fileExists(atPath: url.path) else { return [:] }
-        let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode([String: AnthropicOAuthCredentials].self, from: data)
+        let existing: [String: Any]
+        if FileManager.default.fileExists(atPath: url.path),
+           let data = try? Data(contentsOf: url),
+           let json = try? JSONSerialization.jsonObject(with: data, options: []),
+           let dict = json as? [String: Any]
+        {
+            existing = dict
+        } else {
+            existing = [:]
+        }
+
+        var updated = existing
+        updated[self.providerKey] = [
+            "type": creds.type,
+            "refresh": creds.refresh,
+            "access": creds.access,
+            "expires": creds.expires,
+        ]
+
+        try self.saveStorage(updated)
     }
 
-    private static func saveStorage(_ storage: [String: AnthropicOAuthCredentials]) throws {
+    private static func saveStorage(_ storage: [String: Any]) throws {
         let dir = self.oauthDir()
         try FileManager.default.createDirectory(
             at: dir,
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(storage)
-
         let url = self.oauthURL()
+        let data = try JSONSerialization.data(withJSONObject: storage, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: url, options: [.atomic])
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }

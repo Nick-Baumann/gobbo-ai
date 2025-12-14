@@ -57,6 +57,8 @@ struct OnboardingView: View {
     @State private var anthropicAuthStatus: String?
     @State private var anthropicAuthBusy = false
     @State private var anthropicAuthConnected = false
+    @State private var monitoringAuth = false
+    @State private var authMonitorTask: Task<Void, Never>?
     @State private var identityName: String = ""
     @State private var identityTheme: String = ""
     @State private var identityEmoji: String = ""
@@ -73,6 +75,7 @@ struct OnboardingView: View {
     private let pageWidth: CGFloat = 680
     private let contentHeight: CGFloat = 520
     private let connectionPageIndex = 1
+    private let anthropicAuthPageIndex = 2
     private let permissionsPageIndex = 5
     private var pageOrder: [Int] {
         if self.state.connectionMode == .remote {
@@ -149,6 +152,7 @@ struct OnboardingView: View {
         .onDisappear {
             self.stopPermissionMonitoring()
             self.stopDiscovery()
+            self.stopAuthMonitoring()
         }
         .task {
             await self.refreshPerms()
@@ -323,6 +327,26 @@ struct OnboardingView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 12) {
+                    Text(PiOAuthStore.oauthURL().path)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Spacer()
+
+                    Button("Reveal") {
+                        NSWorkspace.shared.activateFileViewerSelecting([PiOAuthStore.oauthURL()])
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("Refresh") {
+                        self.refreshAnthropicOAuthStatus()
+                    }
+                    .buttonStyle(.bordered)
+                }
 
                 Divider().padding(.vertical, 2)
 
@@ -1070,6 +1094,7 @@ struct OnboardingView: View {
     private func updateMonitoring(for pageIndex: Int) {
         self.updatePermissionMonitoring(for: pageIndex)
         self.updateDiscoveryMonitoring(for: pageIndex)
+        self.updateAuthMonitoring(for: pageIndex)
     }
 
     private func stopPermissionMonitoring() {
@@ -1082,6 +1107,33 @@ struct OnboardingView: View {
         guard self.monitoringDiscovery else { return }
         self.monitoringDiscovery = false
         self.masterDiscovery.stop()
+    }
+
+    private func updateAuthMonitoring(for pageIndex: Int) {
+        let shouldMonitor = pageIndex == self.anthropicAuthPageIndex && self.state.connectionMode == .local
+        if shouldMonitor, !self.monitoringAuth {
+            self.monitoringAuth = true
+            self.startAuthMonitoring()
+        } else if !shouldMonitor, self.monitoringAuth {
+            self.stopAuthMonitoring()
+        }
+    }
+
+    private func startAuthMonitoring() {
+        self.refreshAnthropicOAuthStatus()
+        self.authMonitorTask?.cancel()
+        self.authMonitorTask = Task {
+            while !Task.isCancelled {
+                await MainActor.run { self.refreshAnthropicOAuthStatus() }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+    }
+
+    private func stopAuthMonitoring() {
+        self.monitoringAuth = false
+        self.authMonitorTask?.cancel()
+        self.authMonitorTask = nil
     }
 
     private func installCLI() async {
