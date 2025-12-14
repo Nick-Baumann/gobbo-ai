@@ -160,12 +160,22 @@ final class MenuContextCardInjector: NSObject, NSMenuDelegate {
     }
 
     private func findInsertIndex(in menu: NSMenu) -> Int? {
-        // Prefer inserting before the "Send Heartbeats" toggle item.
+        // Prefer inserting before the first separator (so the card sits right below the Active toggle).
         if let idx = menu.items.firstIndex(where: { $0.title == "Send Heartbeats" }) {
+            // SwiftUI menus typically include a separator right after the first toggle; insert before it so the
+            // separator appears below the context card.
+            if let sepIdx = menu.items[..<idx].lastIndex(where: { $0.isSeparatorItem }) {
+                return sepIdx
+            }
             return idx
         }
-        // Fallback: insert after the first two rows (active toggle + status).
-        if menu.items.count >= 2 { return 2 }
+
+        if let sepIdx = menu.items.firstIndex(where: { $0.isSeparatorItem }) {
+            return sepIdx
+        }
+
+        // Fallback: insert after the first item.
+        if menu.items.count >= 1 { return 1 }
         return menu.items.count
     }
 
