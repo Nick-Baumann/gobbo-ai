@@ -12,15 +12,15 @@ extension ConnectStatusStore: @unchecked Sendable {}
 struct SettingsTab: View {
     @EnvironmentObject private var appModel: NodeAppModel
     @EnvironmentObject private var voiceWake: VoiceWakeManager
+    @EnvironmentObject private var bridgeController: BridgeConnectionController
     @Environment(\.dismiss) private var dismiss
     @AppStorage("node.displayName") private var displayName: String = "iOS Node"
     @AppStorage("node.instanceId") private var instanceId: String = UUID().uuidString
     @AppStorage("voiceWake.enabled") private var voiceWakeEnabled: Bool = false
+    @AppStorage("camera.enabled") private var cameraEnabled: Bool = true
     @AppStorage("bridge.preferredStableID") private var preferredBridgeStableID: String = ""
-    @StateObject private var discovery = BridgeDiscoveryModel()
     @StateObject private var connectStatus = ConnectStatusStore()
     @State private var connectingBridgeID: String?
-    @State private var didAutoConnect = false
     @State private var localIPAddress: String?
 
     var body: some View {
@@ -58,8 +58,15 @@ struct SettingsTab: View {
                     }
                 }
 
+                Section("Camera") {
+                    Toggle("Allow Camera", isOn: self.$cameraEnabled)
+                    Text("Allows the bridge to request photos or short video clips (foreground only).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Bridge") {
-                    LabeledContent("Discovery", value: self.discovery.statusText)
+                    LabeledContent("Discovery", value: self.bridgeController.discoveryStatusText)
                     LabeledContent("Status", value: self.appModel.bridgeStatusText)
                     if let serverName = self.appModel.bridgeServerName {
                         LabeledContent("Server", value: serverName)
@@ -120,31 +127,12 @@ struct SettingsTab: View {
                 }
             }
             .onAppear {
-                self.discovery.start()
                 self.localIPAddress = Self.primaryIPv4Address()
             }
-            .onDisappear { self.discovery.stop() }
-            .onChange(of: self.discovery.bridges) { _, newValue in
-                if self.didAutoConnect { return }
-                if self.appModel.bridgeServerName != nil { return }
-
-                let existing = KeychainStore.loadString(
-                    service: "com.steipete.clawdis.bridge",
-                    account: self.keychainAccount())
-                guard let existing, !existing.isEmpty else { return }
-                guard let target = self.pickAutoConnectBridge(from: newValue) else { return }
-
-                self.didAutoConnect = true
-                self.preferredBridgeStableID = target.stableID
-                self.appModel.connectToBridge(
-                    endpoint: target.endpoint,
-                    hello: BridgeHello(
-                        nodeId: self.instanceId,
-                        displayName: self.displayName,
-                        token: existing,
-                        platform: self.platformString(),
-                        version: self.appVersion()))
-                self.connectStatus.text = nil
+            .onChange(of: self.preferredBridgeStableID) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                BridgeSettingsStore.savePreferredBridgeStableID(trimmed)
             }
             .onChange(of: self.appModel.bridgeServerName) { _, _ in
                 self.connectStatus.text = nil
@@ -154,12 +142,12 @@ struct SettingsTab: View {
 
     @ViewBuilder
     private func bridgeList(showing: BridgeListMode) -> some View {
-        if self.discovery.bridges.isEmpty {
+        if self.bridgeController.bridges.isEmpty {
             Text("No bridges found yet.")
                 .foregroundStyle(.secondary)
         } else {
             let connectedID = self.appModel.connectedBridgeID
-            let rows = self.discovery.bridges.filter { bridge in
+            let rows = self.bridgeController.bridges.filter { bridge in
                 let isConnected = bridge.stableID == connectedID
                 switch showing {
                 case .all:
@@ -218,6 +206,7 @@ struct SettingsTab: View {
     private func connect(_ bridge: BridgeDiscoveryModel.DiscoveredBridge) async {
         self.connectingBridgeID = bridge.id
         self.preferredBridgeStableID = bridge.stableID
+        BridgeSettingsStore.savePreferredBridgeStableID(bridge.stableID)
         defer { self.connectingBridgeID = nil }
 
         do {
@@ -263,16 +252,6 @@ struct SettingsTab: View {
         } catch {
             self.connectStatus.text = "Failed: \(error.localizedDescription)"
         }
-    }
-
-    private func pickAutoConnectBridge(from bridges: [BridgeDiscoveryModel.DiscoveredBridge]) -> BridgeDiscoveryModel
-    .DiscoveredBridge? {
-        if !self.preferredBridgeStableID.isEmpty,
-           let match = bridges.first(where: { $0.stableID == self.preferredBridgeStableID })
-        {
-            return match
-        }
-        return bridges.first
     }
 
     private static func primaryIPv4Address() -> String? {
