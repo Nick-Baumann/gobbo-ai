@@ -112,33 +112,6 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
-# Android Gradle Plugin requires a supported JDK (typically 17).
-# On macOS, prefer JDK 17 when JAVA_HOME isn't set.
-if [ "$darwin" = "true" ] && [ -z "$JAVA_HOME" ] ; then
-    if [ -x "/usr/libexec/java_home" ] ; then
-        jdk17=$(/usr/libexec/java_home -v 17 2>/dev/null)
-        if [ -n "$jdk17" ] && [ -d "$jdk17" ] ; then
-            JAVA_HOME=$jdk17
-            export JAVA_HOME
-        fi
-    fi
-fi
-
-# If the Android SDK isn't configured, try common default locations.
-if [ -z "$ANDROID_SDK_ROOT" ] ; then
-    if [ -d "$HOME/Library/Android/sdk" ] ; then
-        ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
-        export ANDROID_SDK_ROOT
-    elif [ -d "$HOME/Android/Sdk" ] ; then
-        ANDROID_SDK_ROOT="$HOME/Android/Sdk"
-        export ANDROID_SDK_ROOT
-    fi
-fi
-if [ -z "$ANDROID_HOME" ] && [ -n "$ANDROID_SDK_ROOT" ] ; then
-    ANDROID_HOME="$ANDROID_SDK_ROOT"
-    export ANDROID_HOME
-fi
-
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
 
@@ -227,7 +200,7 @@ fi
 
 
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-DEFAULT_JVM_OPTS='-Dfile.encoding=UTF-8 "-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
 # Collect all arguments for the java command:
 #   * DEFAULT_JVM_OPTS, JAVA_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
