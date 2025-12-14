@@ -80,7 +80,9 @@ actor VoicePushToTalk {
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "voicewake.ptt")
 
     private var recognizer: SFSpeechRecognizer?
-    private var audioEngine = AVAudioEngine()
+    // Lazily created on begin() to avoid creating an AVAudioEngine at app launch, which can switch Bluetooth
+    // headphones into the low-quality headset profile even if push-to-talk is never used.
+    private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var tapInstalled = false
@@ -166,7 +168,7 @@ actor VoicePushToTalk {
         // Stop feeding Speech buffers first, then end the request. Stopping the engine here can race with
         // Speech draining its converter chain (and we already stop/cancel in finalize).
         if self.tapInstalled {
-            self.audioEngine.inputNode.removeTap(onBus: 0)
+            self.audioEngine?.inputNode.removeTap(onBus: 0)
             self.tapInstalled = false
         }
         self.recognitionRequest?.endAudio()
@@ -201,7 +203,13 @@ actor VoicePushToTalk {
         self.recognitionRequest?.shouldReportPartialResults = true
         guard let request = self.recognitionRequest else { return }
 
-        let input = self.audioEngine.inputNode
+        // Lazily create the engine here so app launch doesn't grab audio resources / trigger Bluetooth HFP.
+        if self.audioEngine == nil {
+            self.audioEngine = AVAudioEngine()
+        }
+        guard let audioEngine = self.audioEngine else { return }
+
+        let input = audioEngine.inputNode
         let format = input.outputFormat(forBus: 0)
         if self.tapInstalled {
             input.removeTap(onBus: 0)
@@ -213,8 +221,8 @@ actor VoicePushToTalk {
         }
         self.tapInstalled = true
 
-        self.audioEngine.prepare()
-        try self.audioEngine.start()
+        audioEngine.prepare()
+        try audioEngine.start()
 
         self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self else { return }
@@ -301,13 +309,15 @@ actor VoicePushToTalk {
         self.recognitionRequest = nil
         self.recognitionTask = nil
         if self.tapInstalled {
-            self.audioEngine.inputNode.removeTap(onBus: 0)
+            self.audioEngine?.inputNode.removeTap(onBus: 0)
             self.tapInstalled = false
         }
-        if self.audioEngine.isRunning {
-            self.audioEngine.stop()
-            self.audioEngine.reset()
+        if self.audioEngine?.isRunning == true {
+            self.audioEngine?.stop()
+            self.audioEngine?.reset()
         }
+        // Release the engine so we also release any audio session/resources when push-to-talk ends.
+        self.audioEngine = nil
 
         self.committed = ""
         self.volatile = ""

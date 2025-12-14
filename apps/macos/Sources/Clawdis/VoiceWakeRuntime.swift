@@ -15,7 +15,9 @@ actor VoiceWakeRuntime {
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "voicewake.runtime")
 
     private var recognizer: SFSpeechRecognizer?
-    private var audioEngine = AVAudioEngine()
+    // Lazily created on start to avoid creating an AVAudioEngine at app launch, which can switch Bluetooth
+    // headphones into the low-quality headset profile even if Voice Wake is disabled.
+    private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var recognitionGeneration: Int = 0 // drop stale callbacks after restarts
@@ -54,8 +56,10 @@ actor VoiceWakeRuntime {
         self.recognitionTask = nil
         self.recognitionRequest?.endAudio()
         self.recognitionRequest = nil
-        self.audioEngine.inputNode.removeTap(onBus: 0)
-        self.audioEngine.stop()
+        self.audioEngine?.inputNode.removeTap(onBus: 0)
+        self.audioEngine?.stop()
+        // Release the engine so we also release any audio session/resources when Voice Wake is idle.
+        self.audioEngine = nil
     }
 
     struct RuntimeConfig: Equatable {
@@ -115,7 +119,13 @@ actor VoiceWakeRuntime {
             self.recognitionRequest?.shouldReportPartialResults = true
             guard let request = self.recognitionRequest else { return }
 
-            let input = self.audioEngine.inputNode
+            // Lazily create the engine here so app launch doesn't grab audio resources / trigger Bluetooth HFP.
+            if self.audioEngine == nil {
+                self.audioEngine = AVAudioEngine()
+            }
+            guard let audioEngine = self.audioEngine else { return }
+
+            let input = audioEngine.inputNode
             let format = input.outputFormat(forBus: 0)
             input.removeTap(onBus: 0)
             input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self, weak request] buffer, _ in
@@ -127,8 +137,8 @@ actor VoiceWakeRuntime {
                 }
             }
 
-            self.audioEngine.prepare()
-            try self.audioEngine.start()
+            audioEngine.prepare()
+            try audioEngine.start()
 
             self.currentConfig = config
             self.lastHeard = Date()
@@ -168,8 +178,10 @@ actor VoiceWakeRuntime {
         self.recognitionTask = nil
         self.recognitionRequest?.endAudio()
         self.recognitionRequest = nil
-        self.audioEngine.inputNode.removeTap(onBus: 0)
-        self.audioEngine.stop()
+        self.audioEngine?.inputNode.removeTap(onBus: 0)
+        self.audioEngine?.stop()
+        // Release the engine so we also release any audio session/resources when Voice Wake is disabled/stopped.
+        self.audioEngine = nil
         self.currentConfig = nil
         self.listeningState = .idle
         self.logger.debug("voicewake runtime stopped")
