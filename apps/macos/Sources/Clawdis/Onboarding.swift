@@ -66,8 +66,9 @@ struct OnboardingView: View {
     private let permissionsPageIndex = 3
     private var pageOrder: [Int] {
         if self.state.connectionMode == .remote {
-            // Remote setup doesn't need local gateway/CLI/workspace setup pages.
-            return [0, 1, 3, 6, 7]
+            // Remote setup doesn't need local gateway/CLI/workspace setup pages,
+            // and WhatsApp/Telegram setup is optional.
+            return [0, 1, 3, 7]
         }
         return [0, 1, 2, 3, 4, 5, 6, 7]
     }
