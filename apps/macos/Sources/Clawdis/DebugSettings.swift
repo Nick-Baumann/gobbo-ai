@@ -8,7 +8,6 @@ struct DebugSettings: View {
     @AppStorage(modelCatalogPathKey) private var modelCatalogPath: String = ModelCatalogLoader.defaultPath
     @AppStorage(modelCatalogReloadKey) private var modelCatalogReloadBump: Int = 0
     @AppStorage(iconOverrideKey) private var iconOverrideRaw: String = IconOverrideSelection.system.rawValue
-    @AppStorage(deepLinkAgentEnabledKey) private var deepLinkAgentEnabled: Bool = false
     @State private var modelsCount: Int?
     @State private var modelsLoading = false
     @State private var modelsError: String?
@@ -150,13 +149,6 @@ struct DebugSettings: View {
                                     "to an already-running gateway " +
                                     "and will not start one itself.")
                     }
-                    GridRow {
-                        self.gridLabel("Deep links")
-                        Toggle("", isOn: self.$deepLinkAgentEnabled)
-                            .labelsHidden()
-                            .toggleStyle(.checkbox)
-                            .help("Enables handling of clawdis://agent?... deep links to trigger an agent run.")
-                    }
                 }
 
                 let key = DeepLinkHandler.currentKey()
@@ -185,6 +177,10 @@ struct DebugSettings: View {
                     .buttonStyle(.bordered)
                     Spacer(minLength: 0)
                 }
+
+                Text("Deep links (clawdis://…) are always enabled; the key controls unattended runs.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Stdout / stderr")

@@ -17,12 +17,6 @@ final class DeepLinkHandler {
             deepLinkLogger.debug("ignored url \(url.absoluteString, privacy: .public)")
             return
         }
-        guard UserDefaults.standard.bool(forKey: deepLinkAgentEnabledKey) else {
-            self.presentAlert(
-                title: "Deep links are disabled",
-                message: "Enable “Allow URL scheme (agent)” in Clawdis Debug Settings to accept clawdis:// links.")
-            return
-        }
         guard !AppStateStore.shared.isPaused else {
             self.presentAlert(title: "Clawdis is paused", message: "Unpause Clawdis to run agent actions.")
             return
