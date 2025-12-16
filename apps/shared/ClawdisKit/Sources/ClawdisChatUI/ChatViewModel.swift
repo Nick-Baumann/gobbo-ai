@@ -34,6 +34,10 @@ public final class ClawdisChatViewModel {
         didSet { self.pendingRunCount = self.pendingRuns.count }
     }
 
+    @ObservationIgnored
+    private nonisolated(unsafe) var pendingRunTimeoutTasks: [String: Task<Void, Never>] = [:]
+    private let pendingRunTimeoutMs: UInt64 = 120_000
+
     private var lastHealthPollAt: Date?
 
     public init(sessionKey: String, transport: any ClawdisChatTransport) {
@@ -54,6 +58,9 @@ public final class ClawdisChatViewModel {
 
     deinit {
         self.eventTask?.cancel()
+        for (_, task) in self.pendingRunTimeoutTasks {
+            task.cancel()
+        }
     }
 
     public func load() {
@@ -91,6 +98,7 @@ public final class ClawdisChatViewModel {
         self.isLoading = true
         self.errorText = nil
         self.healthOK = false
+        self.clearPendingRuns(reason: nil)
         defer { self.isLoading = false }
         do {
             do {
@@ -173,6 +181,7 @@ public final class ClawdisChatViewModel {
                 idempotencyKey: runId,
                 attachments: encodedAttachments)
             self.pendingRuns.insert(response.runId)
+            self.armPendingRunTimeout(runId: response.runId)
         } catch {
             self.errorText = error.localizedDescription
             chatUILogger.error("chat.send failed \(error.localizedDescription, privacy: .public)")
@@ -193,6 +202,7 @@ public final class ClawdisChatViewModel {
             self.handleChatEvent(chat)
         case .seqGap:
             self.errorText = "Event stream interrupted; try refreshing."
+            self.clearPendingRuns(reason: nil)
         }
     }
 
@@ -214,15 +224,50 @@ public final class ClawdisChatViewModel {
                 self.messages.append(msg)
             }
             if let runId = chat.runId {
-                self.pendingRuns.remove(runId)
+                self.clearPendingRun(runId)
+            } else if self.pendingRuns.count <= 1 {
+                self.clearPendingRuns(reason: nil)
             }
         case "error":
             self.errorText = chat.errorMessage ?? "Chat failed"
             if let runId = chat.runId {
-                self.pendingRuns.remove(runId)
+                self.clearPendingRun(runId)
+            } else if self.pendingRuns.count <= 1 {
+                self.clearPendingRuns(reason: nil)
             }
         default:
             break
+        }
+    }
+
+    private func armPendingRunTimeout(runId: String) {
+        self.pendingRunTimeoutTasks[runId]?.cancel()
+        self.pendingRunTimeoutTasks[runId] = Task { [weak self] in
+            let timeoutMs = await MainActor.run { self?.pendingRunTimeoutMs ?? 0 }
+            try? await Task.sleep(nanoseconds: timeoutMs * 1_000_000)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                guard self.pendingRuns.contains(runId) else { return }
+                self.clearPendingRun(runId)
+                self.errorText = "Timed out waiting for a reply; try again or refresh."
+            }
+        }
+    }
+
+    private func clearPendingRun(_ runId: String) {
+        self.pendingRuns.remove(runId)
+        self.pendingRunTimeoutTasks[runId]?.cancel()
+        self.pendingRunTimeoutTasks[runId] = nil
+    }
+
+    private func clearPendingRuns(reason: String?) {
+        for runId in self.pendingRuns {
+            self.pendingRunTimeoutTasks[runId]?.cancel()
+        }
+        self.pendingRunTimeoutTasks.removeAll()
+        self.pendingRuns.removeAll()
+        if let reason, !reason.isEmpty {
+            self.errorText = reason
         }
     }
 

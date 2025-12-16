@@ -130,8 +130,14 @@ struct ClawdisChatComposer: View {
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(ClawdisChatTheme.card))
-            .overlay(self.editorOverlay)
-            .frame(maxHeight: 140)
+            .overlay(alignment: .topLeading) {
+                self.editorOverlay
+            }
+            .overlay(alignment: .bottomTrailing) {
+                self.sendButton
+                    .padding(8)
+            }
+            .frame(minHeight: 44, idealHeight: 44, maxHeight: 96)
     }
 
     private var editorOverlay: some View {
@@ -140,16 +146,16 @@ struct ClawdisChatComposer: View {
                 Text("Message Clawd…")
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
             }
 
             #if os(macOS)
             ChatComposerTextView(text: self.$viewModel.input) {
                 self.viewModel.send()
             }
-            .frame(minHeight: 44, maxHeight: 120)
+            .frame(minHeight: 32, idealHeight: 32, maxHeight: 72)
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
             .padding(.trailing, 44)
             #else
             TextEditor(text: self.$viewModel.input)
@@ -159,28 +165,23 @@ struct ClawdisChatComposer: View {
                 .padding(.vertical, 8)
                 .focused(self.$isFocused)
             #endif
+        }
+    }
 
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button {
-                        self.viewModel.send()
-                    } label: {
-                        if self.viewModel.isSending {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.up")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(!self.viewModel.canSend)
-                    .padding(8)
-                }
+    private var sendButton: some View {
+        Button {
+            self.viewModel.send()
+        } label: {
+            if self.viewModel.isSending {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 13, weight: .semibold))
             }
         }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+        .disabled(!self.viewModel.canSend)
     }
 
     #if os(macOS)
@@ -252,7 +253,7 @@ private struct ChatComposerTextView: NSViewRepresentable {
         textView.font = .systemFont(ofSize: 14, weight: .regular)
         textView.textContainer?.lineBreakMode = .byWordWrapping
         textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainerInset = NSSize(width: 2, height: 8)
+        textView.textContainerInset = NSSize(width: 2, height: 6)
         textView.focusRingType = .none
 
         textView.minSize = .zero
