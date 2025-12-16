@@ -1728,6 +1728,84 @@ describe("gateway server", () => {
     await server.close();
   });
 
+  test("chat.history caps large histories and honors limit", async () => {
+    const firstContentText = (msg: unknown): string | undefined => {
+      if (!msg || typeof msg !== "object") return undefined;
+      const content = (msg as { content?: unknown }).content;
+      if (!Array.isArray(content) || content.length === 0) return undefined;
+      const first = content[0];
+      if (!first || typeof first !== "object") return undefined;
+      const text = (first as { text?: unknown }).text;
+      return typeof text === "string" ? text : undefined;
+    };
+
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-gw-"));
+    testSessionStorePath = path.join(dir, "sessions.json");
+    await fs.writeFile(
+      testSessionStorePath,
+      JSON.stringify(
+        {
+          main: {
+            sessionId: "sess-main",
+            updatedAt: Date.now(),
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const lines: string[] = [];
+    for (let i = 0; i < 300; i += 1) {
+      lines.push(
+        JSON.stringify({
+          message: {
+            role: "user",
+            content: [{ type: "text", text: `m${i}` }],
+            timestamp: Date.now() + i,
+          },
+        }),
+      );
+    }
+    await fs.writeFile(
+      path.join(dir, "sess-main.jsonl"),
+      lines.join("\n"),
+      "utf-8",
+    );
+
+    const { server, ws } = await startServerWithClient();
+    await connectOk(ws);
+
+    const defaultRes = await rpcReq<{ messages?: unknown[] }>(
+      ws,
+      "chat.history",
+      {
+        sessionKey: "main",
+      },
+    );
+    expect(defaultRes.ok).toBe(true);
+    const defaultMsgs = defaultRes.payload?.messages ?? [];
+    expect(defaultMsgs.length).toBe(200);
+    expect(firstContentText(defaultMsgs[0])).toBe("m100");
+
+    const limitedRes = await rpcReq<{ messages?: unknown[] }>(
+      ws,
+      "chat.history",
+      {
+        sessionKey: "main",
+        limit: 5,
+      },
+    );
+    expect(limitedRes.ok).toBe(true);
+    const limitedMsgs = limitedRes.payload?.messages ?? [];
+    expect(limitedMsgs.length).toBe(5);
+    expect(firstContentText(limitedMsgs[0])).toBe("m295");
+
+    ws.close();
+    await server.close();
+  });
+
   test("chat.send does not overwrite last delivery route", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-gw-"));
     testSessionStorePath = path.join(dir, "sessions.json");
