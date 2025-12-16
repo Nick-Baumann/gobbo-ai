@@ -54,8 +54,14 @@ function stripRpcNoise(raw: string): string {
       if (type === "message_update") continue;
 
       // Ignore toolcall delta chatter and input buffer append events.
-      if (type === "message_update" && msgType === "toolcall_delta") continue;
+      if (msgType === "toolcall_delta") continue;
       if (type === "input_audio_buffer.append") continue;
+
+      // Preserve agent_end so piSpec.parseOutput can extract the final message set.
+      if (type === "agent_end") {
+        kept.push(line);
+        continue;
+      }
 
       // Keep only assistant/tool messages; drop agent_start/turn_start/user/etc.
       const isAssistant = role === "assistant";
@@ -140,12 +146,21 @@ function extractRpcAssistantText(raw: string): string | undefined {
   return lastAssistant?.trim() || undefined;
 }
 
-function extractAssistantTextLoosely(raw: string): string | undefined {
-  // Fallback: grab the last "text":"..." occurrence from a JSON-ish blob.
-  const matches = [...raw.matchAll(/"text"\s*:\s*"([^"]+?)"/g)];
-  if (!matches.length) return undefined;
-  const last = matches.at(-1)?.[1];
-  return last ? last.replace(/\\n/g, "\n").trim() : undefined;
+function extractNonJsonText(raw: string): string | undefined {
+  const kept: string[] = [];
+  for (const line of raw.split(/\n+/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      JSON.parse(trimmed);
+      // JSON protocol frame → never surface directly.
+      continue;
+    } catch {
+      kept.push(line);
+    }
+  }
+  const text = kept.join("\n").trim();
+  return text ? text : undefined;
 }
 
 type CommandReplyConfig = NonNullable<ClawdisConfig["inbound"]>["reply"] & {
@@ -859,12 +874,10 @@ export async function runCommandReply(
       });
     }
 
-    // If parser gave nothing, fall back to best-effort assistant text (prefers RPC deltas).
-    const fallbackText =
-      rpcAssistantText ??
-      extractRpcAssistantText(trimmed) ??
-      extractAssistantTextLoosely(trimmed) ??
-      trimmed;
+    // If parser gave nothing, fall back to best-effort assistant text (from RPC deltas),
+    // or any non-JSON stdout the child may have emitted (e.g. MEDIA tokens).
+    // Never fall back to raw stdout JSON protocol frames.
+    const fallbackText = rpcAssistantText ?? extractNonJsonText(rawStdout);
     const normalize = (s?: string) =>
       stripStructuralPrefixes((s ?? "").trim()).toLowerCase();
     const bodyNorm = normalize(
@@ -1030,8 +1043,7 @@ export async function runCommandReply(
         `${timeoutSeconds}s${resolvedCwd ? ` (cwd: ${resolvedCwd})` : ""}. Try a shorter prompt or split the request.`;
       const partial =
         extractRpcAssistantText(errorObj.stdout ?? "") ||
-        extractAssistantTextLoosely(errorObj.stdout ?? "") ||
-        stripRpcNoise(errorObj.stdout ?? "");
+        extractNonJsonText(errorObj.stdout ?? "");
       const partialSnippet =
         partial && partial.length > 800
           ? `${partial.slice(0, 800)}...`

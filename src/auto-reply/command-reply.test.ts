@@ -378,6 +378,74 @@ describe("runCommandReply (pi)", () => {
     expect(payloads?.[0]?.text).toBe("Acknowledged.");
   });
 
+  it("parses assistant text from agent_end messages", async () => {
+    mockPiRpc({
+      stdout: JSON.stringify({
+        type: "agent_end",
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "from agent_end" }],
+            model: "pi-1",
+            provider: "inflection",
+            usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, total: 2 },
+            stopReason: "stop",
+          },
+        ],
+      }),
+      stderr: "",
+      code: 0,
+    });
+
+    const { payloads } = await runCommandReply({
+      reply: {
+        mode: "command",
+        command: ["pi", "{{Body}}"],
+        agent: { kind: "pi" },
+      },
+      templatingCtx: noopTemplateCtx,
+      sendSystemOnce: false,
+      isNewSession: true,
+      isFirstTurnInSession: true,
+      systemSent: false,
+      timeoutMs: 1000,
+      timeoutSeconds: 1,
+      enqueue: enqueueImmediate,
+    });
+
+    expect(payloads?.[0]?.text).toBe("from agent_end");
+  });
+
+  it("does not leak JSON protocol frames when assistant emits no text", async () => {
+    mockPiRpc({
+      stdout: [
+        '{"type":"message_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm"}],"usage":{"input":10,"output":5}}}',
+      ].join("\n"),
+      stderr: "",
+      code: 0,
+    });
+
+    const { payloads } = await runCommandReply({
+      reply: {
+        mode: "command",
+        command: ["pi", "{{Body}}"],
+        agent: { kind: "pi" },
+      },
+      templatingCtx: noopTemplateCtx,
+      sendSystemOnce: false,
+      isNewSession: true,
+      isFirstTurnInSession: true,
+      systemSent: false,
+      timeoutMs: 1000,
+      timeoutSeconds: 1,
+      enqueue: enqueueImmediate,
+    });
+
+    expect(payloads?.[0]?.text).toMatch(/produced no output/i);
+    expect(payloads?.[0]?.text).not.toContain("message_end");
+    expect(payloads?.[0]?.text).not.toContain("\"type\"");
+  });
+
   it("does not stream tool results when verbose is off", async () => {
     const onPartial = vi.fn();
     mockPiRpc({
