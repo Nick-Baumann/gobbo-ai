@@ -46,6 +46,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val instanceId by viewModel.instanceId.collectAsState()
   val displayName by viewModel.displayName.collectAsState()
   val cameraEnabled by viewModel.cameraEnabled.collectAsState()
+  val preventSleep by viewModel.preventSleep.collectAsState()
   val wakeWords by viewModel.wakeWords.collectAsState()
   val isConnected by viewModel.isConnected.collectAsState()
   val manualEnabled by viewModel.manualEnabled.collectAsState()
@@ -152,6 +153,17 @@ fun SettingsSheet(viewModel: MainViewModel) {
       }
     }
     item { Text("Tip: grant Microphone permission for video clips with audio.") }
+
+    item { HorizontalDivider() }
+
+    item { Text("Screen") }
+    item {
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Switch(checked = preventSleep, onCheckedChange = viewModel::setPreventSleep)
+        Text(if (preventSleep) "Prevent Sleep" else "Allow Sleep")
+      }
+    }
+    item { Text("Keeps the screen awake while Clawdis is open.") }
 
     item { HorizontalDivider() }
 

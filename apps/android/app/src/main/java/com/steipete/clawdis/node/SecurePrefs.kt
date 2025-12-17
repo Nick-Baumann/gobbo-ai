@@ -41,6 +41,9 @@ class SecurePrefs(context: Context) {
   private val _cameraEnabled = MutableStateFlow(prefs.getBoolean("camera.enabled", true))
   val cameraEnabled: StateFlow<Boolean> = _cameraEnabled
 
+  private val _preventSleep = MutableStateFlow(prefs.getBoolean("screen.preventSleep", true))
+  val preventSleep: StateFlow<Boolean> = _preventSleep
+
   private val _manualEnabled = MutableStateFlow(prefs.getBoolean("bridge.manual.enabled", false))
   val manualEnabled: StateFlow<Boolean> = _manualEnabled
 
@@ -72,6 +75,11 @@ class SecurePrefs(context: Context) {
   fun setCameraEnabled(value: Boolean) {
     prefs.edit().putBoolean("camera.enabled", value).apply()
     _cameraEnabled.value = value
+  }
+
+  fun setPreventSleep(value: Boolean) {
+    prefs.edit().putBoolean("screen.preventSleep", value).apply()
+    _preventSleep.value = value
   }
 
   fun setManualEnabled(value: Boolean) {

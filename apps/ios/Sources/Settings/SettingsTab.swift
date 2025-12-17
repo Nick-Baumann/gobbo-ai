@@ -21,6 +21,7 @@ struct SettingsTab: View {
     @AppStorage("node.instanceId") private var instanceId: String = UUID().uuidString
     @AppStorage("voiceWake.enabled") private var voiceWakeEnabled: Bool = false
     @AppStorage("camera.enabled") private var cameraEnabled: Bool = true
+    @AppStorage("screen.preventSleep") private var preventSleep: Bool = true
     @AppStorage("bridge.preferredStableID") private var preferredBridgeStableID: String = ""
     @AppStorage("bridge.lastDiscoveredStableID") private var lastDiscoveredBridgeStableID: String = ""
     @AppStorage("bridge.manual.enabled") private var manualBridgeEnabled: Bool = false
@@ -69,6 +70,13 @@ struct SettingsTab: View {
                 Section("Camera") {
                     Toggle("Allow Camera", isOn: self.$cameraEnabled)
                     Text("Allows the bridge to request photos or short video clips (foreground only).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Screen") {
+                    Toggle("Prevent Sleep", isOn: self.$preventSleep)
+                    Text("Keeps the screen awake while Clawdis is open.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

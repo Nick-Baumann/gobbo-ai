@@ -78,6 +78,7 @@ class NodeRuntime(context: Context) {
   val instanceId: StateFlow<String> = prefs.instanceId
   val displayName: StateFlow<String> = prefs.displayName
   val cameraEnabled: StateFlow<Boolean> = prefs.cameraEnabled
+  val preventSleep: StateFlow<Boolean> = prefs.preventSleep
   val wakeWords: StateFlow<List<String>> = prefs.wakeWords
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
@@ -143,6 +144,10 @@ class NodeRuntime(context: Context) {
 
   fun setCameraEnabled(value: Boolean) {
     prefs.setCameraEnabled(value)
+  }
+
+  fun setPreventSleep(value: Boolean) {
+    prefs.setPreventSleep(value)
   }
 
   fun setManualEnabled(value: Boolean) {

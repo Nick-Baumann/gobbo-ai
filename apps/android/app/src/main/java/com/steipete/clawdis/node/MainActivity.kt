@@ -3,6 +3,7 @@ package com.steipete.clawdis.node
 import android.Manifest
 import android.os.Bundle
 import android.os.Build
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -10,7 +11,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.steipete.clawdis.node.ui.RootScreen
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels()
@@ -21,6 +26,19 @@ class MainActivity : ComponentActivity() {
     requestNotificationPermissionIfNeeded()
     NodeForegroundService.start(this)
     viewModel.camera.attachLifecycleOwner(this)
+
+    lifecycleScope.launch {
+      repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewModel.preventSleep.collect { enabled ->
+          if (enabled) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+          } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+          }
+        }
+      }
+    }
+
     setContent {
       MaterialTheme {
         Surface(modifier = Modifier) {

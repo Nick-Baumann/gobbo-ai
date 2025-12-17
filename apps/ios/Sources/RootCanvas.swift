@@ -1,9 +1,12 @@
 import SwiftUI
+import UIKit
 
 struct RootCanvas: View {
     @Environment(NodeAppModel.self) private var appModel
     @Environment(VoiceWakeManager.self) private var voiceWake
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(VoiceWakePreferences.enabledKey) private var voiceWakeEnabled: Bool = false
+    @AppStorage("screen.preventSleep") private var preventSleep: Bool = true
     @State private var presentedSheet: PresentedSheet?
     @State private var voiceWakeToastText: String?
     @State private var toastDismissTask: Task<Void, Never>?
@@ -63,6 +66,9 @@ struct RootCanvas: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { self.updateIdleTimer() }
+        .onChange(of: self.preventSleep) { _, _ in self.updateIdleTimer() }
+        .onChange(of: self.scenePhase) { _, _ in self.updateIdleTimer() }
         .onChange(of: self.voiceWake.lastTriggeredCommand) { _, newValue in
             guard let newValue else { return }
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -83,6 +89,7 @@ struct RootCanvas: View {
             }
         }
         .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
             self.toastDismissTask?.cancel()
             self.toastDismissTask = nil
         }
@@ -103,6 +110,10 @@ struct RootCanvas: View {
         }
 
         return .disconnected
+    }
+
+    private func updateIdleTimer() {
+        UIApplication.shared.isIdleTimerDisabled = (self.scenePhase == .active && self.preventSleep)
     }
 }
 
