@@ -41,6 +41,7 @@
 - Also read the shared guardrails at `~/Projects/oracle/AGENTS.md` and `~/Projects/agent-scripts/AGENTS.MD` before making changes; align with any cross-repo rules noted there.
 - SwiftUI state management (iOS/macOS): prefer the `Observation` framework (`@Observable`, `@Bindable`) over `ObservableObject`/`@StateObject`; don’t introduce new `ObservableObject` unless required for compatibility, and migrate existing usages when touching related code.
 - **Multi-agent safety:** do **not** create/apply/drop `git stash` entries unless Peter explicitly asks. Assume other agents may be working; keep unrelated WIP untouched and avoid cross-cutting state changes.
+- **Multi-agent safety:** do **not** switch branches / check out a different branch unless Peter explicitly asks.
 - When asked to open a “session” file, open the Pi session logs under `~/.clawdis/sessions/*.jsonl` (newest unless a specific ID is given), not the default `sessions.json`.
 - Menubar dimming + restart flow mirrors Trimmy: use `scripts/restart-mac.sh` (kills all Clawdis variants, runs `swift build`, packages, relaunches). Icon dimming depends on MenuBarExtraAccess wiring in AppMain; keep `appearsDisabled` updates intact when touching the status item.
 - Never send streaming/partial replies to external messaging surfaces (WhatsApp, Telegram); only final replies should be delivered there. Streaming/tool events may still go to internal UIs/control channel.
