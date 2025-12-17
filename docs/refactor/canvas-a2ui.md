@@ -12,7 +12,16 @@
 
 ## Fixes (2025-12-17)
 - Close button: render a small vibrancy/material pill behind the “x” and reduce the button size for less visual weight.
-- Click reliability: `GatewayConnection` auto-starts the local gateway (and retries briefly) when a request fails in `.local` mode, so Canvas actions don’t silently fail if the gateway isn’t running yet.
+- Click reliability:
+  - Allow A2UI clicks from any local Canvas path (not just `/` or the built-in A2UI shell).
+  - Inject an A2UI → native bridge at document start that listens for `a2uiaction` and forwards it:
+    - Prefer `WKScriptMessageHandler` when available.
+    - Otherwise fall back to an unattended `clawdis://agent?...&key=...` deep link (no prompt).
+  - Intercept `clawdis://…` navigations inside the Canvas WKWebView and route them through `DeepLinkHandler` (no NSWorkspace bounce).
+  - `GatewayConnection` auto-starts the local gateway (and retries briefly) when a request fails in `.local` mode, so Canvas actions don’t silently fail if the gateway isn’t running yet.
+  - Fix a crash that made `clawdis-mac canvas show`/`eval` look “hung”:
+    - `VoicePushToTalkHotkey`’s NSEvent monitor could call `@MainActor` code off-main, triggering executor checks / EXC_BAD_ACCESS on macOS 26.2.
+    - Now it hops back to the main actor before mutating state.
 
 ## Follow-ups
 - Add a small “action sent / failed” debug overlay in the A2UI shell (dev-only) to make failures obvious.

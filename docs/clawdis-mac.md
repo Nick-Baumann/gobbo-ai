@@ -108,15 +108,15 @@ open 'clawdis://agent?message=Hello%20from%20deep%20link'
 Query parameters:
 - `message` (required): the agent prompt (URL-encoded).
 - `sessionKey` (optional): explicit session key to use.
-- `thinking` (optional): `off|minimal|low|medium|high` (or omit for default).
+- `thinking` (optional): thinking hint (e.g. `low`; omit for default).
 - `deliver` (optional): `true|false` (default: false).
 - `to` / `channel` (optional): forwarded to the Gateway `agent` method (only meaningful with `deliver=true`).
 - `timeoutSeconds` (optional): timeout hint forwarded to the Gateway.
 - `key` (optional): unattended mode key (see below).
 
 Safety/guardrails:
-- Disabled by default; enable in **Clawdis → Settings → Debug** (“Allow URL scheme (agent)”).
-- Without `key`, Clawdis prompts with a confirmation dialog before invoking the agent.
+- Always enabled.
+- Without a `key` query param, the app will prompt for confirmation before invoking the agent.
 - With `key=<value>`, Clawdis runs without prompting (intended for personal automations).
   - The current key is shown in Debug Settings and stored locally in UserDefaults.
 

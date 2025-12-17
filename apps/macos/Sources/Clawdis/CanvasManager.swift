@@ -1,10 +1,13 @@
 import AppKit
 import ClawdisIPC
 import Foundation
+import OSLog
 
 @MainActor
 final class CanvasManager {
     static let shared = CanvasManager()
+
+    private static let logger = Logger(subsystem: "com.steipete.clawdis", category: "CanvasManager")
 
     private var panelController: CanvasWindowController?
     private var panelSessionKey: String?
@@ -24,6 +27,8 @@ final class CanvasManager {
     }
 
     func showDetailed(sessionKey: String, target: String? = nil, placement: CanvasPlacement? = nil) throws -> CanvasShowResult {
+        Self.logger.debug(
+            "showDetailed start session=\(sessionKey, privacy: .public) target=\(target ?? "", privacy: .public) placement=\(placement != nil)")
         let anchorProvider = self.defaultAnchorProvider ?? Self.mouseAnchorProvider
         let session = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedTarget = target?
@@ -31,6 +36,7 @@ final class CanvasManager {
             .nonEmpty
 
         if let controller = self.panelController, self.panelSessionKey == session {
+            Self.logger.debug("showDetailed reuse existing session=\(session, privacy: .public)")
             controller.onVisibilityChanged = { [weak self] visible in
                 self?.onPanelVisibilityChanged?(visible)
             }
@@ -54,15 +60,19 @@ final class CanvasManager {
                 url: nil)
         }
 
+        Self.logger.debug("showDetailed creating new session=\(session, privacy: .public)")
         self.panelController?.close()
         self.panelController = nil
         self.panelSessionKey = nil
 
+        Self.logger.debug("showDetailed ensure canvas root dir")
         try FileManager.default.createDirectory(at: Self.canvasRoot, withIntermediateDirectories: true)
+        Self.logger.debug("showDetailed init CanvasWindowController")
         let controller = try CanvasWindowController(
             sessionKey: session,
             root: Self.canvasRoot,
             presentation: .panel(anchorProvider: anchorProvider))
+        Self.logger.debug("showDetailed CanvasWindowController init done")
         controller.onVisibilityChanged = { [weak self] visible in
             self?.onPanelVisibilityChanged?(visible)
         }
@@ -72,7 +82,9 @@ final class CanvasManager {
 
         // New session: default to "/" so the user sees either the welcome page or `index.html`.
         let effectiveTarget = normalizedTarget ?? "/"
+        Self.logger.debug("showDetailed showCanvas effectiveTarget=\(effectiveTarget, privacy: .public)")
         controller.showCanvas(path: effectiveTarget)
+        Self.logger.debug("showDetailed showCanvas done")
 
         return self.makeShowResult(
             directory: controller.directoryPath,

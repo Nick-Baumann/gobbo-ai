@@ -113,9 +113,7 @@ enum ControlRequestHandler {
                 priority: request.priority)
             return ok ? Response(ok: true) : Response(ok: false, message: "notification not authorized")
         case .overlay:
-            await MainActor.run {
-                NotifyOverlayController.shared.present(title: request.title, body: request.body)
-            }
+            await NotifyOverlayController.shared.present(title: request.title, body: request.body)
             return Response(ok: true)
         case .auto:
             let ok = await notifier.send(
@@ -124,9 +122,7 @@ enum ControlRequestHandler {
                 sound: chosenSound,
                 priority: request.priority)
             if ok { return Response(ok: true) }
-            await MainActor.run {
-                NotifyOverlayController.shared.present(title: request.title, body: request.body)
-            }
+            await NotifyOverlayController.shared.present(title: request.title, body: request.body)
             return Response(ok: true, message: "notification not authorized; used overlay")
         }
     }
@@ -194,28 +190,36 @@ enum ControlRequestHandler {
         placement: CanvasPlacement?) async -> Response
     {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
+        let logger = Logger(subsystem: "com.steipete.clawdis", category: "CanvasControl")
+        logger.info("canvas show start session=\(session, privacy: .public) path=\(path ?? "", privacy: .public)")
         do {
-            let res = try await MainActor.run {
-                try CanvasManager.shared.showDetailed(sessionKey: session, target: path, placement: placement)
-            }
+            logger.info("canvas show awaiting CanvasManager")
+            let res = try await CanvasManager.shared.showDetailed(sessionKey: session, target: path, placement: placement)
+            logger.info("canvas show done dir=\(res.directory, privacy: .public) status=\(String(describing: res.status), privacy: .public)")
             let payload = try? JSONEncoder().encode(res)
             return Response(ok: true, message: res.directory, payload: payload)
         } catch {
+            logger.error("canvas show failed \(error.localizedDescription, privacy: .public)")
             return Response(ok: false, message: error.localizedDescription)
         }
     }
 
     private static func handleCanvasHide(session: String) async -> Response {
-        await MainActor.run { CanvasManager.shared.hide(sessionKey: session) }
+        await CanvasManager.shared.hide(sessionKey: session)
         return Response(ok: true)
     }
 
     private static func handleCanvasEval(session: String, javaScript: String) async -> Response {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
+        let logger = Logger(subsystem: "com.steipete.clawdis", category: "CanvasControl")
+        logger.info("canvas eval start session=\(session, privacy: .public) bytes=\(javaScript.utf8.count)")
         do {
+            logger.info("canvas eval awaiting CanvasManager.eval")
             let result = try await CanvasManager.shared.eval(sessionKey: session, javaScript: javaScript)
+            logger.info("canvas eval done bytes=\(result.utf8.count)")
             return Response(ok: true, payload: Data(result.utf8))
         } catch {
+            logger.error("canvas eval failed \(error.localizedDescription, privacy: .public)")
             return Response(ok: false, message: error.localizedDescription)
         }
     }
@@ -234,16 +238,12 @@ enum ControlRequestHandler {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
         do {
             // Ensure the Canvas is visible without forcing a navigation/reload.
-            _ = try await MainActor.run {
-                try CanvasManager.shared.show(sessionKey: session, path: nil)
-            }
+            _ = try await CanvasManager.shared.show(sessionKey: session, path: nil)
 
             // Wait for the in-page A2UI bridge. If it doesn't appear, force-load the bundled A2UI shell once.
             var ready = await Self.waitForCanvasA2UI(session: session, requireBuiltinPath: false, timeoutMs: 2_000)
             if !ready {
-                _ = try await MainActor.run {
-                    try CanvasManager.shared.show(sessionKey: session, path: "/__clawdis__/a2ui/")
-                }
+                _ = try await CanvasManager.shared.show(sessionKey: session, path: "/__clawdis__/a2ui/")
                 ready = await Self.waitForCanvasA2UI(session: session, requireBuiltinPath: true, timeoutMs: 5_000)
             }
 
