@@ -130,14 +130,14 @@ struct ClawdisChatComposer: View {
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(ClawdisChatTheme.card))
-            .overlay(alignment: .topLeading) {
-                self.editorOverlay
-            }
-            .overlay(alignment: .bottom) {
-                HStack(alignment: .bottom, spacing: 8) {
-                    self.connectionPill
-                    Spacer(minLength: 0)
-                    self.sendButton
+            .overlay {
+                VStack(alignment: .leading, spacing: 6) {
+                    self.editorOverlay
+                    HStack(alignment: .bottom, spacing: 8) {
+                        self.connectionPill
+                        Spacer(minLength: 0)
+                        self.sendButton
+                    }
                 }
                 .padding(8)
             }
@@ -163,29 +163,26 @@ struct ClawdisChatComposer: View {
 
     private var editorOverlay: some View {
         ZStack(alignment: .topLeading) {
-                if self.viewModel.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Message Clawd…")
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                }
+            if self.viewModel.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Message Clawd…")
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 5)
+            }
 
             #if os(macOS)
             ChatComposerTextView(text: self.$viewModel.input) {
                 self.viewModel.send()
             }
             .frame(minHeight: 32, idealHeight: 32, maxHeight: 72)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .padding(.trailing, 44)
-            .padding(.bottom, 28)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
             #else
             TextEditor(text: self.$viewModel.input)
                 .font(.system(size: 15))
                 .scrollContentBackground(.hidden)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-                .padding(.bottom, 28)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 6)
                 .focused(self.$isFocused)
             #endif
         }

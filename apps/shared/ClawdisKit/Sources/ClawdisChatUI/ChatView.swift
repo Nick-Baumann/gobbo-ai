@@ -7,6 +7,24 @@ public struct ClawdisChatView: View {
     @State private var showSessions = false
     private let showsSessionSwitcher: Bool
 
+    private enum Layout {
+        #if os(macOS)
+        static let outerPadding: CGFloat = 2
+        static let stackSpacing: CGFloat = 3
+        static let messageSpacing: CGFloat = 8
+        static let messageListPaddingTop: CGFloat = 0
+        static let messageListPaddingBottom: CGFloat = 2
+        static let messageListPaddingHorizontal: CGFloat = 4
+        #else
+        static let outerPadding: CGFloat = 6
+        static let stackSpacing: CGFloat = 6
+        static let messageSpacing: CGFloat = 12
+        static let messageListPaddingTop: CGFloat = 4
+        static let messageListPaddingBottom: CGFloat = 6
+        static let messageListPaddingHorizontal: CGFloat = 8
+        #endif
+    }
+
     public init(viewModel: ClawdisChatViewModel, showsSessionSwitcher: Bool = false) {
         self._viewModel = State(initialValue: viewModel)
         self.showsSessionSwitcher = showsSessionSwitcher
@@ -17,12 +35,12 @@ public struct ClawdisChatView: View {
             ClawdisChatTheme.surface
                 .ignoresSafeArea()
 
-            VStack(spacing: 6) {
+            VStack(spacing: Layout.stackSpacing) {
                 self.messageList
                 ClawdisChatComposer(viewModel: self.viewModel)
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Layout.outerPadding)
+            .padding(.vertical, Layout.outerPadding)
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -39,7 +57,7 @@ public struct ClawdisChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: Layout.messageSpacing) {
                     ForEach(self.viewModel.messages) { msg in
                         ChatMessageBubble(message: msg)
                             .frame(
@@ -66,9 +84,9 @@ public struct ClawdisChatView: View {
                         .frame(height: 1)
                         .id(self.scrollerBottomID)
                 }
-                .padding(.top, 4)
-                .padding(.bottom, 6)
-                .padding(.horizontal, 8)
+                .padding(.top, Layout.messageListPaddingTop)
+                .padding(.bottom, Layout.messageListPaddingBottom)
+                .padding(.horizontal, Layout.messageListPaddingHorizontal)
             }
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
