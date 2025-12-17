@@ -147,6 +147,13 @@ struct ToolsSettings: View {
             method: .go(module: "github.com/steipete/sonoscli/cmd/sonos@latest", binary: "sonos"),
             kind: .tool),
         ToolEntry(
+            id: "blucli",
+            name: "🫐 blucli",
+            url: URL(string: "https://github.com/steipete/blucli")!,
+            description: "Play, group, and automate BluOS players from scripts.",
+            method: .go(module: "github.com/steipete/blucli/cmd/blu@latest", binary: "blu"),
+            kind: .tool),
+        ToolEntry(
             id: "sag",
             name: "🗣️ sag",
             url: URL(string: "https://github.com/steipete/sag")!,

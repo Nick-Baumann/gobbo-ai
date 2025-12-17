@@ -66,6 +66,7 @@ git commit -m "Add Clawd workspace"
 - **spotify-player** — Terminal Spotify client to search/queue/control playback.
 - **sag** — ElevenLabs speech with mac-style say UX; streams to speakers by default.
 - **Sonos CLI** — Control Sonos speakers (discover/status/playback/volume/grouping) from scripts.
+- **blucli** — Play, group, and automate BluOS players from scripts.
 - **OpenHue CLI** — Philips Hue lighting control for scenes and automations.
 - **OpenAI Whisper** — Local speech-to-text for quick dictation and voicemail transcripts.
 - **Gemini CLI** — Google Gemini models from the terminal for fast Q&A.
