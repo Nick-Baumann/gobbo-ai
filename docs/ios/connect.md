@@ -34,6 +34,11 @@ pnpm clawdis gateway --port 18789 --verbose
 Confirm in logs you see something like:
 - `bridge listening on tcp://0.0.0.0:18790 (Iris)`
 
+For tailnet-only setups (recommended for Vienna ⇄ London), bind the bridge to the gateway machine’s Tailscale IP instead:
+
+- Set `CLAWDIS_BRIDGE_HOST=<TAILNET_IPV4>` on the gateway host.
+- Restart the Gateway / macOS menubar app.
+
 ## 2) Verify Bonjour discovery (optional but recommended)
 
 From the gateway machine:

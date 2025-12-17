@@ -29,6 +29,11 @@ brew install coredns
 sudo mkdir -p /opt/homebrew/etc/coredns
 sudo tee /opt/homebrew/etc/coredns/Corefile >/dev/null <<'EOF'
 clawdis.internal:53 {
+    # Security: bind only to tailnet IPs so this DNS server is *not* reachable
+    # via LAN/Wi‑Fi/public interfaces.
+    #
+    # Replace `<TAILNET_IPV4>` / `<TAILNET_IPV6>` with this machine’s Tailscale IPs.
+    bind <TAILNET_IPV4> <TAILNET_IPV6>
     log
     errors
     file /opt/homebrew/etc/coredns/clawdis.internal.db
@@ -76,6 +81,17 @@ In the Tailscale admin console:
 - Add split DNS so the domain `clawdis.internal` uses that nameserver.
 
 Once clients accept tailnet DNS, Iris can browse `_clawdis-bridge._tcp` in `clawdis.internal.` without multicast.
+
+### Bridge listener security (recommended)
+
+The bridge port (default `18790`) is a plain TCP service. By default it binds to `0.0.0.0`, which makes it reachable from *any* interface on the gateway machine (LAN/Wi‑Fi/Tailscale).
+
+For a tailnet-only setup, bind it to the Tailscale IP instead:
+
+- Set `CLAWDIS_BRIDGE_HOST=<TAILNET_IPV4>` on the gateway host.
+- Restart the Gateway (or restart the macOS menubar app via `./scripts/restart-mac.sh` on that machine).
+
+This keeps the bridge reachable only from devices on your tailnet (unless you intentionally expose it some other way).
 
 ## What advertises
 
