@@ -234,12 +234,20 @@ enum ControlRequestHandler {
     private static func handleCanvasA2UI(session: String, command: CanvasA2UICommand, jsonl: String?) async -> Response {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
         do {
-            // Ensure the Canvas is visible and the default page is loaded.
+            // Ensure the Canvas is visible without forcing a navigation/reload.
             _ = try await MainActor.run {
-                try CanvasManager.shared.show(sessionKey: session, path: "/")
+                try CanvasManager.shared.show(sessionKey: session, path: nil)
             }
 
-            let ready = await Self.waitForCanvasA2UI(session: session, timeoutMs: 2_000)
+            // Wait for the in-page A2UI bridge. If it doesn't appear, force-load the bundled A2UI shell once.
+            var ready = await Self.waitForCanvasA2UI(session: session, requireBuiltinPath: false, timeoutMs: 2_000)
+            if !ready {
+                _ = try await MainActor.run {
+                    try CanvasManager.shared.show(sessionKey: session, path: "/__clawdis__/a2ui/")
+                }
+                ready = await Self.waitForCanvasA2UI(session: session, requireBuiltinPath: true, timeoutMs: 5_000)
+            }
+
             guard ready else { return Response(ok: false, message: "A2UI not ready") }
 
             let js: String
@@ -354,14 +362,29 @@ enum ControlRequestHandler {
         }
     }
 
-    private static func waitForCanvasA2UI(session: String, timeoutMs: Int) async -> Bool {
+    private static func waitForCanvasA2UI(session: String, requireBuiltinPath: Bool, timeoutMs: Int) async -> Bool {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .milliseconds(timeoutMs))
         while clock.now < deadline {
             do {
                 let res = try await CanvasManager.shared.eval(
                     sessionKey: session,
-                    javaScript: "(() => globalThis.clawdisA2UI ? 'ready' : '')()")
+                    javaScript: """
+                    (() => {
+                      try {
+                        if (document?.readyState !== 'complete') { return ''; }
+                        if (!globalThis.clawdisA2UI) { return ''; }
+                        if (typeof globalThis.clawdisA2UI.applyMessages !== 'function') { return ''; }
+                        if (\(requireBuiltinPath ? "true" : "false")) {
+                          const p = String(location?.pathname ?? '');
+                          if (!p.startsWith('/__clawdis__/a2ui')) { return ''; }
+                        }
+                        return 'ready';
+                      } catch {
+                        return '';
+                      }
+                    })()
+                    """)
                 if res == "ready" { return true }
             } catch {
                 // Ignore; keep waiting.

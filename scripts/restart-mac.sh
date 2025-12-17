@@ -54,6 +54,8 @@ stop_launch_agent
 
 # 1.5) Bundle web chat assets (single-file JS to avoid import-map issues).
 run_step "bundle webchat" bash -lc "cd '${ROOT_DIR}' && pnpm webchat:bundle"
+# Bundle built-in Canvas A2UI shell (single-file JS, shipped in the app bundle).
+run_step "bundle canvas a2ui" bash -lc "cd '${ROOT_DIR}' && pnpm canvas:a2ui:bundle"
 
 # 2) Rebuild into the same path the packager consumes (.build).
 run_step "clean build cache" bash -lc "cd '${ROOT_DIR}/apps/macos' && rm -rf .build .build-swift .swiftpm 2>/dev/null || true"

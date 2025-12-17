@@ -159,12 +159,14 @@ class ClawdisA2UIHost extends LitElement {
     }
     this.#processor.processMessages(messages);
     this.#syncSurfaces();
+    this.requestUpdate();
     return { ok: true, surfaces: this.surfaces.map(([id]) => id) };
   }
 
   reset() {
     this.#processor.clearSurfaces();
     this.#syncSurfaces();
+    this.requestUpdate();
     return { ok: true };
   }
 

@@ -64,11 +64,29 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
         self.webView = WKWebView(frame: .zero, configuration: config)
         self.webView.setValue(false, forKey: "drawsBackground")
 
-        self.watcher = CanvasFileWatcher(url: self.sessionDir) { [weak webView] in
+        let sessionDir = self.sessionDir
+        let webView = self.webView
+        self.watcher = CanvasFileWatcher(url: sessionDir) { [weak webView] in
             Task { @MainActor in
+                guard let webView else { return }
+
                 // Only auto-reload when we are showing local canvas content.
-                guard webView?.url?.scheme == CanvasScheme.scheme else { return }
-                webView?.reload()
+                guard webView.url?.scheme == CanvasScheme.scheme else { return }
+
+                // Avoid reloading the built-in A2UI shell due to filesystem noise (it does not depend on session files).
+                let path = webView.url?.path ?? ""
+                if path.hasPrefix("/__clawdis__/a2ui") { return }
+                if path == "/" || path.isEmpty {
+                    let indexA = sessionDir.appendingPathComponent("index.html", isDirectory: false)
+                    let indexB = sessionDir.appendingPathComponent("index.htm", isDirectory: false)
+                    if !FileManager.default.fileExists(atPath: indexA.path),
+                       !FileManager.default.fileExists(atPath: indexB.path)
+                    {
+                        return
+                    }
+                }
+
+                webView.reload()
             }
         }
 
