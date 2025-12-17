@@ -55,6 +55,47 @@ public struct CanvasPlacement: Codable, Sendable {
     }
 }
 
+// MARK: - Canvas show result
+
+public enum CanvasShowStatus: String, Codable, Sendable {
+    /// Panel was shown, but no navigation occurred (no target passed and session already existed).
+    case shown
+    /// Target was an http(s) URL.
+    case web
+    /// Local canvas target resolved to an existing file.
+    case ok
+    /// Local canvas target did not resolve to a file (404 page).
+    case notFound
+    /// Local canvas root ("/") has no index, so the welcome page is shown.
+    case welcome
+}
+
+public struct CanvasShowResult: Codable, Sendable {
+    /// Session directory on disk (e.g. `~/Library/Application Support/Clawdis/canvas/<session>/`).
+    public var directory: String
+    /// Target as provided by the caller (may be nil/empty).
+    public var target: String?
+    /// Target actually navigated to (nil when no navigation occurred; defaults to "/" for a newly created session).
+    public var effectiveTarget: String?
+    public var status: CanvasShowStatus
+    /// URL that was loaded (nil when no navigation occurred).
+    public var url: String?
+
+    public init(
+        directory: String,
+        target: String?,
+        effectiveTarget: String?,
+        status: CanvasShowStatus,
+        url: String?)
+    {
+        self.directory = directory
+        self.target = target
+        self.effectiveTarget = effectiveTarget
+        self.status = status
+        self.url = url
+    }
+}
+
 public enum Request: Sendable {
     case notify(
         title: String,
@@ -74,7 +115,6 @@ public enum Request: Sendable {
     case rpcStatus
     case canvasShow(session: String, path: String?, placement: CanvasPlacement?)
     case canvasHide(session: String)
-    case canvasGoto(session: String, path: String, placement: CanvasPlacement?)
     case canvasEval(session: String, javaScript: String)
     case canvasSnapshot(session: String, outPath: String?)
     case nodeList
@@ -131,7 +171,6 @@ extension Request: Codable {
         case rpcStatus
         case canvasShow
         case canvasHide
-        case canvasGoto
         case canvasEval
         case canvasSnapshot
         case nodeList
@@ -187,12 +226,6 @@ extension Request: Codable {
         case let .canvasHide(session):
             try container.encode(Kind.canvasHide, forKey: .type)
             try container.encode(session, forKey: .session)
-
-        case let .canvasGoto(session, path, placement):
-            try container.encode(Kind.canvasGoto, forKey: .type)
-            try container.encode(session, forKey: .session)
-            try container.encode(path, forKey: .path)
-            try container.encodeIfPresent(placement, forKey: .placement)
 
         case let .canvasEval(session, javaScript):
             try container.encode(Kind.canvasEval, forKey: .type)
@@ -277,12 +310,6 @@ extension Request: Codable {
         case .canvasHide:
             let session = try container.decode(String.self, forKey: .session)
             self = .canvasHide(session: session)
-
-        case .canvasGoto:
-            let session = try container.decode(String.self, forKey: .session)
-            let path = try container.decode(String.self, forKey: .path)
-            let placement = try container.decodeIfPresent(CanvasPlacement.self, forKey: .placement)
-            self = .canvasGoto(session: session, path: path, placement: placement)
 
         case .canvasEval:
             let session = try container.decode(String.self, forKey: .session)

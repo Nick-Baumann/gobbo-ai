@@ -18,13 +18,38 @@ final class CanvasManager {
     }()
 
     func show(sessionKey: String, path: String? = nil, placement: CanvasPlacement? = nil) throws -> String {
+        try self.showDetailed(sessionKey: sessionKey, target: path, placement: placement).directory
+    }
+
+    func showDetailed(sessionKey: String, target: String? = nil, placement: CanvasPlacement? = nil) throws -> CanvasShowResult {
         let anchorProvider = self.defaultAnchorProvider ?? Self.mouseAnchorProvider
         let session = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedTarget = target?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty
+
+        let isWebTarget = Self.isWebTarget(normalizedTarget)
+
         if let controller = self.panelController, self.panelSessionKey == session {
             controller.presentAnchoredPanel(anchorProvider: anchorProvider)
             controller.applyPreferredPlacement(placement)
-            controller.goto(path: path ?? "/")
-            return controller.directoryPath
+
+            // Existing session: only navigate when an explicit target was provided.
+            if let normalizedTarget {
+                controller.goto(path: normalizedTarget)
+                return self.makeShowResult(
+                    directory: controller.directoryPath,
+                    target: target,
+                    effectiveTarget: normalizedTarget,
+                    isWebTarget: isWebTarget)
+            }
+
+            return CanvasShowResult(
+                directory: controller.directoryPath,
+                target: target,
+                effectiveTarget: nil,
+                status: .shown,
+                url: nil)
         }
 
         self.panelController?.close()
@@ -39,8 +64,16 @@ final class CanvasManager {
         self.panelController = controller
         self.panelSessionKey = session
         controller.applyPreferredPlacement(placement)
-        controller.showCanvas(path: path ?? "/")
-        return controller.directoryPath
+
+        // New session: default to "/" so the user sees either the welcome page or `index.html`.
+        let effectiveTarget = normalizedTarget ?? "/"
+        controller.showCanvas(path: effectiveTarget)
+
+        return self.makeShowResult(
+            directory: controller.directoryPath,
+            target: target,
+            effectiveTarget: effectiveTarget,
+            isWebTarget: isWebTarget)
     }
 
     func hide(sessionKey: String) {
@@ -51,10 +84,6 @@ final class CanvasManager {
 
     func hideAll() {
         self.panelController?.hideCanvas()
-    }
-
-    func goto(sessionKey: String, path: String, placement: CanvasPlacement? = nil) throws {
-        _ = try self.show(sessionKey: sessionKey, path: path, placement: placement)
     }
 
     func eval(sessionKey: String, javaScript: String) async throws -> String {
@@ -79,4 +108,89 @@ final class CanvasManager {
     }
 
     // placement interpretation is handled by the window controller.
+
+    // MARK: - Helpers
+
+    private static func isWebTarget(_ target: String?) -> Bool {
+        guard let target, let url = URL(string: target), let scheme = url.scheme?.lowercased() else { return false }
+        return scheme == "https" || scheme == "http"
+    }
+
+    private func makeShowResult(
+        directory: String,
+        target: String?,
+        effectiveTarget: String,
+        isWebTarget: Bool) -> CanvasShowResult
+    {
+        if isWebTarget, let url = URL(string: effectiveTarget) {
+            return CanvasShowResult(
+                directory: directory,
+                target: target,
+                effectiveTarget: effectiveTarget,
+                status: .web,
+                url: url.absoluteString)
+        }
+
+        let sessionDir = URL(fileURLWithPath: directory)
+        let status = Self.localStatus(sessionDir: sessionDir, target: effectiveTarget)
+        let host = sessionDir.lastPathComponent
+        let canvasURL = CanvasScheme.makeURL(session: host, path: effectiveTarget)?.absoluteString
+        return CanvasShowResult(
+            directory: directory,
+            target: target,
+            effectiveTarget: effectiveTarget,
+            status: status,
+            url: canvasURL)
+    }
+
+    private static func localStatus(sessionDir: URL, target: String) -> CanvasShowStatus {
+        let fm = FileManager.default
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutQuery = trimmed.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? trimmed
+        var path = withoutQuery
+        if path.hasPrefix("/") { path.removeFirst() }
+        path = path.removingPercentEncoding ?? path
+
+        // Root special-case: welcome page when no index exists.
+        if path.isEmpty {
+            let a = sessionDir.appendingPathComponent("index.html", isDirectory: false)
+            let b = sessionDir.appendingPathComponent("index.htm", isDirectory: false)
+            if fm.fileExists(atPath: a.path) || fm.fileExists(atPath: b.path) { return .ok }
+            return .welcome
+        }
+
+        // Direct file or directory.
+        var candidate = sessionDir.appendingPathComponent(path, isDirectory: false)
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: candidate.path, isDirectory: &isDir) {
+            if isDir.boolValue {
+                return Self.indexExists(in: candidate) ? .ok : .notFound
+            }
+            return .ok
+        }
+
+        // Directory index behavior ("/yolo" -> "yolo/index.html") if directory exists.
+        if !path.isEmpty, !path.hasSuffix("/") {
+            candidate = sessionDir.appendingPathComponent(path, isDirectory: true)
+            if fm.fileExists(atPath: candidate.path, isDirectory: &isDir), isDir.boolValue {
+                return Self.indexExists(in: candidate) ? .ok : .notFound
+            }
+        }
+
+        return .notFound
+    }
+
+    private static func indexExists(in dir: URL) -> Bool {
+        let fm = FileManager.default
+        let a = dir.appendingPathComponent("index.html", isDirectory: false)
+        if fm.fileExists(atPath: a.path) { return true }
+        let b = dir.appendingPathComponent("index.htm", isDirectory: false)
+        return fm.fileExists(atPath: b.path)
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

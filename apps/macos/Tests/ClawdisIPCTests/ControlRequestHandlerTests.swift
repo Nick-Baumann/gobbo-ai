@@ -146,14 +146,6 @@ struct ControlRequestHandlerTests {
         #expect(show.ok == false)
         #expect(show.message == "Canvas disabled by user")
 
-        let goto = try await Self.withDefaultOverride(pauseDefaultsKey, value: false) {
-            try await Self.withDefaultOverride(canvasEnabledKey, value: false) {
-                try await ControlRequestHandler.process(request: .canvasGoto(session: "s", path: "/tmp", placement: nil))
-            }
-        }
-        #expect(goto.ok == false)
-        #expect(goto.message == "Canvas disabled by user")
-
         let eval = try await Self.withDefaultOverride(pauseDefaultsKey, value: false) {
             try await Self.withDefaultOverride(canvasEnabledKey, value: false) {
                 try await ControlRequestHandler.process(request: .canvasEval(session: "s", javaScript: "1+1"))

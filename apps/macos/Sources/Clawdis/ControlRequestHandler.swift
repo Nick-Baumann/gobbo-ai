@@ -61,9 +61,6 @@ enum ControlRequestHandler {
         case let .canvasHide(session):
             return await self.handleCanvasHide(session: session)
 
-        case let .canvasGoto(session, path, placement):
-            return await self.handleCanvasGoto(session: session, path: path, placement: placement)
-
         case let .canvasEval(session, javaScript):
             return await self.handleCanvasEval(session: session, javaScript: javaScript)
 
@@ -196,10 +193,11 @@ enum ControlRequestHandler {
     {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
         do {
-            let dir = try await MainActor.run {
-                try CanvasManager.shared.show(sessionKey: session, path: path, placement: placement)
+            let res = try await MainActor.run {
+                try CanvasManager.shared.showDetailed(sessionKey: session, target: path, placement: placement)
             }
-            return Response(ok: true, message: dir)
+            let payload = try? JSONEncoder().encode(res)
+            return Response(ok: true, message: res.directory, payload: payload)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
         }
@@ -208,18 +206,6 @@ enum ControlRequestHandler {
     private static func handleCanvasHide(session: String) async -> Response {
         await MainActor.run { CanvasManager.shared.hide(sessionKey: session) }
         return Response(ok: true)
-    }
-
-    private static func handleCanvasGoto(session: String, path: String, placement: CanvasPlacement?) async -> Response {
-        guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
-        do {
-            try await MainActor.run {
-                try CanvasManager.shared.goto(sessionKey: session, path: path, placement: placement)
-            }
-            return Response(ok: true)
-        } catch {
-            return Response(ok: false, message: error.localizedDescription)
-        }
     }
 
     private static func handleCanvasEval(session: String, javaScript: String) async -> Response {

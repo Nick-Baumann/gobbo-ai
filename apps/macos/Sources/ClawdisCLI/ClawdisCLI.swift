@@ -243,10 +243,10 @@ struct ClawdisCLI {
         switch sub {
         case "show":
             var session = "main"
-            var path: String?
-            let placement = self.parseCanvasPlacement(args: &args, session: &session, path: &path)
+            var target: String?
+            let placement = self.parseCanvasPlacement(args: &args, session: &session, target: &target)
             return ParsedCLIRequest(
-                request: .canvasShow(session: session, path: path, placement: placement),
+                request: .canvasShow(session: session, path: target, placement: placement),
                 kind: .generic)
         case "hide":
             var session = "main"
@@ -258,14 +258,6 @@ struct ClawdisCLI {
                 }
             }
             return ParsedCLIRequest(request: .canvasHide(session: session), kind: .generic)
-        case "goto":
-            var session = "main"
-            var path: String?
-            let placement = self.parseCanvasPlacement(args: &args, session: &session, path: &path)
-            guard let path else { throw CLIError.help }
-            return ParsedCLIRequest(
-                request: .canvasGoto(session: session, path: path, placement: placement),
-                kind: .generic)
         case "eval":
             var session = "main"
             var js: String?
@@ -359,7 +351,7 @@ struct ClawdisCLI {
     private static func parseCanvasPlacement(
         args: inout [String],
         session: inout String,
-        path: inout String?) -> CanvasPlacement?
+        target: inout String?) -> CanvasPlacement?
     {
         var x: Double?
         var y: Double?
@@ -369,7 +361,7 @@ struct ClawdisCLI {
             let arg = args.removeFirst()
             switch arg {
             case "--session": session = args.popFirst() ?? session
-            case "--path": path = args.popFirst()
+            case "--target", "--path": target = args.popFirst()
             case "--x": x = args.popFirst().flatMap(Double.init)
             case "--y": y = args.popFirst().flatMap(Double.init)
             case "--width": width = args.popFirst().flatMap(Double.init)
@@ -385,6 +377,19 @@ struct ClawdisCLI {
         guard response.ok else {
             let msg = response.message ?? "failed"
             fputs("\(msg)\n", stderr)
+            return
+        }
+
+        if case .canvasShow = parsed.request {
+            if let message = response.message, !message.isEmpty {
+                FileHandle.standardOutput.write(Data((message + "\n").utf8))
+            }
+            if let payload = response.payload, let info = try? JSONDecoder().decode(CanvasShowResult.self, from: payload) {
+                FileHandle.standardOutput.write(Data(("STATUS:\(info.status.rawValue)\n").utf8))
+                if let url = info.url, !url.isEmpty {
+                    FileHandle.standardOutput.write(Data(("URL:\(url)\n").utf8))
+                }
+            }
             return
         }
 
@@ -468,11 +473,9 @@ struct ClawdisCLI {
             clawdis-mac node invoke --node <id> --command <name> [--params-json <json>]
 
           Canvas:
-            clawdis-mac canvas show [--session <key>] [--path </...>]
+            clawdis-mac canvas show [--session <key>] [--target </...|https://...>]
               [--x <screenX> --y <screenY>] [--width <w> --height <h>]
             clawdis-mac canvas hide [--session <key>]
-            clawdis-mac canvas goto --path </...> [--session <key>]
-              [--x <screenX> --y <screenY>] [--width <w> --height <h>]
             clawdis-mac canvas eval --js <code> [--session <key>]
             clawdis-mac canvas snapshot [--out <path>] [--session <key>]
 

@@ -830,7 +830,7 @@ extension DebugSettings {
             """
             try html.write(to: url, atomically: true, encoding: .utf8)
             self.canvasStatus = "wrote: \(url.path)"
-            try CanvasManager.shared.goto(sessionKey: session.isEmpty ? "main" : session, path: "/")
+            _ = try CanvasManager.shared.show(sessionKey: session.isEmpty ? "main" : session, path: "/")
         } catch {
             self.canvasError = error.localizedDescription
         }

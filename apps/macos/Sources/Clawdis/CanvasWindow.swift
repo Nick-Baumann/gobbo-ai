@@ -101,8 +101,6 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
             self.presentAnchoredPanel(anchorProvider: anchorProvider)
             if let path {
                 self.goto(path: path)
-            } else {
-                self.goto(path: "/")
             }
             return
         }
@@ -112,8 +110,6 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
         NSApp.activate(ignoringOtherApps: true)
         if let path {
             self.goto(path: path)
-        } else {
-            self.goto(path: "/")
         }
         self.onVisibilityChanged?(true)
     }
