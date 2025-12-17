@@ -201,7 +201,7 @@ final class NodePairingApprovalPrompter {
     private func endActiveAlert() {
         guard let alert = self.activeAlert else { return }
         if let parent = alert.window.sheetParent {
-            parent.endSheet(alert.window, returnCode: .abortModalResponse)
+            parent.endSheet(alert.window, returnCode: .abort)
         }
         self.activeAlert = nil
         self.activeRequestId = nil

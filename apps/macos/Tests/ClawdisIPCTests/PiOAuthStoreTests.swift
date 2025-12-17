@@ -13,6 +13,25 @@ struct PiOAuthStoreTests {
     }
 
     @Test
+    func usesEnvOverrideForPiAgentDir() throws {
+        let key = "PI_CODING_AGENT_DIR"
+        let previous = ProcessInfo.processInfo.environment[key]
+        defer {
+            if let previous {
+                setenv(key, previous, 1)
+            } else {
+                unsetenv(key)
+            }
+        }
+
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clawdis-pi-agent-\(UUID().uuidString)", isDirectory: true)
+        setenv(key, dir.path, 1)
+
+        #expect(PiOAuthStore.oauthDir().standardizedFileURL == dir.standardizedFileURL)
+    }
+
+    @Test
     func acceptsPiFormatTokens() throws {
         let url = try self.writeOAuthFile([
             "anthropic": [

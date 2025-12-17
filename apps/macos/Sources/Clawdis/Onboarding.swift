@@ -325,7 +325,7 @@ struct OnboardingView: View {
 
     private func anthropicAuthPage() -> some View {
         self.onboardingPage {
-            Text("Sign in to Claude")
+            Text("Connect Claude")
                 .font(.largeTitle.weight(.semibold))
             Text("Give your model the token it needs!")
                 .font(.body)
@@ -422,7 +422,7 @@ struct OnboardingView: View {
                         .font(.headline)
                     Text(
                         "You can also use an Anthropic API key, but this UI is instructions-only for now " +
-                            "(GUI apps don’t automatically inherit your shell env vars).")
+                            "(GUI apps don’t automatically inherit your shell env vars like `ANTHROPIC_API_KEY`).")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

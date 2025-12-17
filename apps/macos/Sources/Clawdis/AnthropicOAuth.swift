@@ -10,6 +10,52 @@ struct AnthropicOAuthCredentials: Codable {
     let expires: Int64
 }
 
+enum AnthropicAuthMode: Equatable {
+    case oauthFile
+    case oauthEnv
+    case apiKeyEnv
+    case missing
+
+    var shortLabel: String {
+        switch self {
+        case .oauthFile: "OAuth (Pi token file)"
+        case .oauthEnv: "OAuth (env var)"
+        case .apiKeyEnv: "API key (env var)"
+        case .missing: "Missing credentials"
+        }
+    }
+
+    var isConfigured: Bool {
+        switch self {
+        case .missing: false
+        case .oauthFile, .oauthEnv, .apiKeyEnv: true
+        }
+    }
+}
+
+enum AnthropicAuthResolver {
+    static func resolve(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        oauthStatus: PiOAuthStore.AnthropicOAuthStatus = PiOAuthStore.anthropicOAuthStatus()) -> AnthropicAuthMode
+    {
+        if oauthStatus.isConnected { return .oauthFile }
+
+        if let token = environment["ANTHROPIC_OAUTH_TOKEN"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !token.isEmpty
+        {
+            return .oauthEnv
+        }
+
+        if let key = environment["ANTHROPIC_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !key.isEmpty
+        {
+            return .apiKeyEnv
+        }
+
+        return .missing
+    }
+}
+
 enum AnthropicOAuth {
     private static let logger = Logger(subsystem: "com.steipete.clawdis", category: "anthropic-oauth")
 
@@ -107,6 +153,7 @@ enum AnthropicOAuth {
 enum PiOAuthStore {
     static let oauthFilename = "oauth.json"
     private static let providerKey = "anthropic"
+    private static let piAgentDirEnv = "PI_CODING_AGENT_DIR"
 
     enum AnthropicOAuthStatus: Equatable {
         case missingFile
@@ -123,18 +170,26 @@ enum PiOAuthStore {
 
         var shortDescription: String {
             switch self {
-            case .missingFile: "oauth.json not found"
-            case .unreadableFile: "oauth.json not readable"
-            case .invalidJSON: "oauth.json invalid"
-            case .missingProviderEntry: "oauth.json has no anthropic entry"
-            case .missingTokens: "anthropic entry missing tokens"
-            case .connected: "OAuth credentials found"
+            case .missingFile: "Pi OAuth token file not found"
+            case .unreadableFile: "Pi OAuth token file not readable"
+            case .invalidJSON: "Pi OAuth token file invalid"
+            case .missingProviderEntry: "No Anthropic entry in Pi OAuth token file"
+            case .missingTokens: "Anthropic entry missing tokens"
+            case .connected: "Pi OAuth credentials found"
             }
         }
     }
 
     static func oauthDir() -> URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        if let override = ProcessInfo.processInfo.environment[self.piAgentDirEnv]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !override.isEmpty
+        {
+            let expanded = NSString(string: override).expandingTildeInPath
+            return URL(fileURLWithPath: expanded, isDirectory: true)
+        }
+
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".pi", isDirectory: true)
             .appendingPathComponent("agent", isDirectory: true)
     }

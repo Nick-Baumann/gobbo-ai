@@ -22,7 +22,7 @@ struct CanvasWindowSmokeTests {
 
         controller.applyPreferredPlacement(CanvasPlacement(x: 120, y: 200, width: 520, height: 680))
         controller.showCanvas(path: "/")
-        _ = await controller.eval(javaScript: "1 + 1")
+        _ = try await controller.eval(javaScript: "1 + 1")
         controller.windowDidMove(Notification(name: NSWindow.didMoveNotification))
         controller.windowDidEndLiveResize(Notification(name: NSWindow.didEndLiveResizeNotification))
         controller.hideCanvas()
@@ -45,4 +45,3 @@ struct CanvasWindowSmokeTests {
         controller.close()
     }
 }
-
