@@ -84,7 +84,8 @@
     "signal-utils": "^0.21.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.15",
+    "wireit": "^0.14.12"
   },
   "vitest": {
     "coverage": {
