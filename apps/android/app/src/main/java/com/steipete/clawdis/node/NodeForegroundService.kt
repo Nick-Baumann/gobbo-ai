@@ -91,7 +91,7 @@ class NodeForegroundService : Service() {
     val stopPending = PendingIntent.getService(this, 2, stopIntent, flags)
 
     return NotificationCompat.Builder(this, CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.stat_sys_upload)
+      .setSmallIcon(R.mipmap.ic_launcher)
       .setContentTitle(title)
       .setContentText(text)
       .setOngoing(true)

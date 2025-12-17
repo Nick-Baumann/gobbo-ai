@@ -15,7 +15,10 @@ The Gateway WebSocket stays loopback-only (`ws://127.0.0.1:18789`). Android talk
 ## Prerequisites
 
 - You can run the Gateway on the “master” machine.
-- Android device/emulator is on the same LAN (mDNS must work) or you know the gateway’s LAN IP for manual connect.
+- Android device/emulator can reach the gateway bridge:
+  - Same LAN with mDNS/NSD, **or**
+  - Same Tailscale tailnet using Wide-Area Bonjour / unicast DNS-SD (see below), **or**
+  - Manual bridge host/port (fallback)
 - You can run the CLI (`clawdis`) on the gateway machine (or via SSH).
 
 ## 1) Start the Gateway (with bridge enabled)
@@ -29,6 +32,11 @@ pnpm clawdis gateway --port 18789 --verbose
 Confirm in logs you see something like:
 - `bridge listening on tcp://0.0.0.0:18790 (Iris)`
 
+For tailnet-only setups (recommended for Vienna ⇄ London), bind the bridge to the gateway machine’s Tailscale IP instead:
+
+- Set `CLAWDIS_BRIDGE_HOST=<TAILNET_IPV4>` on the gateway host.
+- Restart the Gateway / macOS menubar app.
+
 ## 2) Verify discovery (optional)
 
 From the gateway machine:
@@ -38,6 +46,16 @@ dns-sd -B _clawdis-bridge._tcp local.
 ```
 
 More debugging notes: `docs/bonjour.md`.
+
+### Tailnet (Vienna ⇄ London) discovery via unicast DNS-SD
+
+Android NSD/mDNS discovery won’t cross networks. If your Android node and the gateway are on different networks but connected via Tailscale, use Wide-Area Bonjour / unicast DNS-SD instead:
+
+1) Set up a DNS-SD zone (example `clawdis.internal.`) on the gateway host and publish `_clawdis-bridge._tcp` records.
+2) Configure Tailscale split DNS for `clawdis.internal` pointing at that DNS server.
+3) In the Android app: Settings → Advanced → set **Discovery Domain** to `clawdis.internal.`
+
+Details and example CoreDNS config: `docs/bonjour.md`.
 
 ## 3) Connect from Android
 
