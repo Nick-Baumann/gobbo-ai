@@ -36,9 +36,9 @@ fun StatusPill(
     onClick = onClick,
     modifier = modifier,
     shape = RoundedCornerShape(14.dp),
-    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
-    shadowElevation = 10.dp,
-    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.18f)),
+    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
+    shadowElevation = 3.dp,
+    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.10f)),
   ) {
     Row(
       modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),

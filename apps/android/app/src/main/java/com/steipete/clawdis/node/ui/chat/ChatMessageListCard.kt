@@ -57,12 +57,12 @@ fun ChatMessageListCard(
 
   Card(
     modifier = modifier.fillMaxWidth(),
-    shape = MaterialTheme.shapes.extraLarge,
+    shape = MaterialTheme.shapes.large,
     colors =
       CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
       ),
-    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
   ) {
     Box(modifier = Modifier.fillMaxSize()) {
       LazyColumn(
@@ -120,10 +120,10 @@ private fun ChatStatusPill(
 ) {
   Surface(
     modifier = modifier,
-    shape = MaterialTheme.shapes.extraLarge,
-    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-    shadowElevation = 4.dp,
-    tonalElevation = 2.dp,
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.96f),
+    shadowElevation = 1.dp,
+    tonalElevation = 0.dp,
   ) {
     Row(
       modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),

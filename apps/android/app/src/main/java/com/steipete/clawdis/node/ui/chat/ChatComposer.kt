@@ -1,6 +1,5 @@
 package com.steipete.clawdis.node.ui.chat
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,10 +60,10 @@ fun ChatComposer(
   val canSend = pendingRunCount == 0 && (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
 
   Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-    tonalElevation = 2.dp,
-    shadowElevation = 6.dp,
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surfaceContainer,
+    tonalElevation = 0.dp,
+    shadowElevation = 0.dp,
   ) {
     Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Row(
@@ -103,45 +102,37 @@ fun ChatComposer(
         AttachmentsStrip(attachments = attachments, onRemoveAttachment = onRemoveAttachment)
       }
 
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-      ) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedTextField(
-            value = input,
-            onValueChange = { input = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Message Clawd…") },
-            minLines = 2,
-            maxLines = 6,
-          )
+      OutlinedTextField(
+        value = input,
+        onValueChange = { input = it },
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Message Clawd…") },
+        minLines = 2,
+        maxLines = 6,
+      )
 
-          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ConnectionPill(sessionKey = sessionKey, healthOk = healthOk)
-            Spacer(modifier = Modifier.weight(1f))
+      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        ConnectionPill(sessionKey = sessionKey, healthOk = healthOk)
+        Spacer(modifier = Modifier.weight(1f))
 
-            if (pendingRunCount > 0) {
-              FilledTonalIconButton(
-                onClick = onAbort,
-                colors =
-                  IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color(0x33E74C3C),
-                    contentColor = Color(0xFFE74C3C),
-                  ),
-              ) {
-                Icon(Icons.Default.Stop, contentDescription = "Abort")
-              }
-            } else {
-              FilledTonalIconButton(onClick = {
-                val text = input
-                input = ""
-                onSend(text)
-              }, enabled = canSend) {
-                Icon(Icons.Default.ArrowUpward, contentDescription = "Send")
-              }
-            }
+        if (pendingRunCount > 0) {
+          FilledTonalIconButton(
+            onClick = onAbort,
+            colors =
+              IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = Color(0x33E74C3C),
+                contentColor = Color(0xFFE74C3C),
+              ),
+          ) {
+            Icon(Icons.Default.Stop, contentDescription = "Abort")
+          }
+        } else {
+          FilledTonalIconButton(onClick = {
+            val text = input
+            input = ""
+            onSend(text)
+          }, enabled = canSend) {
+            Icon(Icons.Default.ArrowUpward, contentDescription = "Send")
           }
         }
       }
