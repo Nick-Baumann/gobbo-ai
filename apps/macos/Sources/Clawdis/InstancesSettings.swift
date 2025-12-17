@@ -58,6 +58,8 @@ struct InstancesSettings: View {
 
     @ViewBuilder
     private func instanceRow(_ inst: InstanceInfo) -> some View {
+        let isGateway = (inst.mode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "gateway"
+
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text(inst.host ?? "unknown host").font(.subheadline.bold())
@@ -76,20 +78,20 @@ struct InstancesSettings: View {
                 {
                     self.label(icon: device.symbol, text: device.title)
                 }
-                self.label(icon: "clock", text: inst.lastInputDescription)
+
+                // Last local input is helpful for interactive nodes, but noisy/meaningless for the gateway.
+                if !isGateway, let secs = inst.lastInputSeconds {
+                    self.label(icon: "clock", text: "\(secs)s ago")
+                }
                 if let mode = inst.mode { self.label(icon: "network", text: mode) }
-                if let reason = inst.reason, !reason.isEmpty {
-                    self.label(
-                        icon: "info.circle",
-                        text: "Updated by: \(self.presenceUpdateSourceText(reason))")
-                        .help(self.presenceUpdateSourceHelp(reason))
+
+                if let update = self.updateSummaryText(inst, isGateway: isGateway) {
+                    self.label(icon: "arrow.clockwise", text: update)
+                        .help(self.presenceUpdateSourceHelp(inst.reason ?? ""))
                 }
             }
             Text(inst.text)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
-            Text(inst.ageDescription)
-                .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 6)
@@ -151,26 +153,43 @@ struct InstancesSettings: View {
         return (prefix, versionToken)
     }
 
-    private func presenceUpdateSourceText(_ reason: String) -> String {
+    private func presenceUpdateSourceShortText(_ reason: String) -> String? {
         let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
         switch trimmed {
         case "self":
-            return "Gateway (self)"
+            return "Self"
         case "connect":
-            return "Client connected"
+            return "Connect"
         case "disconnect":
-            return "Client disconnected"
+            return "Disconnect"
         case "launch":
-            return "App launch"
+            return "Launch"
         case "periodic":
             return "Heartbeat"
         case "instances-refresh":
-            return "UI refresh (Instances tab)"
+            return "Instances"
         case "seq gap":
-            return "Resynced after event gap"
+            return "Resync"
         default:
-            return trimmed.isEmpty ? "Unknown" : trimmed
+            return trimmed
         }
+    }
+
+    private func updateSummaryText(_ inst: InstanceInfo, isGateway: Bool) -> String? {
+        // For gateway rows, omit the "updated via/by" provenance entirely.
+        if isGateway {
+            return nil
+        }
+
+        let age = inst.ageDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !age.isEmpty else { return nil }
+
+        let source = self.presenceUpdateSourceShortText(inst.reason ?? "")
+        if let source, !source.isEmpty {
+            return "\(age) · \(source)"
+        }
+        return age
     }
 
     private func presenceUpdateSourceHelp(_ reason: String) -> String {
