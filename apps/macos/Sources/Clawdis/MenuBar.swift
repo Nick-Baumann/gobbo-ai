@@ -182,6 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let state {
             Task { await ConnectionModeCoordinator.shared.apply(mode: state.connectionMode, paused: state.isPaused) }
         }
+        TerminationSignalWatcher.shared.start()
         NodePairingApprovalPrompter.shared.start()
         VoiceWakeGlobalSettingsSync.shared.start()
         Task { PresenceReporter.shared.start() }
@@ -202,6 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         GatewayProcessManager.shared.stop()
         PresenceReporter.shared.stop()
         NodePairingApprovalPrompter.shared.stop()
+        TerminationSignalWatcher.shared.stop()
         VoiceWakeGlobalSettingsSync.shared.stop()
         WebChatManager.shared.close()
         WebChatManager.shared.resetTunnels()

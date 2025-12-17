@@ -1,7 +1,9 @@
 import AppKit
+import ClawdisIPC
 import ClawdisProtocol
 import Foundation
 import OSLog
+import UserNotifications
 
 @MainActor
 final class NodePairingApprovalPrompter {
@@ -9,8 +11,28 @@ final class NodePairingApprovalPrompter {
 
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "node-pairing")
     private var task: Task<Void, Never>?
+    private var reconcileTask: Task<Void, Never>?
+    private var isStopping = false
     private var isPresenting = false
     private var queue: [PendingRequest] = []
+    private var activeAlert: NSAlert?
+    private var activeRequestId: String?
+    private var alertHostWindow: NSWindow?
+    private var remoteResolutionsByRequestId: [String: PairingResolution] = [:]
+
+    private struct PairingList: Codable {
+        let pending: [PendingRequest]
+        let paired: [PairedNode]?
+    }
+
+    private struct PairedNode: Codable, Equatable {
+        let nodeId: String
+        let approvedAtMs: Double?
+        let displayName: String?
+        let platform: String?
+        let version: String?
+        let remoteIp: String?
+    }
 
     private struct PendingRequest: Codable, Equatable, Identifiable {
         let requestId: String
@@ -25,11 +47,22 @@ final class NodePairingApprovalPrompter {
         var id: String { self.requestId }
     }
 
+    private enum PairingResolution: String {
+        case approved
+        case rejected
+    }
+
     func start() {
         guard self.task == nil else { return }
+        self.isStopping = false
+        self.reconcileTask?.cancel()
+        self.reconcileTask = Task { [weak self] in
+            await self?.reconcileLoop()
+        }
         self.task = Task { [weak self] in
             guard let self else { return }
             _ = try? await GatewayConnection.shared.refresh()
+            await self.loadPendingRequestsFromGateway()
             let stream = await GatewayConnection.shared.subscribe(bufferingNewest: 200)
             for await push in stream {
                 if Task.isCancelled { return }
@@ -39,10 +72,159 @@ final class NodePairingApprovalPrompter {
     }
 
     func stop() {
+        self.isStopping = true
+        self.endActiveAlert()
         self.task?.cancel()
         self.task = nil
+        self.reconcileTask?.cancel()
+        self.reconcileTask = nil
         self.queue.removeAll(keepingCapacity: false)
         self.isPresenting = false
+        self.activeRequestId = nil
+        self.alertHostWindow?.orderOut(nil)
+        self.alertHostWindow?.close()
+        self.alertHostWindow = nil
+        self.remoteResolutionsByRequestId.removeAll(keepingCapacity: false)
+    }
+
+    private func loadPendingRequestsFromGateway() async {
+        // The gateway process may start slightly after the app. Retry a bit so
+        // pending pairing prompts are still shown on launch.
+        var delayMs: UInt64 = 200
+        for attempt in 1...8 {
+            if Task.isCancelled { return }
+            do {
+                let data = try await GatewayConnection.shared.request(
+                    method: "node.pair.list",
+                    params: nil,
+                    timeoutMs: 6000)
+                guard !data.isEmpty else { return }
+                let list = try JSONDecoder().decode(PairingList.self, from: data)
+                let pending = list.pending.sorted { $0.ts < $1.ts }
+                guard !pending.isEmpty else { return }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.logger.info(
+                        "loaded \(pending.count, privacy: .public) pending node pairing request(s) on startup")
+                    for req in pending {
+                        self.enqueue(req)
+                    }
+                }
+                return
+            } catch {
+                if attempt == 8 {
+                    self.logger
+                        .error(
+                            "failed to load pending pairing requests: \(error.localizedDescription, privacy: .public)")
+                    return
+                }
+                try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
+                delayMs = min(delayMs * 2, 2000)
+            }
+        }
+    }
+
+    private func reconcileLoop() async {
+        // Reconcile requests periodically so multiple running apps stay in sync
+        // (e.g. close dialogs + notify if another machine approves/rejects via app or CLI).
+        let intervalMs: UInt64 = 800
+        while !Task.isCancelled {
+            if self.isStopping { return }
+            do {
+                let list = try await self.fetchPairingList(timeoutMs: 2500)
+                await self.apply(list: list)
+            } catch {
+                // best effort: ignore transient connectivity failures
+            }
+            try? await Task.sleep(nanoseconds: intervalMs * 1_000_000)
+        }
+    }
+
+    private func fetchPairingList(timeoutMs: Double) async throws -> PairingList {
+        let data = try await GatewayConnection.shared.request(
+            method: "node.pair.list",
+            params: nil,
+            timeoutMs: timeoutMs)
+        return try JSONDecoder().decode(PairingList.self, from: data)
+    }
+
+    private func apply(list: PairingList) async {
+        if self.isStopping { return }
+
+        let pendingById = Dictionary(
+            uniqueKeysWithValues: list.pending.map { ($0.requestId, $0) })
+
+        // Enqueue any missing requests (covers missed pushes while reconnecting).
+        for req in list.pending.sorted(by: { $0.ts < $1.ts }) {
+            self.enqueue(req)
+        }
+
+        // Detect resolved requests (approved/rejected elsewhere).
+        let queued = self.queue
+        for req in queued {
+            if pendingById[req.requestId] != nil { continue }
+            let resolution = self.inferResolution(for: req, list: list)
+
+            if self.activeRequestId == req.requestId, self.activeAlert != nil {
+                self.remoteResolutionsByRequestId[req.requestId] = resolution
+                self.logger.info(
+                    "pairing request resolved elsewhere; closing dialog requestId=\(req.requestId, privacy: .public) resolution=\(resolution.rawValue, privacy: .public)")
+                self.endActiveAlert()
+                continue
+            }
+
+            self.logger.info(
+                "pairing request resolved elsewhere requestId=\(req.requestId, privacy: .public) resolution=\(resolution.rawValue, privacy: .public)")
+            self.queue.removeAll { $0 == req }
+            Task { @MainActor in
+                await self.notify(resolution: resolution, request: req, via: "remote")
+            }
+        }
+
+        if self.queue.isEmpty {
+            self.isPresenting = false
+        }
+        self.presentNextIfNeeded()
+    }
+
+    private func inferResolution(for request: PendingRequest, list: PairingList) -> PairingResolution {
+        let paired = list.paired ?? []
+        guard let node = paired.first(where: { $0.nodeId == request.nodeId }) else {
+            return .rejected
+        }
+        if request.isRepair == true, let approvedAtMs = node.approvedAtMs {
+            return approvedAtMs >= request.ts ? .approved : .rejected
+        }
+        return .approved
+    }
+
+    private func endActiveAlert() {
+        guard let alert = self.activeAlert else { return }
+        if let parent = alert.window.sheetParent {
+            parent.endSheet(alert.window, returnCode: .abortModalResponse)
+        }
+        self.activeAlert = nil
+        self.activeRequestId = nil
+    }
+
+    private func requireAlertHostWindow() -> NSWindow {
+        if let alertHostWindow {
+            return alertHostWindow
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 1),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false)
+        window.title = "Clawdis"
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.center()
+
+        self.alertHostWindow = window
+        return window
     }
 
     private func handle(push: GatewayPush) {
@@ -64,6 +246,7 @@ final class NodePairingApprovalPrompter {
     }
 
     private func presentNextIfNeeded() {
+        guard !self.isStopping else { return }
         guard !self.isPresenting else { return }
         guard let next = self.queue.first else { return }
         self.isPresenting = true
@@ -71,22 +254,33 @@ final class NodePairingApprovalPrompter {
     }
 
     private func presentAlert(for req: PendingRequest) {
+        self.logger.info("presenting node pairing alert requestId=\(req.requestId, privacy: .public)")
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Allow node to connect?"
         alert.informativeText = Self.describe(req)
+        // Fail-safe ordering: if the dialog can't be presented, default to "Later".
+        alert.addButton(withTitle: "Later")
         alert.addButton(withTitle: "Approve")
         alert.addButton(withTitle: "Reject")
-        alert.addButton(withTitle: "Later")
-        if #available(macOS 11.0, *), alert.buttons.indices.contains(1) {
-            alert.buttons[1].hasDestructiveAction = true
+        if #available(macOS 11.0, *), alert.buttons.indices.contains(2) {
+            alert.buttons[2].hasDestructiveAction = true
         }
 
-        let response = alert.runModal()
-        Task { [weak self] in
-            await self?.handleAlertResponse(response, request: req)
+        self.activeAlert = alert
+        self.activeRequestId = req.requestId
+        let hostWindow = self.requireAlertHostWindow()
+        hostWindow.makeKeyAndOrderFront(nil)
+        alert.beginSheetModal(for: hostWindow) { [weak self] response in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.activeRequestId = nil
+                self.activeAlert = nil
+                await self.handleAlertResponse(response, request: req)
+                hostWindow.orderOut(nil)
+            }
         }
     }
 
@@ -101,13 +295,25 @@ final class NodePairingApprovalPrompter {
             self.presentNextIfNeeded()
         }
 
+        // Never approve/reject while shutting down (alerts can get dismissed during app termination).
+        guard !self.isStopping else { return }
+
+        if let resolved = self.remoteResolutionsByRequestId.removeValue(forKey: request.requestId) {
+            await self.notify(resolution: resolved, request: request, via: "remote")
+            return
+        }
+
         switch response {
         case .alertFirstButtonReturn:
-            await self.approve(requestId: request.requestId)
-        case .alertSecondButtonReturn:
-            await self.reject(requestId: request.requestId)
-        default:
             // Later: leave as pending (CLI can approve/reject). Request will expire on the gateway TTL.
+            return
+        case .alertSecondButtonReturn:
+            await self.approve(requestId: request.requestId)
+            await self.notify(resolution: .approved, request: request, via: "local")
+        case .alertThirdButtonReturn:
+            await self.reject(requestId: request.requestId)
+            await self.notify(resolution: .rejected, request: request, via: "local")
+        default:
             return
         }
     }
@@ -166,5 +372,26 @@ final class NodePairingApprovalPrompter {
         if raw.lowercased() == "ios" { return "iOS" }
         if raw.lowercased() == "macos" { return "macOS" }
         return raw
+    }
+
+    private func notify(resolution: PairingResolution, request: PendingRequest, via: String) async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .authorized ||
+            settings.authorizationStatus == .provisional
+        else {
+            return
+        }
+
+        let title = resolution == .approved ? "Node pairing approved" : "Node pairing rejected"
+        let name = request.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let device = name?.isEmpty == false ? name! : request.nodeId
+        let body = "\(device)\n(via \(via))"
+
+        _ = await NotificationManager().send(
+            title: title,
+            body: body,
+            sound: nil,
+            priority: .active)
     }
 }
