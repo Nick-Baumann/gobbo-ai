@@ -1,11 +1,11 @@
 import AppKit
 import AVFoundation
+import Dispatch
 import OSLog
 import Speech
 
 /// Observes right Option and starts a push-to-talk capture while it is held.
-@MainActor
-final class VoicePushToTalkHotkey {
+final class VoicePushToTalkHotkey: @unchecked Sendable {
     static let shared = VoicePushToTalkHotkey()
 
     private var globalMonitor: Any?
@@ -13,29 +13,48 @@ final class VoicePushToTalkHotkey {
     private var optionDown = false // right option only
     private var active = false
 
+    private let beginAction: @Sendable () async -> Void
+    private let endAction: @Sendable () async -> Void
+
+    init(
+        beginAction: @escaping @Sendable () async -> Void = { await VoicePushToTalk.shared.begin() },
+        endAction: @escaping @Sendable () async -> Void = { await VoicePushToTalk.shared.end() }
+    ) {
+        self.beginAction = beginAction
+        self.endAction = endAction
+    }
+
     func setEnabled(_ enabled: Bool) {
-        if enabled {
-            self.startMonitoring()
-        } else {
-            self.stopMonitoring()
+        self.withMainThread { [weak self] in
+            guard let self else { return }
+            if enabled {
+                self.startMonitoring()
+            } else {
+                self.stopMonitoring()
+            }
         }
     }
 
     private func startMonitoring() {
+        assert(Thread.isMainThread)
         guard self.globalMonitor == nil, self.localMonitor == nil else { return }
         // Listen-only global monitor; we rely on Input Monitoring permission to receive events.
         self.globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            guard let self else { return }
-            self.updateModifierState(from: event)
+            let keyCode = event.keyCode
+            let flags = event.modifierFlags
+            self?.handleFlagsChanged(keyCode: keyCode, modifierFlags: flags)
         }
         // Also listen locally so we still catch events when the app is active/focused.
         self.localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.updateModifierState(from: event)
+            let keyCode = event.keyCode
+            let flags = event.modifierFlags
+            self?.handleFlagsChanged(keyCode: keyCode, modifierFlags: flags)
             return event
         }
     }
 
     private func stopMonitoring() {
+        assert(Thread.isMainThread)
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
             self.globalMonitor = nil
@@ -48,10 +67,25 @@ final class VoicePushToTalkHotkey {
         self.active = false
     }
 
-    private func updateModifierState(from event: NSEvent) {
+    private func handleFlagsChanged(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
+        self.withMainThread { [weak self] in
+            self?.updateModifierState(keyCode: keyCode, modifierFlags: modifierFlags)
+        }
+    }
+
+    private func withMainThread(_ block: @escaping @Sendable () -> Void) {
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
+    }
+
+    private func updateModifierState(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
+        assert(Thread.isMainThread)
         // Right Option (keyCode 61) acts as a hold-to-talk modifier.
-        if event.keyCode == 61 {
-            self.optionDown = event.modifierFlags.contains(.option)
+        if keyCode == 61 {
+            self.optionDown = modifierFlags.contains(.option)
         }
 
         let chordActive = self.optionDown
@@ -60,16 +94,20 @@ final class VoicePushToTalkHotkey {
             Task {
                 Logger(subsystem: "com.steipete.clawdis", category: "voicewake.ptt")
                     .info("ptt hotkey down")
-                await VoicePushToTalk.shared.begin()
+                await self.beginAction()
             }
         } else if !chordActive, self.active {
             self.active = false
             Task {
                 Logger(subsystem: "com.steipete.clawdis", category: "voicewake.ptt")
                     .info("ptt hotkey up")
-                await VoicePushToTalk.shared.end()
+                await self.endAction()
             }
         }
+    }
+
+    func _testUpdateModifierState(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
+        self.updateModifierState(keyCode: keyCode, modifierFlags: modifierFlags)
     }
 }
 

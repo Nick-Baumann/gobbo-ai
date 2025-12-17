@@ -50,18 +50,85 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
         self.root = root
         self.presentation = presentation
 
+        canvasWindowLogger.debug("CanvasWindowController init start session=\(sessionKey, privacy: .public)")
         let safeSessionKey = CanvasWindowController.sanitizeSessionKey(sessionKey)
+        canvasWindowLogger.debug("CanvasWindowController init sanitized session=\(safeSessionKey, privacy: .public)")
         self.sessionDir = root.appendingPathComponent(safeSessionKey, isDirectory: true)
         try FileManager.default.createDirectory(at: self.sessionDir, withIntermediateDirectories: true)
+        canvasWindowLogger.debug("CanvasWindowController init session dir ready")
 
         self.schemeHandler = CanvasSchemeHandler(root: root)
+        canvasWindowLogger.debug("CanvasWindowController init scheme handler ready")
 
         let config = WKWebViewConfiguration()
         config.userContentController = WKUserContentController()
         config.preferences.isElementFullscreenEnabled = true
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        canvasWindowLogger.debug("CanvasWindowController init config ready")
         config.setURLSchemeHandler(self.schemeHandler, forURLScheme: CanvasScheme.scheme)
+        canvasWindowLogger.debug("CanvasWindowController init scheme handler installed")
 
+        // Bridge A2UI "a2uiaction" DOM events back into the native agent loop.
+        //
+        // Prefer WKScriptMessageHandler when WebKit exposes it, otherwise fall back to an unattended deep link
+        // (includes the app-generated key so it won't prompt).
+        canvasWindowLogger.debug("CanvasWindowController init building A2UI bridge script")
+        let deepLinkKey = DeepLinkHandler.currentCanvasKey()
+        let injectedSessionKey = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? "main"
+        let bridgeScript = """
+        (() => {
+          try {
+            if (location.protocol !== '\(CanvasScheme.scheme):') return;
+            if (globalThis.__clawdisA2UIBridgeInstalled) return;
+            globalThis.__clawdisA2UIBridgeInstalled = true;
+
+            const deepLinkKey = \(Self.jsStringLiteral(deepLinkKey));
+            const sessionKey = \(Self.jsStringLiteral(injectedSessionKey));
+
+            globalThis.addEventListener('a2uiaction', (evt) => {
+              try {
+                const payload = evt?.detail ?? evt?.payload ?? null;
+                if (!payload || payload.eventType !== 'a2ui.action') return;
+
+                const action = payload.action ?? null;
+                const name = action?.name ?? '';
+                if (!name) return;
+
+                const context = Array.isArray(action?.context) ? action.context : [];
+                const userAction = {
+                  name,
+                  surfaceId: payload.surfaceId ?? 'main',
+                  sourceComponentId: payload.sourceComponentId ?? '',
+                  dataContextPath: payload.dataContextPath ?? '',
+                  timestamp: new Date().toISOString(),
+                  ...(context.length ? { context } : {}),
+                };
+
+                const handler = globalThis.webkit?.messageHandlers?.clawdisCanvasA2UIAction;
+                if (handler?.postMessage) {
+                  handler.postMessage({ userAction });
+                  return;
+                }
+
+                const message = 'A2UI action: ' + name + '\\n\\n```json\\n' + JSON.stringify(userAction, null, 2) + '\\n```';
+                const params = new URLSearchParams();
+                params.set('message', message);
+                params.set('sessionKey', sessionKey);
+                params.set('thinking', 'low');
+                params.set('deliver', 'false');
+                params.set('channel', 'last');
+                params.set('key', deepLinkKey);
+                location.href = 'clawdis://agent?' + params.toString();
+              } catch {}
+            }, true);
+          } catch {}
+        })();
+        """
+        config.userContentController.addUserScript(
+            WKUserScript(source: bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        canvasWindowLogger.debug("CanvasWindowController init A2UI bridge installed")
+
+        canvasWindowLogger.debug("CanvasWindowController init creating WKWebView")
         self.webView = WKWebView(frame: .zero, configuration: config)
         self.webView.setValue(false, forKey: "drawsBackground")
 
@@ -93,6 +160,7 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
 
         self.container = HoverChromeContainerView(containing: self.webView)
         let window = Self.makeWindow(for: presentation, contentView: self.container)
+        canvasWindowLogger.debug("CanvasWindowController init makeWindow done")
         super.init(window: window)
 
         let handler = CanvasA2UIActionMessageHandler(sessionKey: sessionKey)
@@ -106,6 +174,7 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
         }
 
         self.watcher.start()
+        canvasWindowLogger.debug("CanvasWindowController init done")
     }
 
     @available(*, unavailable)
@@ -409,6 +478,17 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
         }
         let scheme = url.scheme?.lowercased()
 
+        // Deep links: allow local Canvas content to invoke the agent without bouncing through NSWorkspace.
+        if scheme == "clawdis" {
+            if self.webView.url?.scheme == CanvasScheme.scheme {
+                Task { await DeepLinkHandler.shared.handle(url: url) }
+            } else {
+                canvasWindowLogger.debug("ignoring deep link from non-canvas page \(url.absoluteString, privacy: .public)")
+            }
+            decisionHandler(.cancel)
+            return
+        }
+
         // Keep web content inside the panel when reasonable.
         // `about:blank` and friends are common internal navigations for WKWebView; never send them to NSWorkspace.
         if scheme == CanvasScheme.scheme
@@ -466,6 +546,11 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
         return String(scalars)
     }
 
+    private static func jsStringLiteral(_ value: String) -> String {
+        let data = try? JSONEncoder().encode(value)
+        return data.flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+    }
+
     private static func storedFrameDefaultsKey(sessionKey: String) -> String {
         "clawdis.canvas.frame.\(self.sanitizeSessionKey(sessionKey))"
     }
@@ -503,9 +588,6 @@ private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHan
         guard let webView = message.webView,
               webView.url?.scheme == CanvasScheme.scheme
         else { return }
-
-        let path = webView.url?.path ?? ""
-        guard path == "/" || path.isEmpty || path.hasPrefix("/__clawdis__/a2ui") else { return }
 
         let body: [String: Any] = {
             if let dict = message.body as? [String: Any] { return dict }

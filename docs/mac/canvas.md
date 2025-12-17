@@ -139,8 +139,9 @@ Implementation note (important):
 - In `WKWebView`, intercept `clawdis://…` navigations in `WKNavigationDelegate` and forward them to the app, e.g. by calling `DeepLinkHandler.shared.handle(url:)` and returning `.cancel` for the navigation.
 
 Safety:
-- `clawdis://agent` is disabled by default and must be enabled in **Clawdis → Settings → Debug** (“Allow URL scheme (agent)”).
+- Deep links (`clawdis://agent?...`) are always enabled.
 - Without a `key` query param, the app will prompt for confirmation before invoking the agent.
+- With a valid `key`, the run is unattended (no prompt). For Canvas-originated actions, the app injects an internal key automatically.
 
 ## Security / guardrails
 

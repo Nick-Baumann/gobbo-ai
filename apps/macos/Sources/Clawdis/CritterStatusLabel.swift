@@ -20,7 +20,6 @@ struct CritterStatusLabel: View {
     @State private var nextLegWiggle = Date().addingTimeInterval(Double.random(in: 5.0...11.0))
     @State private var earWiggle: CGFloat = 0
     @State private var nextEarWiggle = Date().addingTimeInterval(Double.random(in: 7.0...14.0))
-    private let ticker = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
 
     private var isWorkingNow: Bool {
         self.iconState.isWorking || self.isWorking
@@ -32,34 +31,18 @@ struct CritterStatusLabel: View {
                 .frame(width: 18, height: 18)
                 .rotationEffect(.degrees(self.wiggleAngle), anchor: .center)
                 .offset(x: self.wiggleOffset)
-                .onReceive(self.ticker) { now in
+                // Avoid Combine's TimerPublisher here: on macOS 26.2 we've seen crashes inside executor checks
+                // triggered by its callbacks. Drive periodic updates via a Swift-concurrency task instead.
+                .task(id: self.tickTaskID) {
                     guard self.animationsEnabled, !self.earBoostActive else {
-                        self.resetMotion()
+                        await MainActor.run { self.resetMotion() }
                         return
                     }
 
-                    if now >= self.nextBlink {
-                        self.blink()
-                        self.nextBlink = now.addingTimeInterval(Double.random(in: 3.5...8.5))
-                    }
-
-                    if now >= self.nextWiggle {
-                        self.wiggle()
-                        self.nextWiggle = now.addingTimeInterval(Double.random(in: 6.5...14))
-                    }
-
-                    if now >= self.nextLegWiggle {
-                        self.wiggleLegs()
-                        self.nextLegWiggle = now.addingTimeInterval(Double.random(in: 5.0...11.0))
-                    }
-
-                    if now >= self.nextEarWiggle {
-                        self.wiggleEars()
-                        self.nextEarWiggle = now.addingTimeInterval(Double.random(in: 7.0...14.0))
-                    }
-
-                    if self.isWorkingNow {
-                        self.scurry()
+                    while !Task.isCancelled {
+                        let now = Date()
+                        await MainActor.run { self.tick(now) }
+                        try? await Task.sleep(nanoseconds: 350_000_000)
                     }
                 }
                 .onChange(of: self.isPaused) { _, _ in self.resetMotion() }
@@ -96,6 +79,42 @@ struct CritterStatusLabel: View {
         .frame(width: 18, height: 18)
     }
 
+    private var tickTaskID: Int {
+        // Ensure SwiftUI restarts (and cancels) the task when these change.
+        (self.animationsEnabled ? 1 : 0) | (self.earBoostActive ? 2 : 0)
+    }
+
+    private func tick(_ now: Date) {
+        guard self.animationsEnabled, !self.earBoostActive else {
+            self.resetMotion()
+            return
+        }
+
+        if now >= self.nextBlink {
+            self.blink()
+            self.nextBlink = now.addingTimeInterval(Double.random(in: 3.5...8.5))
+        }
+
+        if now >= self.nextWiggle {
+            self.wiggle()
+            self.nextWiggle = now.addingTimeInterval(Double.random(in: 6.5...14))
+        }
+
+        if now >= self.nextLegWiggle {
+            self.wiggleLegs()
+            self.nextLegWiggle = now.addingTimeInterval(Double.random(in: 5.0...11.0))
+        }
+
+        if now >= self.nextEarWiggle {
+            self.wiggleEars()
+            self.nextEarWiggle = now.addingTimeInterval(Double.random(in: 7.0...14.0))
+        }
+
+        if self.isWorkingNow {
+            self.scurry()
+        }
+    }
+
     private var iconImage: Image {
         let badge: CritterIconRenderer.Badge? = if let prominence = self.iconState.badgeProminence, !self.isPaused {
             CritterIconRenderer.Badge(
@@ -128,7 +147,8 @@ struct CritterStatusLabel: View {
 
     private func blink() {
         withAnimation(.easeInOut(duration: 0.08)) { self.blinkAmount = 1 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 160_000_000)
             withAnimation(.easeOut(duration: 0.12)) { self.blinkAmount = 0 }
         }
     }
@@ -140,7 +160,8 @@ struct CritterStatusLabel: View {
             self.wiggleAngle = targetAngle
             self.wiggleOffset = targetOffset
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.36) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 360_000_000)
             withAnimation(.interpolatingSpring(stiffness: 220, damping: 18)) {
                 self.wiggleAngle = 0
                 self.wiggleOffset = 0
@@ -153,7 +174,8 @@ struct CritterStatusLabel: View {
         withAnimation(.easeInOut(duration: 0.14)) {
             self.legWiggle = target
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 220_000_000)
             withAnimation(.easeOut(duration: 0.18)) { self.legWiggle = 0 }
         }
     }
@@ -164,7 +186,8 @@ struct CritterStatusLabel: View {
             self.legWiggle = target
             self.wiggleOffset = CGFloat.random(in: -0.6...0.6)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 180_000_000)
             withAnimation(.easeOut(duration: 0.16)) {
                 self.legWiggle = 0.25
                 self.wiggleOffset = 0
@@ -177,8 +200,11 @@ struct CritterStatusLabel: View {
         withAnimation(.interpolatingSpring(stiffness: 260, damping: 19)) {
             self.earWiggle = target
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
-            withAnimation(.interpolatingSpring(stiffness: 260, damping: 19)) { self.earWiggle = 0 }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            withAnimation(.interpolatingSpring(stiffness: 260, damping: 19)) {
+                self.earWiggle = 0
+            }
         }
     }
 
