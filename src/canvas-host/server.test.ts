@@ -11,6 +11,32 @@ describe("canvas host", () => {
     const out = injectCanvasLiveReload("<html><body>Hello</body></html>");
     expect(out).toContain("/__clawdis/ws");
     expect(out).toContain("location.reload");
+    expect(out).toContain("clawdisCanvasA2UIAction");
+    expect(out).toContain("clawdisSendUserAction");
+  });
+
+  it("creates a default index.html when missing", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-canvas-"));
+
+    const server = await startCanvasHost({
+      runtime: defaultRuntime,
+      rootDir: dir,
+      port: 0,
+      listenHost: "127.0.0.1",
+      allowInTests: true,
+    });
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.port}/`);
+      const html = await res.text();
+      expect(res.status).toBe(200);
+      expect(html).toContain("Interactive test page");
+      expect(html).toContain("clawdisSendUserAction");
+      expect(html).toContain("/__clawdis/ws");
+    } finally {
+      await server.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("serves HTML with injection and broadcasts reload on file changes", async () => {
@@ -22,7 +48,7 @@ describe("canvas host", () => {
       runtime: defaultRuntime,
       rootDir: dir,
       port: 0,
-      bind: "loopback",
+      listenHost: "127.0.0.1",
       allowInTests: true,
     });
 

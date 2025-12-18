@@ -834,14 +834,18 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
   const cfgAtStart = loadConfig();
   setCommandLaneConcurrency("cron", cfgAtStart.cron?.maxConcurrentRuns ?? 1);
 
-  if (cfgAtStart.canvasHost?.enabled === true) {
+  const canvasHostEnabled =
+    process.env.CLAWDIS_SKIP_CANVAS_HOST !== "1" &&
+    cfgAtStart.canvasHost?.enabled !== false;
+
+  if (canvasHostEnabled) {
     try {
-      canvasHost = await startCanvasHost({
+      const server = await startCanvasHost({
         runtime: defaultRuntime,
-        rootDir: cfgAtStart.canvasHost.root,
-        port: cfgAtStart.canvasHost.port ?? 18793,
-        bind: cfgAtStart.canvasHost.bind ?? "lan",
+        rootDir: cfgAtStart.canvasHost?.root,
+        port: cfgAtStart.canvasHost?.port ?? 18793,
       });
+      if (server.port > 0) canvasHost = server;
     } catch (err) {
       logWarn(`gateway: canvas host failed to start: ${String(err)}`);
     }
