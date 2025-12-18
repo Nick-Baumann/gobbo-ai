@@ -103,11 +103,20 @@ fun SettingsSheet(viewModel: MainViewModel) {
     }
   }
 
-  val bridgeDiscoveryFooterText =
-    if (bridges.isEmpty()) {
-      discoveryStatusText
+  val visibleBridges =
+    if (isConnected && remoteAddress != null) {
+      bridges.filterNot { "${it.host}:${it.port}" == remoteAddress }
     } else {
-      "Discovery active • ${bridges.size} bridge${if (bridges.size == 1) "" else "s"} found"
+      bridges
+    }
+
+  val bridgeDiscoveryFooterText =
+    if (visibleBridges.isEmpty()) {
+      discoveryStatusText
+    } else if (isConnected) {
+      "Discovery active • ${visibleBridges.size} other bridge${if (visibleBridges.size == 1) "" else "s"} found"
+    } else {
+      "Discovery active • ${visibleBridges.size} bridge${if (visibleBridges.size == 1) "" else "s"} found"
     }
 
   LazyColumn(
@@ -159,35 +168,42 @@ fun SettingsSheet(viewModel: MainViewModel) {
 
     item { HorizontalDivider() }
 
-    item { Text("Discovered Bridges", style = MaterialTheme.typography.titleSmall) }
-    if (bridges.isEmpty()) {
-      item { Text("No bridges found yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    } else {
-      items(items = bridges, key = { it.stableId }) { bridge ->
-        ListItem(
-          headlineContent = { Text(bridge.name) },
-          supportingContent = { Text("${bridge.host}:${bridge.port}") },
-          trailingContent = {
-            Button(
-              onClick = {
-                NodeForegroundService.start(context)
-                viewModel.connect(bridge)
-              },
-            ) {
-              Text("Connect")
-            }
-          },
+    if (!isConnected || visibleBridges.isNotEmpty()) {
+      item {
+        Text(
+          if (isConnected) "Other Bridges" else "Discovered Bridges",
+          style = MaterialTheme.typography.titleSmall,
         )
       }
-    }
-    item {
-      Text(
-        bridgeDiscoveryFooterText,
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
+      if (!isConnected && visibleBridges.isEmpty()) {
+        item { Text("No bridges found yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+      } else {
+        items(items = visibleBridges, key = { it.stableId }) { bridge ->
+          ListItem(
+            headlineContent = { Text(bridge.name) },
+            supportingContent = { Text("${bridge.host}:${bridge.port}") },
+            trailingContent = {
+              Button(
+                onClick = {
+                  NodeForegroundService.start(context)
+                  viewModel.connect(bridge)
+                },
+              ) {
+                Text("Connect")
+              }
+            },
+          )
+        }
+      }
+      item {
+        Text(
+          bridgeDiscoveryFooterText,
+          modifier = Modifier.fillMaxWidth(),
+          textAlign = TextAlign.Center,
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
     }
 
     item { HorizontalDivider() }
