@@ -20,6 +20,11 @@ final class NodePairingApprovalPrompter {
     private var alertHostWindow: NSWindow?
     private var remoteResolutionsByRequestId: [String: PairingResolution] = [:]
 
+    private final class AlertHostWindow: NSWindow {
+        override var canBecomeKey: Bool { true }
+        override var canBecomeMain: Bool { true }
+    }
+
     private struct PairingList: Codable {
         let pending: [PendingRequest]
         let paired: [PairedNode]?
@@ -212,16 +217,19 @@ final class NodePairingApprovalPrompter {
             return alertHostWindow
         }
 
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 1),
-            styleMask: [.titled],
+        let window = AlertHostWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 1),
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false)
-        window.title = "Clawdis"
+        window.title = ""
         window.isReleasedWhenClosed = false
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.center()
+        window.isOpaque = false
+        window.hasShadow = false
+        window.backgroundColor = .clear
+        window.ignoresMouseEvents = true
 
         self.alertHostWindow = window
         return window
@@ -272,6 +280,20 @@ final class NodePairingApprovalPrompter {
         self.activeAlert = alert
         self.activeRequestId = req.requestId
         let hostWindow = self.requireAlertHostWindow()
+
+        // Position the hidden host window so the sheet appears centered on screen.
+        // (Sheets attach to the top edge of their parent window; if the parent is tiny, it looks "anchored".)
+        let sheetSize = alert.window.frame.size
+        if let screen = hostWindow.screen ?? NSScreen.main {
+            let bounds = screen.visibleFrame
+            let x = bounds.midX - (sheetSize.width / 2)
+            let sheetOriginY = bounds.midY - (sheetSize.height / 2)
+            let hostY = sheetOriginY + sheetSize.height - hostWindow.frame.height
+            hostWindow.setFrameOrigin(NSPoint(x: x, y: hostY))
+        } else {
+            hostWindow.center()
+        }
+
         hostWindow.makeKeyAndOrderFront(nil)
         alert.beginSheetModal(for: hostWindow) { [weak self] response in
             Task { @MainActor [weak self] in
