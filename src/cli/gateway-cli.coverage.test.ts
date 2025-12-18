@@ -8,7 +8,11 @@ const startGatewayServer = vi.fn(async () => ({
 }));
 const setVerbose = vi.fn();
 const createDefaultDeps = vi.fn();
-const forceFreePort = vi.fn(() => []);
+const forceFreePortAndWait = vi.fn(async () => ({
+  killed: [],
+  waitedMs: 0,
+  escalatedToSigkill: false,
+}));
 
 const runtimeLogs: string[] = [];
 const runtimeErrors: string[] = [];
@@ -44,7 +48,7 @@ vi.mock("./deps.js", () => ({
 }));
 
 vi.mock("./ports.js", () => ({
-  forceFreePort: () => forceFreePort(),
+  forceFreePortAndWait: (port: number) => forceFreePortAndWait(port),
 }));
 
 describe("gateway-cli coverage", () => {
@@ -141,7 +145,7 @@ describe("gateway-cli coverage", () => {
     ).rejects.toThrow("__exit__:1");
 
     // Force free failure
-    forceFreePort.mockImplementationOnce(() => {
+    forceFreePortAndWait.mockImplementationOnce(async () => {
       throw new Error("boom");
     });
     const programForceFail = new Command();

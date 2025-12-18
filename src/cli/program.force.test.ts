@@ -14,6 +14,7 @@ vi.mock("node:child_process", async () => {
 import { execFileSync } from "node:child_process";
 import {
   forceFreePort,
+  forceFreePortAndWait,
   listPortListeners,
   type PortProcess,
   parseLsofOutput,
@@ -78,5 +79,67 @@ describe("gateway --force helpers", () => {
       { pid: 42, command: "node" },
       { pid: 99, command: "ssh" },
     ]);
+  });
+
+  it("retries until the port is free", async () => {
+    vi.useFakeTimers();
+    let call = 0;
+    (execFileSync as unknown as vi.Mock).mockImplementation(() => {
+      call += 1;
+      // 1st call: initial listeners to kill; 2nd call: still listed; 3rd call: gone.
+      if (call === 1) return ["p42", "cnode", ""].join("\n");
+      if (call === 2) return ["p42", "cnode", ""].join("\n");
+      return "";
+    });
+
+    const killMock = vi.fn();
+    // @ts-expect-error override for test
+    process.kill = killMock;
+
+    const promise = forceFreePortAndWait(18789, {
+      timeoutMs: 500,
+      intervalMs: 100,
+      sigtermTimeoutMs: 400,
+    });
+
+    await vi.runAllTimersAsync();
+    const res = await promise;
+
+    expect(killMock).toHaveBeenCalledWith(42, "SIGTERM");
+    expect(res.killed).toEqual<PortProcess[]>([{ pid: 42, command: "node" }]);
+    expect(res.escalatedToSigkill).toBe(false);
+    expect(res.waitedMs).toBeGreaterThan(0);
+
+    vi.useRealTimers();
+  });
+
+  it("escalates to SIGKILL if SIGTERM doesn't free the port", async () => {
+    vi.useFakeTimers();
+    let call = 0;
+    (execFileSync as unknown as vi.Mock).mockImplementation(() => {
+      call += 1;
+      // 1st call: initial kill list; then keep showing until after SIGKILL.
+      if (call <= 6) return ["p42", "cnode", ""].join("\n");
+      return "";
+    });
+
+    const killMock = vi.fn();
+    // @ts-expect-error override for test
+    process.kill = killMock;
+
+    const promise = forceFreePortAndWait(18789, {
+      timeoutMs: 800,
+      intervalMs: 100,
+      sigtermTimeoutMs: 300,
+    });
+
+    await vi.runAllTimersAsync();
+    const res = await promise;
+
+    expect(killMock).toHaveBeenCalledWith(42, "SIGTERM");
+    expect(killMock).toHaveBeenCalledWith(42, "SIGKILL");
+    expect(res.escalatedToSigkill).toBe(true);
+
+    vi.useRealTimers();
   });
 });

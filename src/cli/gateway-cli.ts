@@ -10,7 +10,7 @@ import { info, setVerbose } from "../globals.js";
 import { GatewayLockError } from "../infra/gateway-lock.js";
 import { defaultRuntime } from "../runtime.js";
 import { createDefaultDeps } from "./deps.js";
-import { forceFreePort } from "./ports.js";
+import { forceFreePortAndWait } from "./ports.js";
 
 type GatewayRpcOpts = {
   url?: string;
@@ -98,7 +98,12 @@ export function registerGatewayCli(program: Command) {
       }
       if (opts.force) {
         try {
-          const killed = forceFreePort(port);
+          const { killed, waitedMs, escalatedToSigkill } =
+            await forceFreePortAndWait(port, {
+              timeoutMs: 2000,
+              intervalMs: 100,
+              sigtermTimeoutMs: 700,
+            });
           if (killed.length === 0) {
             defaultRuntime.log(info(`Force: no listeners on port ${port}`));
           } else {
@@ -109,7 +114,16 @@ export function registerGatewayCli(program: Command) {
                 ),
               );
             }
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            if (escalatedToSigkill) {
+              defaultRuntime.log(
+                info(`Force: escalated to SIGKILL while freeing port ${port}`),
+              );
+            }
+            if (waitedMs > 0) {
+              defaultRuntime.log(
+                info(`Force: waited ${waitedMs}ms for port ${port} to free`),
+              );
+            }
           }
         } catch (err) {
           defaultRuntime.error(`Force: ${String(err)}`);
