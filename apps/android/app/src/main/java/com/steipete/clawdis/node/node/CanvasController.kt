@@ -3,6 +3,7 @@ package com.steipete.clawdis.node.node
 import android.graphics.Bitmap
 import android.os.Build
 import android.graphics.Canvas
+import android.os.Looper
 import android.webkit.WebView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -33,16 +34,28 @@ class CanvasController {
     reload()
   }
 
-  private fun reload() {
+  private inline fun withWebViewOnMain(crossinline block: (WebView) -> Unit) {
     val wv = webView ?: return
-    when (mode) {
-      Mode.WEB -> {
-        // Match iOS behavior: if URL is missing/invalid, keep the current page (canvas scaffold).
-        val trimmed = url.trim()
-        if (trimmed.isBlank()) return
-        wv.loadUrl(trimmed)
+    if (Looper.myLooper() == Looper.getMainLooper()) {
+      block(wv)
+    } else {
+      wv.post { block(wv) }
+    }
+  }
+
+  private fun reload() {
+    val currentMode = mode
+    val currentUrl = url
+    withWebViewOnMain { wv ->
+      when (currentMode) {
+        Mode.WEB -> {
+          // Match iOS behavior: if URL is missing/invalid, keep the current page (canvas scaffold).
+          val trimmed = currentUrl.trim()
+          if (trimmed.isBlank()) return@withWebViewOnMain
+          wv.loadUrl(trimmed)
+        }
+        Mode.CANVAS -> wv.loadDataWithBaseURL(null, canvasHtml, "text/html", "utf-8", null)
       }
-      Mode.CANVAS -> wv.loadDataWithBaseURL(null, canvasHtml, "text/html", "utf-8", null)
     }
   }
 
