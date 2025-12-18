@@ -222,6 +222,10 @@ export const NodePairRequestParamsSchema = Type.Object(
     displayName: Type.Optional(NonEmptyString),
     platform: Type.Optional(NonEmptyString),
     version: Type.Optional(NonEmptyString),
+    deviceFamily: Type.Optional(NonEmptyString),
+    modelIdentifier: Type.Optional(NonEmptyString),
+    caps: Type.Optional(Type.Array(NonEmptyString)),
+    commands: Type.Optional(Type.Array(NonEmptyString)),
     remoteIp: Type.Optional(NonEmptyString),
   },
   { additionalProperties: false },
@@ -249,6 +253,11 @@ export const NodePairVerifyParamsSchema = Type.Object(
 
 export const NodeListParamsSchema = Type.Object(
   {},
+  { additionalProperties: false },
+);
+
+export const NodeDescribeParamsSchema = Type.Object(
+  { nodeId: NonEmptyString },
   { additionalProperties: false },
 );
 
@@ -528,6 +537,7 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   NodePairRejectParams: NodePairRejectParamsSchema,
   NodePairVerifyParams: NodePairVerifyParamsSchema,
   NodeListParams: NodeListParamsSchema,
+  NodeDescribeParams: NodeDescribeParamsSchema,
   NodeInvokeParams: NodeInvokeParamsSchema,
   SessionsListParams: SessionsListParamsSchema,
   SessionsPatchParams: SessionsPatchParamsSchema,
@@ -568,6 +578,7 @@ export type NodePairApproveParams = Static<typeof NodePairApproveParamsSchema>;
 export type NodePairRejectParams = Static<typeof NodePairRejectParamsSchema>;
 export type NodePairVerifyParams = Static<typeof NodePairVerifyParamsSchema>;
 export type NodeListParams = Static<typeof NodeListParamsSchema>;
+export type NodeDescribeParams = Static<typeof NodeDescribeParamsSchema>;
 export type NodeInvokeParams = Static<typeof NodeInvokeParamsSchema>;
 export type SessionsListParams = Static<typeof SessionsListParamsSchema>;
 export type SessionsPatchParams = Static<typeof SessionsPatchParamsSchema>;

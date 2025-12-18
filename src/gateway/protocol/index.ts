@@ -38,6 +38,8 @@ import {
   GatewayFrameSchema,
   type HelloOk,
   HelloOkSchema,
+  type NodeDescribeParams,
+  NodeDescribeParamsSchema,
   type NodeInvokeParams,
   NodeInvokeParamsSchema,
   type NodeListParams,
@@ -111,6 +113,9 @@ export const validateNodePairVerifyParams = ajv.compile<NodePairVerifyParams>(
 );
 export const validateNodeListParams =
   ajv.compile<NodeListParams>(NodeListParamsSchema);
+export const validateNodeDescribeParams = ajv.compile<NodeDescribeParams>(
+  NodeDescribeParamsSchema,
+);
 export const validateNodeInvokeParams = ajv.compile<NodeInvokeParams>(
   NodeInvokeParamsSchema,
 );

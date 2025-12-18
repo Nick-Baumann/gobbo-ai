@@ -18,6 +18,10 @@ type BridgeClientInfo = {
   platform?: string;
   version?: string;
   remoteIp?: string;
+  deviceFamily?: string;
+  modelIdentifier?: string;
+  caps?: string[];
+  commands?: string[];
 };
 
 type BridgeStartOpts = {
@@ -543,23 +547,188 @@ describe("gateway server", () => {
       try {
         await connectOk(ws);
 
-	        const res = await rpcReq(ws, "node.invoke", {
-	          nodeId: "ios-node",
-	          command: "canvas.eval",
-	          params: { javaScript: "2+2" },
-	          timeoutMs: 123,
-	          idempotencyKey: "idem-1",
-	        });
+        const res = await rpcReq(ws, "node.invoke", {
+          nodeId: "ios-node",
+          command: "canvas.eval",
+          params: { javaScript: "2+2" },
+          timeoutMs: 123,
+          idempotencyKey: "idem-1",
+        });
         expect(res.ok).toBe(true);
 
-	        expect(bridgeInvoke).toHaveBeenCalledWith(
-	          expect.objectContaining({
-	            nodeId: "ios-node",
-	            command: "canvas.eval",
-	            paramsJSON: JSON.stringify({ javaScript: "2+2" }),
-	            timeoutMs: 123,
-	          }),
-	        );
+        expect(bridgeInvoke).toHaveBeenCalledWith(
+          expect.objectContaining({
+            nodeId: "ios-node",
+            command: "canvas.eval",
+            paramsJSON: JSON.stringify({ javaScript: "2+2" }),
+            timeoutMs: 123,
+          }),
+        );
+      } finally {
+        ws.close();
+        await server.close();
+      }
+    } finally {
+      await fs.rm(homeDir, { recursive: true, force: true });
+      if (prevHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = prevHome;
+      }
+    }
+  });
+
+  test("node.describe returns supported invoke commands for paired nodes", async () => {
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-home-"));
+    const prevHome = process.env.HOME;
+    process.env.HOME = homeDir;
+
+    try {
+      const { server, ws } = await startServerWithClient();
+      try {
+        await connectOk(ws);
+
+        const reqRes = await rpcReq<{
+          status?: string;
+          request?: { requestId?: string };
+        }>(ws, "node.pair.request", {
+          nodeId: "n1",
+          displayName: "iPad",
+          platform: "iPadOS",
+          version: "dev",
+          deviceFamily: "iPad",
+          modelIdentifier: "iPad16,6",
+          caps: ["canvas", "camera"],
+          commands: ["canvas.eval", "canvas.snapshot", "camera.snap"],
+          remoteIp: "10.0.0.10",
+        });
+        expect(reqRes.ok).toBe(true);
+        const requestId = reqRes.payload?.request?.requestId;
+        expect(typeof requestId).toBe("string");
+
+        const approveRes = await rpcReq(ws, "node.pair.approve", {
+          requestId,
+        });
+        expect(approveRes.ok).toBe(true);
+
+        const describeRes = await rpcReq<{ commands?: string[] }>(
+          ws,
+          "node.describe",
+          { nodeId: "n1" },
+        );
+        expect(describeRes.ok).toBe(true);
+        expect(describeRes.payload?.commands).toEqual([
+          "camera.snap",
+          "canvas.eval",
+          "canvas.snapshot",
+        ]);
+      } finally {
+        ws.close();
+        await server.close();
+      }
+    } finally {
+      await fs.rm(homeDir, { recursive: true, force: true });
+      if (prevHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = prevHome;
+      }
+    }
+  });
+
+  test("node.list includes connected unpaired nodes with capabilities + commands", async () => {
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-home-"));
+    const prevHome = process.env.HOME;
+    process.env.HOME = homeDir;
+
+    try {
+      const { server, ws } = await startServerWithClient();
+      try {
+        await connectOk(ws);
+
+        const reqRes = await rpcReq<{
+          status?: string;
+          request?: { requestId?: string };
+        }>(ws, "node.pair.request", {
+          nodeId: "p1",
+          displayName: "Paired",
+          platform: "iPadOS",
+          version: "dev",
+          deviceFamily: "iPad",
+          modelIdentifier: "iPad16,6",
+          caps: ["canvas"],
+          commands: ["canvas.eval"],
+          remoteIp: "10.0.0.10",
+        });
+        expect(reqRes.ok).toBe(true);
+        const requestId = reqRes.payload?.request?.requestId;
+        expect(typeof requestId).toBe("string");
+
+        const approveRes = await rpcReq(ws, "node.pair.approve", { requestId });
+        expect(approveRes.ok).toBe(true);
+
+        bridgeListConnected.mockReturnValueOnce([
+          {
+            nodeId: "p1",
+            displayName: "Paired Live",
+            platform: "iPadOS",
+            version: "dev-live",
+            remoteIp: "10.0.0.11",
+            deviceFamily: "iPad",
+            modelIdentifier: "iPad16,6",
+            caps: ["canvas", "camera"],
+            commands: ["canvas.snapshot", "canvas.eval"],
+          },
+          {
+            nodeId: "u1",
+            displayName: "Unpaired Live",
+            platform: "Android",
+            version: "dev",
+            remoteIp: "10.0.0.12",
+            deviceFamily: "Android",
+            modelIdentifier: "samsung SM-X926B",
+            caps: ["canvas"],
+            commands: ["canvas.eval"],
+          },
+        ]);
+
+        const listRes = await rpcReq<{
+          nodes?: Array<{
+            nodeId: string;
+            paired?: boolean;
+            connected?: boolean;
+            caps?: string[];
+            commands?: string[];
+            displayName?: string;
+            remoteIp?: string;
+          }>;
+        }>(ws, "node.list", {});
+        expect(listRes.ok).toBe(true);
+        const nodes = listRes.payload?.nodes ?? [];
+
+        const pairedNode = nodes.find((n) => n.nodeId === "p1");
+        expect(pairedNode).toMatchObject({
+          nodeId: "p1",
+          paired: true,
+          connected: true,
+          displayName: "Paired Live",
+          remoteIp: "10.0.0.11",
+        });
+        expect(pairedNode?.caps?.slice().sort()).toEqual(["camera", "canvas"]);
+        expect(pairedNode?.commands?.slice().sort()).toEqual([
+          "canvas.eval",
+          "canvas.snapshot",
+        ]);
+
+        const unpairedNode = nodes.find((n) => n.nodeId === "u1");
+        expect(unpairedNode).toMatchObject({
+          nodeId: "u1",
+          paired: false,
+          connected: true,
+          displayName: "Unpaired Live",
+        });
+        expect(unpairedNode?.caps).toEqual(["canvas"]);
+        expect(unpairedNode?.commands).toEqual(["canvas.eval"]);
       } finally {
         ws.close();
         await server.close();
@@ -2275,11 +2444,11 @@ describe("gateway server", () => {
       }),
     );
 
-	    const abortRes = await onceMessage(
-	      ws,
-	      (o) => o.type === "res" && o.id === "abort-mismatch-1",
-	      10_000,
-	    );
+    const abortRes = await onceMessage(
+      ws,
+      (o) => o.type === "res" && o.id === "abort-mismatch-1",
+      10_000,
+    );
     expect(abortRes.ok).toBe(false);
     expect(abortRes.error?.code).toBe("INVALID_REQUEST");
 
@@ -2292,18 +2461,18 @@ describe("gateway server", () => {
       }),
     );
 
-	    const abortRes2 = await onceMessage(
-	      ws,
-	      (o) => o.type === "res" && o.id === "abort-mismatch-2",
-	      10_000,
-	    );
+    const abortRes2 = await onceMessage(
+      ws,
+      (o) => o.type === "res" && o.id === "abort-mismatch-2",
+      10_000,
+    );
     expect(abortRes2.ok).toBe(true);
 
-	    const sendRes = await onceMessage(
-	      ws,
-	      (o) => o.type === "res" && o.id === "send-mismatch-1",
-	      10_000,
-	    );
+    const sendRes = await onceMessage(
+      ws,
+      (o) => o.type === "res" && o.id === "send-mismatch-1",
+      10_000,
+    );
     expect(sendRes.ok).toBe(true);
 
     ws.close();

@@ -113,6 +113,7 @@ import {
   validateCronRunsParams,
   validateCronStatusParams,
   validateCronUpdateParams,
+  validateNodeDescribeParams,
   validateNodeInvokeParams,
   validateNodeListParams,
   validateNodePairApproveParams,
@@ -194,6 +195,7 @@ const METHODS = [
   "node.pair.reject",
   "node.pair.verify",
   "node.list",
+  "node.describe",
   "node.invoke",
   "cron.list",
   "cron.status",
@@ -2777,6 +2779,10 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
                 displayName?: string;
                 platform?: string;
                 version?: string;
+                deviceFamily?: string;
+                modelIdentifier?: string;
+                caps?: string[];
+                commands?: string[];
                 remoteIp?: string;
               };
               try {
@@ -2785,6 +2791,10 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
                   displayName: p.displayName,
                   platform: p.platform,
                   version: p.version,
+                  deviceFamily: p.deviceFamily,
+                  modelIdentifier: p.modelIdentifier,
+                  caps: p.caps,
+                  commands: p.commands,
                   remoteIp: p.remoteIp,
                 });
                 if (result.status === "pending" && result.created) {
@@ -2960,27 +2970,149 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
 
               try {
                 const list = await listNodePairing();
+                const pairedById = new Map(
+                  list.paired.map((n) => [n.nodeId, n]),
+                );
+
                 const connected = bridge?.listConnected?.() ?? [];
                 const connectedById = new Map(
                   connected.map((n) => [n.nodeId, n]),
                 );
 
-	                const nodes = list.paired.map((n) => {
-	                  const live = connectedById.get(n.nodeId);
-	                  return {
-	                    nodeId: n.nodeId,
-	                    displayName: live?.displayName ?? n.displayName,
-	                    platform: live?.platform ?? n.platform,
-	                    version: live?.version ?? n.version,
-	                    deviceFamily: live?.deviceFamily ?? n.deviceFamily,
-	                    modelIdentifier: live?.modelIdentifier ?? n.modelIdentifier,
-	                    remoteIp: live?.remoteIp ?? n.remoteIp,
-	                    caps: live?.caps ?? n.caps,
-	                    connected: Boolean(live),
-	                  };
-	                });
+                const nodeIds = new Set<string>([
+                  ...pairedById.keys(),
+                  ...connectedById.keys(),
+                ]);
+
+                const nodes = [...nodeIds].map((nodeId) => {
+                  const paired = pairedById.get(nodeId);
+                  const live = connectedById.get(nodeId);
+
+                  const caps = [
+                    ...new Set(
+                      (live?.caps ?? paired?.caps ?? [])
+                        .map((c) => String(c).trim())
+                        .filter(Boolean),
+                    ),
+                  ].sort();
+
+                  const commands = [
+                    ...new Set(
+                      (live?.commands ?? paired?.commands ?? [])
+                        .map((c) => String(c).trim())
+                        .filter(Boolean),
+                    ),
+                  ].sort();
+
+                  return {
+                    nodeId,
+                    displayName: live?.displayName ?? paired?.displayName,
+                    platform: live?.platform ?? paired?.platform,
+                    version: live?.version ?? paired?.version,
+                    deviceFamily: live?.deviceFamily ?? paired?.deviceFamily,
+                    modelIdentifier:
+                      live?.modelIdentifier ?? paired?.modelIdentifier,
+                    remoteIp: live?.remoteIp ?? paired?.remoteIp,
+                    caps,
+                    commands,
+                    paired: Boolean(paired),
+                    connected: Boolean(live),
+                  };
+                });
+
+                nodes.sort((a, b) => {
+                  if (a.connected !== b.connected) return a.connected ? -1 : 1;
+                  const an = (a.displayName ?? a.nodeId).toLowerCase();
+                  const bn = (b.displayName ?? b.nodeId).toLowerCase();
+                  if (an < bn) return -1;
+                  if (an > bn) return 1;
+                  return a.nodeId.localeCompare(b.nodeId);
+                });
 
                 respond(true, { ts: Date.now(), nodes }, undefined);
+              } catch (err) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)),
+                );
+              }
+              break;
+            }
+            case "node.describe": {
+              const params = (req.params ?? {}) as Record<string, unknown>;
+              if (!validateNodeDescribeParams(params)) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.INVALID_REQUEST,
+                    `invalid node.describe params: ${formatValidationErrors(validateNodeDescribeParams.errors)}`,
+                  ),
+                );
+                break;
+              }
+              const { nodeId } = params as { nodeId: string };
+              const id = String(nodeId ?? "").trim();
+              if (!id) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"),
+                );
+                break;
+              }
+
+              try {
+                const list = await listNodePairing();
+                const paired = list.paired.find((n) => n.nodeId === id);
+                const connected = bridge?.listConnected?.() ?? [];
+                const live = connected.find((n) => n.nodeId === id);
+
+                if (!paired && !live) {
+                  respond(
+                    false,
+                    undefined,
+                    errorShape(ErrorCodes.INVALID_REQUEST, "unknown nodeId"),
+                  );
+                  break;
+                }
+
+                const caps = [
+                  ...new Set(
+                    (live?.caps ?? paired?.caps ?? [])
+                      .map((c) => String(c).trim())
+                      .filter(Boolean),
+                  ),
+                ].sort();
+
+                const commands = [
+                  ...new Set(
+                    (live?.commands ?? paired?.commands ?? [])
+                      .map((c) => String(c).trim())
+                      .filter(Boolean),
+                  ),
+                ].sort();
+
+                respond(
+                  true,
+                  {
+                    ts: Date.now(),
+                    nodeId: id,
+                    displayName: live?.displayName ?? paired?.displayName,
+                    platform: live?.platform ?? paired?.platform,
+                    version: live?.version ?? paired?.version,
+                    deviceFamily: live?.deviceFamily ?? paired?.deviceFamily,
+                    modelIdentifier:
+                      live?.modelIdentifier ?? paired?.modelIdentifier,
+                    remoteIp: live?.remoteIp ?? paired?.remoteIp,
+                    caps,
+                    commands,
+                    paired: Boolean(paired),
+                    connected: Boolean(live),
+                  },
+                  undefined,
+                );
               } catch (err) {
                 respond(
                   false,
@@ -3011,20 +3143,20 @@ export async function startGatewayServer(port = 18789): Promise<GatewayServer> {
                 );
                 break;
               }
-	              const p = params as {
-	                nodeId: string;
-	                command: string;
-	                params?: unknown;
-	                timeoutMs?: number;
-	                idempotencyKey: string;
-	              };
-	              const nodeId = String(p.nodeId ?? "").trim();
-	              const command = String(p.command ?? "").trim();
-	              if (!nodeId || !command) {
-	                respond(
-	                  false,
-	                  undefined,
-	                  errorShape(
+              const p = params as {
+                nodeId: string;
+                command: string;
+                params?: unknown;
+                timeoutMs?: number;
+                idempotencyKey: string;
+              };
+              const nodeId = String(p.nodeId ?? "").trim();
+              const command = String(p.command ?? "").trim();
+              if (!nodeId || !command) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
                     ErrorCodes.INVALID_REQUEST,
                     "nodeId and command required",
                   ),
