@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.steipete.clawdis.node.chat.ChatController
 import com.steipete.clawdis.node.chat.ChatMessage
@@ -41,6 +42,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import java.util.concurrent.atomic.AtomicLong
 
 class NodeRuntime(context: Context) {
   private val appContext = context.applicationContext
@@ -87,6 +89,13 @@ class NodeRuntime(context: Context) {
 
   private val _statusText = MutableStateFlow("Offline")
   val statusText: StateFlow<String> = _statusText.asStateFlow()
+
+  private val cameraHudSeq = AtomicLong(0)
+  private val _cameraHud = MutableStateFlow<CameraHudState?>(null)
+  val cameraHud: StateFlow<CameraHudState?> = _cameraHud.asStateFlow()
+
+  private val _cameraFlashToken = MutableStateFlow(0L)
+  val cameraFlashToken: StateFlow<Long> = _cameraFlashToken.asStateFlow()
 
   private val _serverName = MutableStateFlow<String?>(null)
   val serverName: StateFlow<String?> = _serverName.asStateFlow()
@@ -603,14 +612,33 @@ class NodeRuntime(context: Context) {
         BridgeSession.InvokeResult.ok(res)
       }
       ClawdisCameraCommand.Snap.rawValue -> {
-        val res = camera.snap(paramsJson)
+        showCameraHud(message = "Taking photo…", kind = CameraHudKind.Photo)
+        triggerCameraFlash()
+        val res =
+          try {
+            camera.snap(paramsJson)
+          } catch (err: Throwable) {
+            val (code, message) = invokeErrorFromThrowable(err)
+            showCameraHud(message = message, kind = CameraHudKind.Error, autoHideMs = 2200)
+            return BridgeSession.InvokeResult.error(code = code, message = message)
+          }
+        showCameraHud(message = "Photo captured", kind = CameraHudKind.Success, autoHideMs = 1600)
         BridgeSession.InvokeResult.ok(res.payloadJson)
       }
       ClawdisCameraCommand.Clip.rawValue -> {
         val includeAudio = paramsJson?.contains("\"includeAudio\":true") != false
         if (includeAudio) externalAudioCaptureActive.value = true
         try {
-          val res = camera.clip(paramsJson)
+          showCameraHud(message = "Recording…", kind = CameraHudKind.Recording)
+          val res =
+            try {
+              camera.clip(paramsJson)
+            } catch (err: Throwable) {
+              val (code, message) = invokeErrorFromThrowable(err)
+              showCameraHud(message = message, kind = CameraHudKind.Error, autoHideMs = 2400)
+              return BridgeSession.InvokeResult.error(code = code, message = message)
+            }
+          showCameraHud(message = "Clip captured", kind = CameraHudKind.Success, autoHideMs = 1800)
           BridgeSession.InvokeResult.ok(res.payloadJson)
         } finally {
           if (includeAudio) externalAudioCaptureActive.value = false
@@ -622,6 +650,35 @@ class NodeRuntime(context: Context) {
           message = "INVALID_REQUEST: unknown command",
         )
     }
+  }
+
+  private fun triggerCameraFlash() {
+    // Token is used as a pulse trigger; value doesn't matter as long as it changes.
+    _cameraFlashToken.value = SystemClock.elapsedRealtimeNanos()
+  }
+
+  private fun showCameraHud(message: String, kind: CameraHudKind, autoHideMs: Long? = null) {
+    val token = cameraHudSeq.incrementAndGet()
+    _cameraHud.value = CameraHudState(token = token, kind = kind, message = message)
+
+    if (autoHideMs != null && autoHideMs > 0) {
+      scope.launch {
+        delay(autoHideMs)
+        if (_cameraHud.value?.token == token) _cameraHud.value = null
+      }
+    }
+  }
+
+  private fun invokeErrorFromThrowable(err: Throwable): Pair<String, String> {
+    val raw = (err.message ?: "").trim()
+    if (raw.isEmpty()) return "UNAVAILABLE" to "UNAVAILABLE: camera error"
+
+    val idx = raw.indexOf(':')
+    if (idx <= 0) return "UNAVAILABLE" to raw
+    val code = raw.substring(0, idx).trim().ifEmpty { "UNAVAILABLE" }
+    val message = raw.substring(idx + 1).trim().ifEmpty { raw }
+    // Preserve full string for callers/logging, but keep the returned message human-friendly.
+    return code to "$code: $message"
   }
 
   private suspend fun ensureA2uiReady(): Boolean {

@@ -58,6 +58,8 @@ fun RootScreen(viewModel: MainViewModel) {
   val context = LocalContext.current
   val serverName by viewModel.serverName.collectAsState()
   val statusText by viewModel.statusText.collectAsState()
+  val cameraHud by viewModel.cameraHud.collectAsState()
+  val cameraFlashToken by viewModel.cameraFlashToken.collectAsState()
 
   val bridgeState =
     remember(serverName, statusText) {
@@ -76,6 +78,11 @@ fun RootScreen(viewModel: MainViewModel) {
 
   Box(modifier = Modifier.fillMaxSize()) {
     CanvasView(viewModel = viewModel, modifier = Modifier.fillMaxSize())
+  }
+
+  // Camera HUD (flash + toast) must be in a Popup to render above the WebView.
+  Popup(alignment = Alignment.Center, properties = PopupProperties(focusable = false)) {
+    CameraHudOverlay(hud = cameraHud, flashToken = cameraFlashToken, modifier = Modifier.fillMaxSize())
   }
 
   // Keep the overlay buttons above the WebView canvas (AndroidView), otherwise they may not receive touches.

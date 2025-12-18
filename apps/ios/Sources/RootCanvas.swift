@@ -31,6 +31,8 @@ struct RootCanvas: View {
                 bridgeStatus: self.bridgeStatus,
                 voiceWakeEnabled: self.voiceWakeEnabled,
                 voiceWakeToastText: self.voiceWakeToastText,
+                cameraHUDText: self.appModel.cameraHUDText,
+                cameraHUDKind: self.appModel.cameraHUDKind,
                 openChat: {
                     self.presentedSheet = .chat
                 },
@@ -38,6 +40,10 @@ struct RootCanvas: View {
                     self.presentedSheet = .settings
                 })
                 .preferredColorScheme(.dark)
+
+            if self.appModel.cameraFlashNonce != 0 {
+                CameraFlashOverlay(nonce: self.appModel.cameraFlashNonce)
+            }
         }
         .sheet(item: self.$presentedSheet) { sheet in
             switch sheet {
@@ -103,6 +109,8 @@ private struct CanvasContent: View {
     var bridgeStatus: StatusPill.BridgeState
     var voiceWakeEnabled: Bool
     var voiceWakeToastText: String?
+    var cameraHUDText: String?
+    var cameraHUDKind: NodeAppModel.CameraHUDKind?
     var openChat: () -> Void
     var openSettings: () -> Void
 
@@ -147,6 +155,32 @@ private struct CanvasContent: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .overlay(alignment: .topLeading) {
+            if let cameraHUDText, !cameraHUDText.isEmpty, let cameraHUDKind {
+                CameraCaptureToast(
+                    text: cameraHUDText,
+                    kind: self.mapCameraKind(cameraHUDKind),
+                    brighten: self.brightenButtons)
+                    .padding(SwiftUI.Edge.Set.leading, 10)
+                    .safeAreaPadding(SwiftUI.Edge.Set.top, 106)
+                    .transition(
+                        AnyTransition.move(edge: SwiftUI.Edge.top)
+                            .combined(with: AnyTransition.opacity))
+            }
+        }
+    }
+
+    private func mapCameraKind(_ kind: NodeAppModel.CameraHUDKind) -> CameraCaptureToast.Kind {
+        switch kind {
+        case .photo:
+            .photo
+        case .recording:
+            .recording
+        case .success:
+            .success
+        case .error:
+            .error
+        }
     }
 }
 
@@ -185,5 +219,87 @@ private struct OverlayButton: View {
                 }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct CameraFlashOverlay: View {
+    var nonce: Int
+
+    @State private var opacity: CGFloat = 0
+    @State private var task: Task<Void, Never>?
+
+    var body: some View {
+        Color.white
+            .opacity(self.opacity)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .onChange(of: self.nonce) { _, _ in
+                self.task?.cancel()
+                self.task = Task { @MainActor in
+                    withAnimation(.easeOut(duration: 0.08)) {
+                        self.opacity = 0.85
+                    }
+                    try? await Task.sleep(nanoseconds: 110_000_000)
+                    withAnimation(.easeOut(duration: 0.32)) {
+                        self.opacity = 0
+                    }
+                }
+            }
+    }
+}
+
+private struct CameraCaptureToast: View {
+    enum Kind {
+        case photo
+        case recording
+        case success
+        case error
+    }
+
+    var text: String
+    var kind: Kind
+    var brighten: Bool = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            self.icon
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Text(self.text)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(.white.opacity(self.brighten ? 0.24 : 0.18), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+        }
+        .accessibilityLabel("Camera")
+        .accessibilityValue(self.text)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        switch self.kind {
+        case .photo:
+            Image(systemName: "camera.fill")
+        case .recording:
+            Image(systemName: "record.circle.fill")
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.red, .primary)
+        case .success:
+            Image(systemName: "checkmark.circle.fill")
+        case .error:
+            Image(systemName: "exclamationmark.triangle.fill")
+        }
     }
 }

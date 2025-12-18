@@ -7,6 +7,13 @@ import UIKit
 @MainActor
 @Observable
 final class NodeAppModel {
+    enum CameraHUDKind {
+        case photo
+        case recording
+        case success
+        case error
+    }
+
     var isBackgrounded: Bool = false
     let screen = ScreenController()
     let camera = CameraController()
@@ -18,9 +25,14 @@ final class NodeAppModel {
     private let bridge = BridgeSession()
     private var bridgeTask: Task<Void, Never>?
     private var voiceWakeSyncTask: Task<Void, Never>?
+    @ObservationIgnored private var cameraHUDDismissTask: Task<Void, Never>?
     let voiceWake = VoiceWakeManager()
 
     var bridgeSession: BridgeSession { self.bridge }
+
+    var cameraHUDText: String?
+    var cameraHUDKind: CameraHUDKind?
+    var cameraFlashNonce: Int = 0
 
     init() {
         self.voiceWake.configure { [weak self] cmd in
@@ -453,6 +465,8 @@ final class NodeAppModel {
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: resultJSON)
 
             case ClawdisCameraCommand.snap.rawValue:
+                self.showCameraHUD(text: "Taking photo…", kind: .photo)
+                self.triggerCameraFlash()
                 let params = (try? Self.decodeParams(ClawdisCameraSnapParams.self, from: req.paramsJSON)) ??
                     ClawdisCameraSnapParams()
                 let res = try await self.camera.snap(params: params)
@@ -468,6 +482,7 @@ final class NodeAppModel {
                     base64: res.base64,
                     width: res.width,
                     height: res.height))
+                self.showCameraHUD(text: "Photo captured", kind: .success, autoHideSeconds: 1.6)
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
 
             case ClawdisCameraCommand.clip.rawValue:
@@ -477,6 +492,7 @@ final class NodeAppModel {
                 let suspended = (params.includeAudio ?? true) ? self.voiceWake.suspendForExternalAudioCapture() : false
                 defer { self.voiceWake.resumeAfterExternalAudioCapture(wasSuspended: suspended) }
 
+                self.showCameraHUD(text: "Recording…", kind: .recording)
                 let res = try await self.camera.clip(params: params)
 
                 struct Payload: Codable {
@@ -490,6 +506,7 @@ final class NodeAppModel {
                     base64: res.base64,
                     durationMs: res.durationMs,
                     hasAudio: res.hasAudio))
+                self.showCameraHUD(text: "Clip captured", kind: .success, autoHideSeconds: 1.8)
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
 
             default:
@@ -499,6 +516,10 @@ final class NodeAppModel {
                     error: ClawdisNodeError(code: .invalidRequest, message: "INVALID_REQUEST: unknown command"))
             }
         } catch {
+            if command.hasPrefix("camera.") {
+                let text = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                self.showCameraHUD(text: text, kind: .error, autoHideSeconds: 2.2)
+            }
             return BridgeInvokeResponse(
                 id: req.id,
                 ok: false,
@@ -529,5 +550,27 @@ final class NodeAppModel {
         // Default-on: if the key doesn't exist yet, treat it as enabled.
         if UserDefaults.standard.object(forKey: "camera.enabled") == nil { return true }
         return UserDefaults.standard.bool(forKey: "camera.enabled")
+    }
+
+    private func triggerCameraFlash() {
+        self.cameraFlashNonce &+= 1
+    }
+
+    private func showCameraHUD(text: String, kind: CameraHUDKind, autoHideSeconds: Double? = nil) {
+        self.cameraHUDDismissTask?.cancel()
+
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+            self.cameraHUDText = text
+            self.cameraHUDKind = kind
+        }
+
+        guard let autoHideSeconds else { return }
+        self.cameraHUDDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(autoHideSeconds * 1_000_000_000))
+            withAnimation(.easeOut(duration: 0.25)) {
+                self.cameraHUDText = nil
+                self.cameraHUDKind = nil
+            }
+        }
     }
 }
