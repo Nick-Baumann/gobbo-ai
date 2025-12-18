@@ -24,6 +24,23 @@ enum ControlRequestHandler {
         var nodes: [NodeListNode]
     }
 
+    struct GatewayNodeListPayload: Decodable {
+        struct Node: Decodable {
+            var nodeId: String
+            var displayName: String?
+            var platform: String?
+            var version: String?
+            var deviceFamily: String?
+            var modelIdentifier: String?
+            var remoteIp: String?
+            var connected: Bool?
+            var caps: [String]?
+        }
+
+        var ts: Int?
+        var nodes: [Node]
+    }
+
     static func process(
         request: Request,
         notifier: NotificationManager = NotificationManager(),
@@ -413,58 +430,50 @@ enum ControlRequestHandler {
     }
 
     private static func handleNodeList() async -> Response {
-        let paired = await BridgeServer.shared.pairedNodes()
-        let connected = await BridgeServer.shared.connectedNodes()
-        let result = self.buildNodeListResult(paired: paired, connected: connected)
+        do {
+            let data = try await GatewayConnection.shared.request(
+                method: "node.list",
+                params: [:],
+                timeoutMs: 10_000)
+            let payload = try JSONDecoder().decode(GatewayNodeListPayload.self, from: data)
+            let result = self.buildNodeListResult(payload: payload)
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let payload = (try? encoder.encode(result))
-            .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-        return Response(ok: true, payload: Data(payload.utf8))
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let json = (try? encoder.encode(result))
+                .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+            return Response(ok: true, payload: Data(json.utf8))
+        } catch {
+            return Response(ok: false, message: error.localizedDescription)
+        }
     }
 
-    static func buildNodeListResult(paired: [PairedNode], connected: [BridgeNodeInfo]) -> NodeListResult {
-        let connectedById = Dictionary(uniqueKeysWithValues: connected.map { ($0.nodeId, $0) })
-
-        var nodesById: [String: NodeListNode] = [:]
-
-        for p in paired {
-            let live = connectedById[p.nodeId]
-            nodesById[p.nodeId] = NodeListNode(
-                nodeId: p.nodeId,
-                displayName: (live?.displayName ?? p.displayName),
-                platform: (live?.platform ?? p.platform),
-                version: (live?.version ?? p.version),
-                deviceFamily: (live?.deviceFamily ?? p.deviceFamily),
-                modelIdentifier: (live?.modelIdentifier ?? p.modelIdentifier),
-                remoteAddress: live?.remoteAddress,
-                connected: live != nil,
-                capabilities: live?.caps)
+    static func buildNodeListResult(payload: GatewayNodeListPayload) -> NodeListResult {
+        let nodes = payload.nodes.map { n -> NodeListNode in
+            NodeListNode(
+                nodeId: n.nodeId,
+                displayName: n.displayName,
+                platform: n.platform,
+                version: n.version,
+                deviceFamily: n.deviceFamily,
+                modelIdentifier: n.modelIdentifier,
+                remoteAddress: n.remoteIp,
+                connected: n.connected == true,
+                capabilities: n.caps)
         }
 
-        for c in connected where nodesById[c.nodeId] == nil {
-            nodesById[c.nodeId] = NodeListNode(
-                nodeId: c.nodeId,
-                displayName: c.displayName,
-                platform: c.platform,
-                version: c.version,
-                deviceFamily: c.deviceFamily,
-                modelIdentifier: c.modelIdentifier,
-                remoteAddress: c.remoteAddress,
-                connected: true,
-                capabilities: c.caps)
-        }
-
-        let nodes = nodesById.values.sorted { a, b in
+        let sorted = nodes.sorted { a, b in
             (a.displayName ?? a.nodeId) < (b.displayName ?? b.nodeId)
         }
 
+        let pairedNodeIds = sorted.map(\.nodeId).sorted()
+        let connectedNodeIds = sorted.filter(\.connected).map(\.nodeId).sorted()
+
         return NodeListResult(
-            ts: Int(Date().timeIntervalSince1970 * 1000),
-            connectedNodeIds: connected.map(\.nodeId).sorted(),
-            pairedNodeIds: paired.map(\.nodeId).sorted(),
-            nodes: nodes)
+            ts: payload.ts ?? Int(Date().timeIntervalSince1970 * 1000),
+            connectedNodeIds: connectedNodeIds,
+            pairedNodeIds: pairedNodeIds,
+            nodes: sorted)
     }
 
     private static func handleNodeInvoke(
@@ -474,13 +483,30 @@ enum ControlRequestHandler {
         logger: Logger) async -> Response
     {
         do {
-            let res = try await BridgeServer.shared.invoke(nodeId: nodeId, command: command, paramsJSON: paramsJSON)
-            if res.ok {
-                let payload = res.payloadJSON ?? ""
-                return Response(ok: true, payload: Data(payload.utf8))
+            var paramsObj: Any? = nil
+            let raw = (paramsJSON ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !raw.isEmpty {
+                if let data = raw.data(using: .utf8) {
+                    paramsObj = try JSONSerialization.jsonObject(with: data)
+                } else {
+                    return Response(ok: false, message: "params-json not UTF-8")
+                }
             }
-            let errText = res.error?.message ?? "node invoke failed"
-            return Response(ok: false, message: errText)
+
+            var params: [String: AnyCodable] = [
+                "nodeId": AnyCodable(nodeId),
+                "command": AnyCodable(command),
+                "idempotencyKey": AnyCodable(UUID().uuidString),
+            ]
+            if let paramsObj {
+                params["params"] = AnyCodable(paramsObj)
+            }
+
+            let data = try await GatewayConnection.shared.request(
+                method: "node.invoke",
+                params: params,
+                timeoutMs: 30_000)
+            return Response(ok: true, payload: data)
         } catch {
             logger.error("node invoke failed: \(error.localizedDescription, privacy: .public)")
             return Response(ok: false, message: error.localizedDescription)
