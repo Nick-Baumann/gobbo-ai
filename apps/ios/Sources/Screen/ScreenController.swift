@@ -126,10 +126,13 @@ final class ScreenController {
             inset: -20%;
             background:
               repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
-                                       transparent 1px, transparent 48px),
+                                     transparent 1px, transparent 48px),
               repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
-                                       transparent 1px, transparent 48px);
-            transform: rotate(-7deg);
+                                     transparent 1px, transparent 48px);
+            transform: translate3d(0,0,0) rotate(-7deg);
+            will-change: transform, opacity;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
             opacity: 0.45;
             pointer-events: none;
             animation: clawdis-grid-drift 140s ease-in-out infinite alternate;
@@ -145,6 +148,10 @@ final class ScreenController {
             filter: blur(28px);
             opacity: 0.52;
             mix-blend-mode: screen;
+            will-change: transform, opacity;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            transform: translate3d(0,0,0);
             pointer-events: none;
             animation: clawdis-glow-drift 110s ease-in-out infinite alternate;
           }
@@ -178,6 +185,7 @@ final class ScreenController {
             background: rgba(18, 18, 22, 0.42);
             border: 1px solid rgba(255,255,255,0.08);
             box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+            -webkit-backdrop-filter: blur(14px);
             backdrop-filter: blur(14px);
           }
           #clawdis-status .title {
