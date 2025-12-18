@@ -43,17 +43,62 @@ final class ScreenController {
 
     func navigate(to urlString: String) {
         self.urlString = urlString
+        if !urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // `canvas.navigate` is expected to show web content; default to WEB mode.
+            self.mode = .web
+        }
         self.reload()
     }
 
     func reload() {
         switch self.mode {
         case .web:
-            guard let url = URL(string: self.urlString.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
-            self.webView.load(URLRequest(url: url))
+            let trimmed = self.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = URL(string: trimmed) else { return }
+            if url.isFileURL {
+                self.webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+            } else {
+                self.webView.load(URLRequest(url: url))
+            }
         case .canvas:
             self.webView.loadHTMLString(Self.canvasScaffoldHTML, baseURL: nil)
         }
+    }
+
+    func showA2UI() throws {
+        guard let url = ClawdisKitResources.bundle.url(
+            forResource: "index",
+            withExtension: "html",
+            subdirectory: "CanvasA2UI")
+        else {
+            throw NSError(domain: "Canvas", code: 10, userInfo: [
+                NSLocalizedDescriptionKey: "A2UI resources missing (CanvasA2UI/index.html)",
+            ])
+        }
+        self.mode = .web
+        self.urlString = url.absoluteString
+        self.reload()
+    }
+
+    func waitForA2UIReady(timeoutMs: Int) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .milliseconds(timeoutMs))
+        while clock.now < deadline {
+            do {
+                let res = try await self.eval(javaScript: """
+                (() => {
+                  try {
+                    return !!globalThis.clawdisA2UI && typeof globalThis.clawdisA2UI.applyMessages === 'function';
+                  } catch (_) { return false; }
+                })()
+                """)
+                if res == "true" { return true }
+            } catch {
+                // ignore; page likely still loading
+            }
+            try? await Task.sleep(nanoseconds: 120_000_000)
+        }
+        return false
     }
 
     func eval(javaScript: String) async throws -> String {

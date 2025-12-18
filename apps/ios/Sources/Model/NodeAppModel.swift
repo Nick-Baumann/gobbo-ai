@@ -316,6 +316,56 @@ final class NodeAppModel {
                 let payload = try Self.encodePayload(["format": "png", "base64": base64])
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
 
+            case ClawdisCanvasA2UICommand.reset.rawValue:
+                try self.screen.showA2UI()
+                if await !self.screen.waitForA2UIReady(timeoutMs: 5000) {
+                    return BridgeInvokeResponse(
+                        id: req.id,
+                        ok: false,
+                        error: ClawdisNodeError(code: .unavailable, message: "A2UI not ready"))
+                }
+
+                let json = try await self.screen.eval(javaScript: """
+                (() => {
+                  if (!globalThis.clawdisA2UI) return JSON.stringify({ ok: false, error: "missing clawdisA2UI" });
+                  return JSON.stringify(globalThis.clawdisA2UI.reset());
+                })()
+                """)
+                return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: json)
+
+            case ClawdisCanvasA2UICommand.push.rawValue, ClawdisCanvasA2UICommand.pushJSONL.rawValue:
+                let messages: [AnyCodable]
+                if command == ClawdisCanvasA2UICommand.pushJSONL.rawValue {
+                    let params = try Self.decodeParams(ClawdisCanvasA2UIPushJSONLParams.self, from: req.paramsJSON)
+                    messages = try ClawdisCanvasA2UIJSONL.decodeMessagesFromJSONL(params.jsonl)
+                } else {
+                    let params = try Self.decodeParams(ClawdisCanvasA2UIPushParams.self, from: req.paramsJSON)
+                    messages = params.messages
+                }
+
+                try self.screen.showA2UI()
+                if await !self.screen.waitForA2UIReady(timeoutMs: 5000) {
+                    return BridgeInvokeResponse(
+                        id: req.id,
+                        ok: false,
+                        error: ClawdisNodeError(code: .unavailable, message: "A2UI not ready"))
+                }
+
+                let messagesJSON = try ClawdisCanvasA2UIJSONL.encodeMessagesJSONArray(messages)
+                let js = """
+                (() => {
+                  try {
+                    if (!globalThis.clawdisA2UI) return JSON.stringify({ ok: false, error: "missing clawdisA2UI" });
+                    const messages = \(messagesJSON);
+                    return JSON.stringify(globalThis.clawdisA2UI.applyMessages(messages));
+                  } catch (e) {
+                    return JSON.stringify({ ok: false, error: String(e?.message ?? e) });
+                  }
+                })()
+                """
+                let resultJSON = try await self.screen.eval(javaScript: js)
+                return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: resultJSON)
+
             case ClawdisCameraCommand.snap.rawValue:
                 let params = (try? Self.decodeParams(ClawdisCameraSnapParams.self, from: req.paramsJSON)) ??
                     ClawdisCameraSnapParams()

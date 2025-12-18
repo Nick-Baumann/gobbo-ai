@@ -179,6 +179,8 @@ final class BridgeConnectionController {
             ClawdisCanvasCommand.navigate.rawValue,
             ClawdisCanvasCommand.evalJS.rawValue,
             ClawdisCanvasCommand.snapshot.rawValue,
+            ClawdisCanvasA2UICommand.push.rawValue,
+            ClawdisCanvasA2UICommand.reset.rawValue,
         ]
 
         let caps = Set(self.currentCaps())

@@ -17,10 +17,9 @@ import WebKit
         #expect(scrollView.bounces == false)
     }
 
-    @Test @MainActor func webModeRejectsInvalidURLStrings() {
+    @Test @MainActor func navigateDefaultsToWebMode() {
         let screen = ScreenController()
-        screen.navigate(to: "about:blank")
-        screen.setMode(.web)
+        screen.navigate(to: "not a url")
 
         #expect(screen.mode == .web)
     }
