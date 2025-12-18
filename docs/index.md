@@ -118,6 +118,7 @@ Example:
   - [Clawd personal assistant setup](./clawd.md)
   - [AGENTS.md template (default)](./AGENTS.default.md)
   - [Gateway runbook](./gateway.md)
+  - [Nodes (iOS/Android)](./nodes.md)
   - [Web surfaces (Control UI)](./web.md)
   - [Discovery + transports](./discovery.md)
   - [Remote access](./remote.md)

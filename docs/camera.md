@@ -96,7 +96,7 @@ Like `canvas.*`, the Android node only allows `camera.*` commands in the **foreg
 
 The macOS companion app exposes a checkbox:
 
-- **Settings → Debug → Camera → Allow Camera (agent)** (`clawdis.cameraEnabled`)
+- **Settings → General → Allow Camera** (`clawdis.cameraEnabled`)
   - Default: **off**
   - When off: camera requests return “Camera disabled by user”.
 
@@ -109,7 +109,8 @@ Examples:
 ```bash
 clawdis-mac camera snap                         # prints MEDIA:<path>
 clawdis-mac camera snap --max-width 1280
-clawdis-mac camera clip --duration-ms 3000      # prints MEDIA:<path>
+clawdis-mac camera clip --duration 10s          # prints MEDIA:<path>
+clawdis-mac camera clip --duration-ms 3000      # prints MEDIA:<path> (legacy flag)
 clawdis-mac camera clip --no-audio
 ```
 
@@ -120,3 +121,14 @@ Notes:
 
 - Camera and microphone access trigger the usual OS permission prompts (and require usage strings in Info.plist).
 - Video clips are capped (currently `<= 60s`) to avoid oversized bridge payloads (base64 overhead + message limits).
+
+## macOS screen video (OS-level)
+
+For *screen* video (not camera), use the macOS companion:
+
+```bash
+clawdis-mac screen record --duration 10s --fps 15   # prints MEDIA:<path>
+```
+
+Notes:
+- Requires macOS **Screen Recording** permission (TCC).
