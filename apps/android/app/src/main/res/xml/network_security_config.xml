@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+  <!-- This app is primarily used on a trusted tailnet; allow cleartext for IP-based endpoints too. -->
+  <base-config cleartextTrafficPermitted="true" />
   <!-- Allow HTTP for tailnet/local dev endpoints (e.g. canvas/background web). -->
   <domain-config cleartextTrafficPermitted="true">
     <domain includeSubdomains="true">clawdis.internal</domain>
