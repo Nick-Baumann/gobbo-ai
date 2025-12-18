@@ -8,6 +8,7 @@ import WebKit
 final class ScreenController {
     let webView: WKWebView
     private let navigationDelegate: ScreenNavigationDelegate
+    private let a2uiActionHandler: CanvasA2UIActionMessageHandler
 
     var mode: ClawdisCanvasMode = .canvas
     var urlString: String = ""
@@ -16,14 +17,23 @@ final class ScreenController {
     /// Callback invoked when a clawdis:// deep link is tapped in the canvas
     var onDeepLink: ((URL) -> Void)?
 
+    /// Callback invoked when the user clicks an A2UI action (e.g. button) inside the canvas web UI.
+    var onA2UIAction: (([String: Any]) -> Void)?
+
     init() {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
+        let a2uiActionHandler = CanvasA2UIActionMessageHandler()
+        let userContentController = WKUserContentController()
+        userContentController.add(a2uiActionHandler, name: CanvasA2UIActionMessageHandler.messageName)
+        config.userContentController = userContentController
         self.navigationDelegate = ScreenNavigationDelegate()
+        self.a2uiActionHandler = a2uiActionHandler
         self.webView = WKWebView(frame: .zero, configuration: config)
-        self.webView.isOpaque = false
-        self.webView.backgroundColor = .clear
-        self.webView.scrollView.backgroundColor = .clear
+        // Canvas scaffold is a fully self-contained HTML page; avoid relying on transparency underlays.
+        self.webView.isOpaque = true
+        self.webView.backgroundColor = .black
+        self.webView.scrollView.backgroundColor = .black
         self.webView.scrollView.contentInsetAdjustmentBehavior = .never
         self.webView.scrollView.contentInset = .zero
         self.webView.scrollView.scrollIndicatorInsets = .zero
@@ -33,6 +43,7 @@ final class ScreenController {
         self.webView.scrollView.bounces = false
         self.webView.navigationDelegate = self.navigationDelegate
         self.navigationDelegate.controller = self
+        a2uiActionHandler.controller = self
         self.reload()
     }
 
@@ -61,18 +72,16 @@ final class ScreenController {
                 self.webView.load(URLRequest(url: url))
             }
         case .canvas:
-            self.webView.loadHTMLString(Self.canvasScaffoldHTML, baseURL: nil)
+            guard let url = Self.canvasScaffoldURL else { return }
+            self.webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         }
     }
 
     func showA2UI() throws {
-        guard let url = ClawdisKitResources.bundle.url(
-            forResource: "index",
-            withExtension: "html",
-            subdirectory: "CanvasA2UI")
+        guard let url = Self.a2uiIndexURL
         else {
             throw NSError(domain: "Canvas", code: 10, userInfo: [
-                NSLocalizedDescriptionKey: "A2UI resources missing (CanvasA2UI/index.html)",
+                NSLocalizedDescriptionKey: "A2UI resources missing (index.html)",
             ])
         }
         self.mode = .web
@@ -145,164 +154,17 @@ final class ScreenController {
         return data.base64EncodedString()
     }
 
-    private static let canvasScaffoldHTML = """
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <title>Canvas</title>
-        <style>
-          :root { color-scheme: dark; }
-          @media (prefers-reduced-motion: reduce) {
-            body::before, body::after { animation: none !important; }
-          }
-          html,body { height:100%; margin:0; }
-          body {
-            background: radial-gradient(1200px 900px at 15% 20%, rgba(42, 113, 255, 0.18), rgba(0,0,0,0) 55%),
-                        radial-gradient(900px 700px at 85% 30%, rgba(255, 0, 138, 0.14), rgba(0,0,0,0) 60%),
-                        radial-gradient(1000px 900px at 60% 90%, rgba(0, 209, 255, 0.10), rgba(0,0,0,0) 60%),
-                        #000;
-            overflow: hidden;
-          }
-          body::before {
-            content:"";
-            position: fixed;
-            inset: -20%;
-            background:
-              repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px,
-                                     transparent 1px, transparent 48px),
-              repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px,
-                                     transparent 1px, transparent 48px);
-            transform: translate3d(0,0,0) rotate(-7deg);
-            will-change: transform, opacity;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            opacity: 0.45;
-            pointer-events: none;
-            animation: clawdis-grid-drift 140s ease-in-out infinite alternate;
-          }
-          body::after {
-            content:"";
-            position: fixed;
-            inset: -35%;
-            background:
-              radial-gradient(900px 700px at 30% 30%, rgba(42,113,255,0.16), rgba(0,0,0,0) 60%),
-              radial-gradient(800px 650px at 70% 35%, rgba(255,0,138,0.12), rgba(0,0,0,0) 62%),
-              radial-gradient(900px 800px at 55% 75%, rgba(0,209,255,0.10), rgba(0,0,0,0) 62%);
-            filter: blur(28px);
-            opacity: 0.52;
-            will-change: transform, opacity;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            transform: translate3d(0,0,0);
-            pointer-events: none;
-            animation: clawdis-glow-drift 110s ease-in-out infinite alternate;
-          }
-          @supports (mix-blend-mode: screen) {
-            body::after { mix-blend-mode: screen; }
-          }
-          @supports not (mix-blend-mode: screen) {
-            body::after { opacity: 0.70; }
-          }
-          @keyframes clawdis-grid-drift {
-            0%   { transform: translate3d(-12px, 8px, 0) rotate(-7deg); opacity: 0.40; }
-            50%  { transform: translate3d( 10px,-7px, 0) rotate(-6.6deg); opacity: 0.56; }
-            100% { transform: translate3d(-8px,  6px, 0) rotate(-7.2deg); opacity: 0.42; }
-          }
-          @keyframes clawdis-glow-drift {
-            0%   { transform: translate3d(-18px, 12px, 0) scale(1.02); opacity: 0.40; }
-            50%  { transform: translate3d( 14px,-10px, 0) scale(1.05); opacity: 0.52; }
-            100% { transform: translate3d(-10px,  8px, 0) scale(1.03); opacity: 0.43; }
-          }
-          canvas {
-            display:block;
-            width:100vw;
-            height:100vh;
-            touch-action: none;
-          }
-          #clawdis-status {
-            position: fixed;
-            inset: 0;
-            display: grid;
-            place-items: center;
-            pointer-events: none;
-          }
-          #clawdis-status .card {
-            text-align: center;
-            padding: 16px 18px;
-            border-radius: 14px;
-            background: rgba(18, 18, 22, 0.42);
-            border: 1px solid rgba(255,255,255,0.08);
-            box-shadow: 0 18px 60px rgba(0,0,0,0.55);
-            -webkit-backdrop-filter: blur(14px);
-            backdrop-filter: blur(14px);
-          }
-          #clawdis-status .title {
-            font: 600 20px -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
-            letter-spacing: 0.2px;
-            color: rgba(255,255,255,0.92);
-            text-shadow: 0 0 22px rgba(42, 113, 255, 0.35);
-          }
-          #clawdis-status .subtitle {
-            margin-top: 6px;
-            font: 500 12px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-            color: rgba(255,255,255,0.58);
-          }
-        </style>
-      </head>
-      <body>
-        <canvas id="clawdis-canvas"></canvas>
-        <div id="clawdis-status">
-          <div class="card">
-            <div class="title" id="clawdis-status-title">Ready</div>
-            <div class="subtitle" id="clawdis-status-subtitle">Waiting for agent</div>
-          </div>
-        </div>
-        <script>
-          (() => {
-            const canvas = document.getElementById('clawdis-canvas');
-            const ctx = canvas.getContext('2d');
-            const statusEl = document.getElementById('clawdis-status');
-            const titleEl = document.getElementById('clawdis-status-title');
-            const subtitleEl = document.getElementById('clawdis-status-subtitle');
+    // SwiftPM flattens resource directories; ensure resource filenames are unique.
+    private static let canvasScaffoldURL: URL? = ClawdisKitResources.bundle.url(
+        forResource: "scaffold",
+        withExtension: "html")
+    private static let a2uiIndexURL: URL? = ClawdisKitResources.bundle.url(forResource: "index", withExtension: "html")
 
-            function resize() {
-              const dpr = window.devicePixelRatio || 1;
-              const w = Math.max(1, Math.floor(window.innerWidth * dpr));
-              const h = Math.max(1, Math.floor(window.innerHeight * dpr));
-              canvas.width = w;
-              canvas.height = h;
-              ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            }
-
-            window.addEventListener('resize', resize);
-            resize();
-
-            window.__clawdis = {
-              canvas,
-              ctx,
-              setStatus: (title, subtitle) => {
-                if (!statusEl) return;
-                if (!title && !subtitle) {
-                  statusEl.style.display = 'none';
-                  return;
-                }
-                statusEl.style.display = 'grid';
-                if (titleEl && typeof title === 'string') titleEl.textContent = title;
-                if (subtitleEl && typeof subtitle === 'string') subtitleEl.textContent = subtitle;
-                // Auto-hide after 3 seconds
-                clearTimeout(window.__statusTimeout);
-                window.__statusTimeout = setTimeout(() => {
-                  statusEl.style.display = 'none';
-                }, 3000);
-              }
-            };
-          })();
-        </script>
-      </body>
-    </html>
-    """
+    fileprivate func isBundledA2UIURL(_ url: URL) -> Bool {
+        guard url.isFileURL else { return false }
+        guard let expected = Self.a2uiIndexURL else { return false }
+        return url.standardizedFileURL == expected.standardizedFileURL
+    }
 }
 
 // MARK: - Navigation Delegate
@@ -331,5 +193,33 @@ private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
         }
 
         decisionHandler(.allow)
+    }
+}
+
+private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHandler {
+    static let messageName = "clawdisCanvasA2UIAction"
+
+    weak var controller: ScreenController?
+
+    func userContentController(_: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName else { return }
+        guard let controller else { return }
+
+        // Only accept actions from local bundled CanvasA2UI content (not arbitrary web pages).
+        guard let url = message.webView?.url, controller.isBundledA2UIURL(url) else { return }
+
+        let body: [String: Any] = {
+            if let dict = message.body as? [String: Any] { return dict }
+            if let dict = message.body as? [AnyHashable: Any] {
+                return dict.reduce(into: [String: Any]()) { acc, pair in
+                    guard let key = pair.key as? String else { return }
+                    acc[key] = pair.value
+                }
+            }
+            return [:]
+        }()
+        guard !body.isEmpty else { return }
+
+        controller.onA2UIAction?(body)
     }
 }

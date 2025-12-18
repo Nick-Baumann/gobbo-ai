@@ -2,6 +2,7 @@ import ClawdisKit
 import Network
 import Observation
 import SwiftUI
+import UIKit
 
 @MainActor
 @Observable
@@ -42,6 +43,90 @@ final class NodeAppModel {
             Task { @MainActor in
                 await self.handleDeepLink(url: url)
             }
+        }
+
+        // Wire up A2UI action clicks (buttons, etc.)
+        self.screen.onA2UIAction = { [weak self] body in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.handleCanvasA2UIAction(body: body)
+            }
+        }
+    }
+
+    private func handleCanvasA2UIAction(body: [String: Any]) async {
+        let userActionAny = body["userAction"] ?? body
+        let userAction: [String: Any] = {
+            if let dict = userActionAny as? [String: Any] { return dict }
+            if let dict = userActionAny as? [AnyHashable: Any] {
+                return dict.reduce(into: [String: Any]()) { acc, pair in
+                    guard let key = pair.key as? String else { return }
+                    acc[key] = pair.value
+                }
+            }
+            return [:]
+        }()
+        guard !userAction.isEmpty else { return }
+
+        guard let name = userAction["name"] as? String, !name.isEmpty else { return }
+        let actionId: String = {
+            let id = (userAction["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return id.isEmpty ? UUID().uuidString : id
+        }()
+
+        let surfaceId: String = {
+            let raw = (userAction["surfaceId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return raw.isEmpty ? "main" : raw
+        }()
+        let sourceComponentId: String = {
+            let raw = (userAction[
+                "sourceComponentId",
+            ] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return raw.isEmpty ? "-" : raw
+        }()
+
+        let host = UserDefaults.standard.string(forKey: "node.displayName") ?? UIDevice.current.name
+        let instanceId = (UserDefaults.standard.string(forKey: "node.instanceId") ?? "ios-node").lowercased()
+        let contextJSON = ClawdisCanvasA2UIAction.compactJSON(userAction["context"])
+        let sessionKey = "main"
+
+        let message = ClawdisCanvasA2UIAction.formatAgentMessage(
+            actionName: name,
+            sessionKey: sessionKey,
+            surfaceId: surfaceId,
+            sourceComponentId: sourceComponentId,
+            host: host,
+            instanceId: instanceId,
+            contextJSON: contextJSON)
+
+        let ok: Bool
+        var errorText: String? = nil
+        if await !self.isBridgeConnected() {
+            ok = false
+            errorText = "bridge not connected"
+        } else {
+            do {
+                try await self.sendAgentRequest(link: AgentDeepLink(
+                    message: message,
+                    sessionKey: sessionKey,
+                    thinking: "low",
+                    deliver: false,
+                    to: nil,
+                    channel: nil,
+                    timeoutSeconds: nil,
+                    key: actionId))
+                ok = true
+            } catch {
+                ok = false
+                errorText = error.localizedDescription
+            }
+        }
+
+        let js = ClawdisCanvasA2UIAction.jsDispatchA2UIActionStatus(actionId: actionId, ok: ok, error: errorText)
+        do {
+            _ = try await self.screen.eval(javaScript: js)
+        } catch {
+            // ignore
         }
     }
 
@@ -339,8 +424,14 @@ final class NodeAppModel {
                     let params = try Self.decodeParams(ClawdisCanvasA2UIPushJSONLParams.self, from: req.paramsJSON)
                     messages = try ClawdisCanvasA2UIJSONL.decodeMessagesFromJSONL(params.jsonl)
                 } else {
-                    let params = try Self.decodeParams(ClawdisCanvasA2UIPushParams.self, from: req.paramsJSON)
-                    messages = params.messages
+                    do {
+                        let params = try Self.decodeParams(ClawdisCanvasA2UIPushParams.self, from: req.paramsJSON)
+                        messages = params.messages
+                    } catch {
+                        // Be forgiving: some clients still send JSONL payloads to `canvas.a2ui.push`.
+                        let params = try Self.decodeParams(ClawdisCanvasA2UIPushJSONLParams.self, from: req.paramsJSON)
+                        messages = try ClawdisCanvasA2UIJSONL.decodeMessagesFromJSONL(params.jsonl)
+                    }
                 }
 
                 try self.screen.showA2UI()

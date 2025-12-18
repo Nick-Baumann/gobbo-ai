@@ -97,6 +97,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     runtime.disconnect()
   }
 
+  fun handleCanvasA2UIActionFromWebView(payloadJson: String) {
+    runtime.handleCanvasA2UIActionFromWebView(payloadJson)
+  }
+
   fun loadChat(sessionKey: String = "main") {
     runtime.loadChat(sessionKey)
   }

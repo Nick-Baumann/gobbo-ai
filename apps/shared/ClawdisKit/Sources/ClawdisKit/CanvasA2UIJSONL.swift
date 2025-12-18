@@ -73,4 +73,3 @@ public enum ClawdisCanvasA2UIJSONL: Sendable {
         return json
     }
 }
-

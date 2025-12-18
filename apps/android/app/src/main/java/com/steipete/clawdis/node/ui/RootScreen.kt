@@ -6,13 +6,13 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.util.Log
 import android.view.View
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebSettings
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebViewClient
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,12 +24,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.background
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
@@ -42,10 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -80,7 +75,6 @@ fun RootScreen(viewModel: MainViewModel) {
       PackageManager.PERMISSION_GRANTED
 
   Box(modifier = Modifier.fillMaxSize()) {
-    CanvasBackdrop(modifier = Modifier.fillMaxSize())
     CanvasView(viewModel = viewModel, modifier = Modifier.fillMaxSize())
   }
 
@@ -187,73 +181,30 @@ private fun CanvasView(viewModel: MainViewModel, modifier: Modifier = Modifier) 
               )
             }
           }
-        setBackgroundColor(Color.TRANSPARENT)
-        setBackgroundResource(0)
-        // WebView transparency + HW acceleration can render as solid black on some Android/WebView builds.
-        // Prefer correct alpha blending since we render the idle backdrop in Compose underneath.
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        setBackgroundColor(Color.BLACK)
+        setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
+        addJavascriptInterface(
+          CanvasA2UIActionBridge { payload ->
+            viewModel.handleCanvasA2UIActionFromWebView(payload)
+          },
+          CanvasA2UIActionBridge.interfaceName,
+        )
         viewModel.canvas.attach(this)
       }
     },
   )
 }
 
-@Composable
-private fun CanvasBackdrop(modifier: Modifier = Modifier) {
-  val base = MaterialTheme.colorScheme.background
+private class CanvasA2UIActionBridge(private val onMessage: (String) -> Unit) {
+  @JavascriptInterface
+  fun postMessage(payload: String?) {
+    val msg = payload?.trim().orEmpty()
+    if (msg.isEmpty()) return
+    onMessage(msg)
+  }
 
-  Canvas(modifier = modifier.background(base)) {
-    // Subtle idle backdrop; also acts as fallback when WebView content is transparent or fails to load.
-    drawRect(
-      brush =
-        Brush.linearGradient(
-          colors =
-            listOf(
-              ComposeColor(0xFF0A2034),
-              ComposeColor(0xFF070A10),
-              ComposeColor(0xFF250726),
-            ),
-          start = Offset(0f, 0f),
-          end = Offset(size.width, size.height),
-        ),
-    )
-
-    val step = 48f * density
-    val lineColor = ComposeColor.White.copy(alpha = 0.028f)
-    var x = -step
-    while (x < size.width + step) {
-      drawLine(color = lineColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
-      x += step
-    }
-    var y = -step
-    while (y < size.height + step) {
-      drawLine(color = lineColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
-      y += step
-    }
-
-    drawRect(
-      brush =
-        Brush.radialGradient(
-          colors = listOf(ComposeColor(0xFF2A71FF).copy(alpha = 0.22f), ComposeColor.Transparent),
-          center = Offset(size.width * 0.15f, size.height * 0.20f),
-          radius = size.minDimension * 0.9f,
-        ),
-    )
-    drawRect(
-      brush =
-        Brush.radialGradient(
-          colors = listOf(ComposeColor(0xFFFF008A).copy(alpha = 0.18f), ComposeColor.Transparent),
-          center = Offset(size.width * 0.85f, size.height * 0.30f),
-          radius = size.minDimension * 0.75f,
-        ),
-    )
-    drawRect(
-      brush =
-        Brush.radialGradient(
-          colors = listOf(ComposeColor(0xFF00D1FF).copy(alpha = 0.14f), ComposeColor.Transparent),
-          center = Offset(size.width * 0.60f, size.height * 0.90f),
-          radius = size.minDimension * 0.85f,
-        ),
-    )
+  companion object {
+    const val interfaceName: String = "clawdisCanvasA2UIAction"
   }
 }

@@ -18,6 +18,7 @@ import com.steipete.clawdis.node.node.CameraCaptureManager
 import com.steipete.clawdis.node.node.CanvasController
 import com.steipete.clawdis.node.protocol.ClawdisCapability
 import com.steipete.clawdis.node.protocol.ClawdisCameraCommand
+import com.steipete.clawdis.node.protocol.ClawdisCanvasA2UIAction
 import com.steipete.clawdis.node.protocol.ClawdisCanvasA2UICommand
 import com.steipete.clawdis.node.protocol.ClawdisCanvasCommand
 import com.steipete.clawdis.node.voice.VoiceWakeManager
@@ -364,6 +365,79 @@ class NodeRuntime(context: Context) {
     session.disconnect()
   }
 
+  fun handleCanvasA2UIActionFromWebView(payloadJson: String) {
+    scope.launch {
+      val trimmed = payloadJson.trim()
+      if (trimmed.isEmpty()) return@launch
+
+      val root =
+        try {
+          json.parseToJsonElement(trimmed).asObjectOrNull() ?: return@launch
+        } catch (_: Throwable) {
+          return@launch
+        }
+
+      val userActionObj = (root["userAction"] as? JsonObject) ?: root
+      val actionId = (userActionObj["id"] as? JsonPrimitive)?.content?.trim().orEmpty().ifEmpty {
+        java.util.UUID.randomUUID().toString()
+      }
+      val name = (userActionObj["name"] as? JsonPrimitive)?.content?.trim().orEmpty()
+      if (name.isEmpty()) return@launch
+
+      val surfaceId =
+        (userActionObj["surfaceId"] as? JsonPrimitive)?.content?.trim().orEmpty().ifEmpty { "main" }
+      val sourceComponentId =
+        (userActionObj["sourceComponentId"] as? JsonPrimitive)?.content?.trim().orEmpty().ifEmpty { "-" }
+      val contextJson = (userActionObj["context"] as? JsonObject)?.toString()
+
+      val sessionKey = "main"
+      val message =
+        ClawdisCanvasA2UIAction.formatAgentMessage(
+          actionName = name,
+          sessionKey = sessionKey,
+          surfaceId = surfaceId,
+          sourceComponentId = sourceComponentId,
+          host = displayName.value,
+          instanceId = instanceId.value.lowercase(),
+          contextJson = contextJson,
+        )
+
+      val connected = isConnected.value
+      var error: String? = null
+      if (connected) {
+        try {
+          session.sendEvent(
+            event = "agent.request",
+            payloadJson =
+              buildJsonObject {
+                put("message", JsonPrimitive(message))
+                put("sessionKey", JsonPrimitive(sessionKey))
+                put("thinking", JsonPrimitive("low"))
+                put("deliver", JsonPrimitive(false))
+                put("key", JsonPrimitive(actionId))
+              }.toString(),
+          )
+        } catch (e: Throwable) {
+          error = e.message ?: "send failed"
+        }
+      } else {
+        error = "bridge not connected"
+      }
+
+      try {
+        canvas.eval(
+          ClawdisCanvasA2UIAction.jsDispatchA2UIActionStatus(
+            actionId = actionId,
+            ok = connected && error == null,
+            error = error,
+          ),
+        )
+      } catch (_: Throwable) {
+        // ignore
+      }
+    }
+  }
+
   fun loadChat(sessionKey: String = "main") {
     chat.load(sessionKey)
   }
@@ -581,11 +655,15 @@ class NodeRuntime(context: Context) {
     val raw = paramsJson?.trim().orEmpty()
     if (raw.isBlank()) throw IllegalArgumentException("INVALID_REQUEST: paramsJSON required")
 
-    if (command == ClawdisCanvasA2UICommand.PushJSONL.rawValue) {
-      val obj =
-        json.parseToJsonElement(raw) as? JsonObject
-          ?: throw IllegalArgumentException("INVALID_REQUEST: expected object params")
-      val jsonl = (obj["jsonl"] as? JsonPrimitive)?.content?.trim().orEmpty()
+    val obj =
+      json.parseToJsonElement(raw) as? JsonObject
+        ?: throw IllegalArgumentException("INVALID_REQUEST: expected object params")
+
+    val jsonlField = (obj["jsonl"] as? JsonPrimitive)?.content?.trim().orEmpty()
+    val hasMessagesArray = obj["messages"] is JsonArray
+
+    if (command == ClawdisCanvasA2UICommand.PushJSONL.rawValue || (!hasMessagesArray && jsonlField.isNotBlank())) {
+      val jsonl = jsonlField
       if (jsonl.isBlank()) throw IllegalArgumentException("INVALID_REQUEST: jsonl required")
       val messages =
         jsonl
@@ -604,9 +682,6 @@ class NodeRuntime(context: Context) {
       return JsonArray(messages).toString()
     }
 
-    val obj =
-      json.parseToJsonElement(raw) as? JsonObject
-        ?: throw IllegalArgumentException("INVALID_REQUEST: expected object params")
     val arr = obj["messages"] as? JsonArray ?: throw IllegalArgumentException("INVALID_REQUEST: messages[] required")
     val out =
       arr.mapIndexed { idx, el ->
@@ -638,7 +713,7 @@ class NodeRuntime(context: Context) {
 
 private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
-private const val a2uiIndexUrl: String = "file:///android_asset/canvas_a2ui/index.html"
+private const val a2uiIndexUrl: String = "file:///android_asset/CanvasA2UI/index.html"
 
 private const val a2uiReadyCheckJS: String =
   """

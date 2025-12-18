@@ -1,5 +1,6 @@
 import AppKit
 import ClawdisIPC
+import ClawdisKit
 import Foundation
 import OSLog
 import QuartzCore
@@ -149,7 +150,8 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
 
         canvasWindowLogger.debug("CanvasWindowController init creating WKWebView")
         self.webView = WKWebView(frame: .zero, configuration: config)
-        self.webView.setValue(false, forKey: "drawsBackground")
+        // Canvas scaffold is a fully self-contained HTML page; avoid relying on transparency underlays.
+        self.webView.setValue(true, forKey: "drawsBackground")
 
         let sessionDir = self.sessionDir
         let webView = self.webView
@@ -646,23 +648,18 @@ private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHan
             .nonEmpty ?? "main"
         let sourceComponentId = (userAction["sourceComponentId"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? "-"
-        let host = Self.sanitizeTagValue(InstanceIdentity.displayName)
         let instanceId = InstanceIdentity.instanceId.lowercased()
-        let contextJSON = Self.compactJSON(userAction["context"])
-        let contextSuffix = contextJSON.flatMap { $0.isEmpty ? nil : " ctx=\($0)" } ?? ""
+        let contextJSON = ClawdisCanvasA2UIAction.compactJSON(userAction["context"])
 
         // Token-efficient and unambiguous. The agent should treat this as a UI event and (by default) update Canvas.
-        let text =
-            [
-                "CANVAS_A2UI",
-                "action=\(Self.sanitizeTagValue(name))",
-                "session=\(Self.sanitizeTagValue(self.sessionKey))",
-                "surface=\(Self.sanitizeTagValue(surfaceId))",
-                "component=\(Self.sanitizeTagValue(sourceComponentId))",
-                "host=\(host)",
-                "instance=\(instanceId)\(contextSuffix)",
-                "default=update_canvas",
-            ].joined(separator: " ")
+        let text = ClawdisCanvasA2UIAction.formatAgentMessage(
+            actionName: name,
+            sessionKey: self.sessionKey,
+            surfaceId: surfaceId,
+            sourceComponentId: sourceComponentId,
+            host: InstanceIdentity.displayName,
+            instanceId: instanceId,
+            contextJSON: contextJSON)
 
         Task { [weak webView] in
             if AppStateStore.shared.connectionMode == .local {
@@ -680,7 +677,7 @@ private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHan
 
             await MainActor.run {
                 guard let webView else { return }
-                let js = Self.jsDispatchA2UIActionStatus(actionId: actionId, ok: result.ok, error: result.error)
+                let js = ClawdisCanvasA2UIAction.jsDispatchA2UIActionStatus(actionId: actionId, ok: result.ok, error: result.error)
                 webView.evaluateJavaScript(js) { _, _ in }
             }
             if !result.ok {
@@ -690,39 +687,7 @@ private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHan
         }
     }
 
-    private static func sanitizeTagValue(_ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? "-"
-        let normalized = trimmed.replacingOccurrences(of: " ", with: "_")
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.:")
-        let scalars = normalized.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" }
-        return String(scalars)
-    }
-
-    private static func compactJSON(_ obj: Any?) -> String? {
-        guard let obj else { return nil }
-        guard JSONSerialization.isValidJSONObject(obj) else { return nil }
-        guard let data = try? JSONSerialization.data(withJSONObject: obj, options: []),
-              let str = String(data: data, encoding: .utf8)
-        else { return nil }
-        return str
-    }
-
-    private static func jsDispatchA2UIActionStatus(actionId: String, ok: Bool, error: String?) -> String {
-        let payload: [String: Any] = [
-            "id": actionId,
-            "ok": ok,
-            "error": error ?? "",
-        ]
-        let json: String = {
-            if let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
-               let str = String(data: data, encoding: .utf8)
-            {
-                return str
-            }
-            return "{\"id\":\"\(actionId)\",\"ok\":\(ok ? "true" : "false"),\"error\":\"\"}"
-        }()
-        return "window.dispatchEvent(new CustomEvent('clawdis:a2ui-action-status', { detail: \(json) }));"
-    }
+    // Formatting helpers live in ClawdisKit (`ClawdisCanvasA2UIAction`).
 }
 
 // MARK: - Hover chrome container

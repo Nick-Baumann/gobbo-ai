@@ -7,11 +7,11 @@ import WebKit
         let screen = ScreenController()
 
         #expect(screen.mode == .canvas)
-        #expect(screen.webView.isOpaque == false)
-        #expect(screen.webView.backgroundColor == .clear)
+        #expect(screen.webView.isOpaque == true)
+        #expect(screen.webView.backgroundColor == .black)
 
         let scrollView = screen.webView.scrollView
-        #expect(scrollView.backgroundColor == .clear)
+        #expect(scrollView.backgroundColor == .black)
         #expect(scrollView.contentInsetAdjustmentBehavior == .never)
         #expect(scrollView.isScrollEnabled == false)
         #expect(scrollView.bounces == false)

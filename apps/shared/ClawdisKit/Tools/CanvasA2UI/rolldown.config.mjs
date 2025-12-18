@@ -1,8 +1,9 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "rolldown";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const repoRoot = path.resolve(here, "../../../../../..");
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, "../../../../..");
 const fromHere = (p) => path.resolve(here, p);
 const outputFile = path.resolve(here, "../../Sources/ClawdisKit/Resources/CanvasA2UI/a2ui.bundle.js");
 

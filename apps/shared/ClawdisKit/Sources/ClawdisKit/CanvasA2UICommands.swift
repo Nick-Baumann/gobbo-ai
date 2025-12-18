@@ -24,4 +24,3 @@ public struct ClawdisCanvasA2UIPushJSONLParams: Codable, Sendable, Equatable {
         self.jsonl = jsonl
     }
 }
-

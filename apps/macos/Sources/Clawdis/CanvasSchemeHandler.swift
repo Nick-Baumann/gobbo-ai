@@ -205,8 +205,8 @@ final class CanvasSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func a2uiShellPage(sessionRoot: URL) -> CanvasResponse {
-        // Default Canvas UX: when no index exists, show the built-in A2UI shell.
-        if let data = self.loadBundledResourceData(subdirectory: "CanvasA2UI", relativePath: "index.html") {
+        // Default Canvas UX: when no index exists, show the built-in scaffold page.
+        if let data = self.loadBundledResourceData(relativePath: "scaffold.html") {
             return CanvasResponse(mime: "text/html", data: data)
         }
 
@@ -234,7 +234,7 @@ final class CanvasSchemeHandler: NSObject, WKURLSchemeHandler {
             return self.html("Forbidden", title: "Canvas: 403")
         }
 
-        guard let data = self.loadBundledResourceData(subdirectory: "CanvasA2UI", relativePath: relative) else {
+        guard let data = self.loadBundledResourceData(relativePath: relative) else {
             return self.html("Not Found", title: "Canvas: 404")
         }
 
@@ -243,12 +243,15 @@ final class CanvasSchemeHandler: NSObject, WKURLSchemeHandler {
         return CanvasResponse(mime: mime, data: data)
     }
 
-    private func loadBundledResourceData(subdirectory: String, relativePath: String) -> Data? {
-        guard let base = ClawdisKitResources.bundle.resourceURL?.appendingPathComponent(subdirectory, isDirectory: true) else {
-            return nil
-        }
-        let url = base.appendingPathComponent(relativePath, isDirectory: false)
-        return try? Data(contentsOf: url)
+    private func loadBundledResourceData(relativePath: String) -> Data? {
+        // SwiftPM flattens resource directories; treat bundled canvas resources as uniquely-named files.
+        if relativePath.contains("/") { return nil }
+        let url = URL(fileURLWithPath: relativePath)
+        let ext = url.pathExtension
+        let name = url.deletingPathExtension().lastPathComponent
+        guard !name.isEmpty, !ext.isEmpty else { return nil }
+        guard let resourceURL = ClawdisKitResources.bundle.url(forResource: name, withExtension: ext) else { return nil }
+        return try? Data(contentsOf: resourceURL)
     }
 
     private func textEncodingName(forMimeType mimeType: String) -> String? {

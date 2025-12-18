@@ -9,6 +9,12 @@ android {
   namespace = "com.steipete.clawdis.node"
   compileSdk = 36
 
+  sourceSets {
+    getByName("main") {
+      assets.srcDir(file("../../shared/ClawdisKit/Sources/ClawdisKit/Resources"))
+    }
+  }
+
   defaultConfig {
     applicationId = "com.steipete.clawdis.node"
     minSdk = 31

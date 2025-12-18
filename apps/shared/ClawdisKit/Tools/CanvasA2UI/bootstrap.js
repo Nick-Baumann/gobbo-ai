@@ -10,6 +10,12 @@ const empty = Object.freeze({});
 const emptyClasses = () => ({});
 const textHintStyles = () => ({ h1: {}, h2: {}, h3: {}, h4: {}, h5: {}, body: {}, caption: {} });
 
+const isAndroid = /Android/i.test(globalThis.navigator?.userAgent ?? "");
+const cardShadow = isAndroid ? "0 2px 10px rgba(0,0,0,.18)" : "0 10px 30px rgba(0,0,0,.35)";
+const buttonShadow = isAndroid ? "0 2px 10px rgba(6, 182, 212, 0.14)" : "0 10px 25px rgba(6, 182, 212, 0.18)";
+const statusShadow = isAndroid ? "0 2px 10px rgba(0, 0, 0, 0.18)" : "0 10px 24px rgba(0, 0, 0, 0.25)";
+const statusBlur = isAndroid ? "10px" : "14px";
+
 const clawdisTheme = {
   components: {
     AudioPlayer: emptyClasses(),
@@ -85,7 +91,7 @@ const clawdisTheme = {
       border: "1px solid rgba(255,255,255,.09)",
       borderRadius: "14px",
       padding: "14px",
-      boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+      boxShadow: cardShadow,
     },
     Column: { gap: "10px" },
     Row: { gap: "10px", alignItems: "center" },
@@ -98,7 +104,7 @@ const clawdisTheme = {
       color: "#071016",
       fontWeight: "650",
       cursor: "pointer",
-      boxShadow: "0 10px 25px rgba(6, 182, 212, 0.18)",
+      boxShadow: buttonShadow,
     },
     Text: {
       ...textHintStyles(),
@@ -161,11 +167,11 @@ class ClawdisA2UIHost extends LitElement {
       background: rgba(0, 0, 0, 0.45);
       border: 1px solid rgba(255, 255, 255, 0.18);
       color: rgba(255, 255, 255, 0.92);
-      font: 13px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font: 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
       pointer-events: none;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(${statusBlur});
+      -webkit-backdrop-filter: blur(${statusBlur});
+      box-shadow: ${statusShadow};
       z-index: 5;
     }
 
@@ -182,11 +188,11 @@ class ClawdisA2UIHost extends LitElement {
       background: rgba(0, 0, 0, 0.45);
       border: 1px solid rgba(255, 255, 255, 0.18);
       color: rgba(255, 255, 255, 0.92);
-      font: 13px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font: 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
       pointer-events: none;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(${statusBlur});
+      -webkit-backdrop-filter: blur(${statusBlur});
+      box-shadow: ${statusShadow};
       z-index: 5;
     }
 
@@ -335,10 +341,17 @@ class ClawdisA2UIHost extends LitElement {
 
     globalThis.__clawdisLastA2UIAction = userAction;
 
-    const handler = globalThis.webkit?.messageHandlers?.clawdisCanvasA2UIAction;
+    const handler =
+      globalThis.webkit?.messageHandlers?.clawdisCanvasA2UIAction ??
+      globalThis.clawdisCanvasA2UIAction;
     if (handler?.postMessage) {
       try {
-        handler.postMessage({ userAction });
+        // WebKit message handlers support structured objects; Android's JS interface expects strings.
+        if (handler === globalThis.clawdisCanvasA2UIAction) {
+          handler.postMessage(JSON.stringify({ userAction }));
+        } else {
+          handler.postMessage({ userAction });
+        }
       } catch (e) {
         const msg = String(e?.message ?? e);
         this.pendingAction = { id: actionId, name, phase: "error", startedAt: Date.now(), error: msg };
