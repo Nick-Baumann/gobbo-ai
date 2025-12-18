@@ -265,7 +265,15 @@ final class NodeAppModel {
     }
 
     private func handleInvoke(_ req: BridgeInvokeRequest) async -> BridgeInvokeResponse {
-        if req.command.hasPrefix("screen.") || req.command.hasPrefix("camera."), self.isBackgrounded {
+        // Alias for "canvas" capability: accept canvas.* commands and map them to screen.*.
+        let command =
+            if req.command.hasPrefix("canvas.") {
+                "screen." + req.command.dropFirst("canvas.".count)
+            } else {
+                req.command
+            }
+
+        if command.hasPrefix("screen.") || command.hasPrefix("camera."), self.isBackgrounded {
             return BridgeInvokeResponse(
                 id: req.id,
                 ok: false,
@@ -274,7 +282,7 @@ final class NodeAppModel {
                     message: "NODE_BACKGROUND_UNAVAILABLE: screen/camera commands require foreground"))
         }
 
-        if req.command.hasPrefix("camera."), !self.isCameraEnabled() {
+        if command.hasPrefix("camera."), !self.isCameraEnabled() {
             return BridgeInvokeResponse(
                 id: req.id,
                 ok: false,
@@ -284,7 +292,7 @@ final class NodeAppModel {
         }
 
         do {
-            switch req.command {
+            switch command {
             case ClawdisScreenCommand.show.rawValue:
                 return BridgeInvokeResponse(id: req.id, ok: true)
 
