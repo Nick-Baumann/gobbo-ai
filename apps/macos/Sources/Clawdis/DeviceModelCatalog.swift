@@ -13,8 +13,7 @@ enum DeviceModelCatalog {
         let model = (modelIdentifier ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
         let friendlyName = model.isEmpty ? nil : self.modelIdentifierToName[model]
-        let symbol = self.symbolFor(modelIdentifier: model, friendlyName: friendlyName)
-            ?? self.fallbackSymbol(for: family, modelIdentifier: model)
+        let symbol = self.symbol(deviceFamily: family, modelIdentifier: model, friendlyName: friendlyName)
 
         let title = if let friendlyName, !friendlyName.isEmpty {
             friendlyName
@@ -32,6 +31,14 @@ enum DeviceModelCatalog {
         return DevicePresentation(title: title, symbol: symbol)
     }
 
+    static func symbol(deviceFamily familyRaw: String, modelIdentifier modelIdentifierRaw: String, friendlyName: String?) -> String? {
+        let family = familyRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelIdentifier = modelIdentifierRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return self.symbolFor(modelIdentifier: modelIdentifier, friendlyName: friendlyName)
+            ?? self.fallbackSymbol(for: family, modelIdentifier: modelIdentifier)
+    }
+
     private static func symbolFor(modelIdentifier rawModelIdentifier: String, friendlyName: String?) -> String? {
         let modelIdentifier = rawModelIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !modelIdentifier.isEmpty else { return nil }
@@ -47,17 +54,15 @@ enum DeviceModelCatalog {
         if lower.hasPrefix("macbook") || lower.hasPrefix("macbookpro") || lower.hasPrefix("macbookair") {
             return "laptopcomputer"
         }
-        if lower.hasPrefix("imac") || lower.hasPrefix("macmini") || lower.hasPrefix("macpro") || lower
-            .hasPrefix("macstudio")
-        {
-            return "desktopcomputer"
-        }
+        if lower.hasPrefix("macstudio") { return "macstudio" }
+        if lower.hasPrefix("macmini") { return "macmini" }
+        if lower.hasPrefix("imac") || lower.hasPrefix("macpro") { return "desktopcomputer" }
 
         if lower.hasPrefix("mac"), let friendlyNameLower = friendlyName?.lowercased() {
             if friendlyNameLower.contains("macbook") { return "laptopcomputer" }
             if friendlyNameLower.contains("imac") { return "desktopcomputer" }
-            if friendlyNameLower.contains("mac mini") { return "desktopcomputer" }
-            if friendlyNameLower.contains("mac studio") { return "desktopcomputer" }
+            if friendlyNameLower.contains("mac mini") { return "macmini" }
+            if friendlyNameLower.contains("mac studio") { return "macstudio" }
             if friendlyNameLower.contains("mac pro") { return "desktopcomputer" }
         }
 
@@ -75,8 +80,7 @@ enum DeviceModelCatalog {
         case "mac":
             return "laptopcomputer"
         case "android":
-            // Prefer tablet glyph when we know it's an Android tablet. (No attempt to infer phone/tablet here.)
-            return "cpu"
+            return "logo.android"
         case "linux":
             return "cpu"
         default:

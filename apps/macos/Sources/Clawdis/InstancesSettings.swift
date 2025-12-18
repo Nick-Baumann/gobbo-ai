@@ -60,47 +60,67 @@ struct InstancesSettings: View {
     @ViewBuilder
     private func instanceRow(_ inst: InstanceInfo) -> some View {
         let isGateway = (inst.mode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "gateway"
+        let prettyPlatform = inst.platform.flatMap { self.prettyPlatform($0) }
+        let device = DeviceModelCatalog.presentation(
+            deviceFamily: inst.deviceFamily,
+            modelIdentifier: inst.modelIdentifier)
+        let leadingSymbol = self.leadingDeviceSymbol(inst, device: device)
 
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(inst.host ?? "unknown host").font(.subheadline.bold())
-                if let ip = inst.ip { Text("(") + Text(ip).monospaced() + Text(")") }
-            }
-            HStack(spacing: 8) {
-                if let version = inst.version {
-                    self.label(icon: "shippingbox", text: version)
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: leadingSymbol)
+                .font(.system(size: 26, weight: .regular))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28, alignment: .center)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(inst.host ?? "unknown host").font(.subheadline.bold())
+                    if let ip = inst.ip { Text("(") + Text(ip).monospaced() + Text(")") }
                 }
-                let prettyPlatform = inst.platform.flatMap { self.prettyPlatform($0) }
-                let device = DeviceModelCatalog.presentation(
-                    deviceFamily: inst.deviceFamily,
-                    modelIdentifier: inst.modelIdentifier)
 
-                if let device {
-                    // Avoid showing generic "Mac"/"iPhone"/etc; prefer the concrete model name.
-                    let family = (inst.deviceFamily ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    let isGeneric = !family.isEmpty && device.title == family
-                    if !isGeneric {
-                        if let prettyPlatform {
-                            self.label(icon: device.symbol, text: "\(device.title) · \(prettyPlatform)")
-                        } else {
-                            self.label(icon: device.symbol, text: device.title)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    HStack(spacing: 8) {
+                        if let version = inst.version {
+                            self.label(icon: "shippingbox", text: version)
                         }
-                    } else if let prettyPlatform, let platform = inst.platform {
-                        self.label(icon: self.platformIcon(platform), text: prettyPlatform)
+
+                        if let device {
+                            // Avoid showing generic "Mac"/"iPhone"/etc; prefer the concrete model name.
+                            let family = (inst.deviceFamily ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            let isGeneric = !family.isEmpty && device.title == family
+                            if !isGeneric {
+                                if let prettyPlatform {
+                                    self.label(icon: device.symbol, text: "\(device.title) · \(prettyPlatform)")
+                                } else {
+                                    self.label(icon: device.symbol, text: device.title)
+                                }
+                            } else if let prettyPlatform, let platform = inst.platform {
+                                self.label(icon: self.platformIcon(platform), text: prettyPlatform)
+                            }
+                        } else if let prettyPlatform, let platform = inst.platform {
+                            self.label(icon: self.platformIcon(platform), text: prettyPlatform)
+                        }
+
+                        if let mode = inst.mode { self.label(icon: "network", text: mode) }
                     }
-                } else if let prettyPlatform, let platform = inst.platform {
-                    self.label(icon: self.platformIcon(platform), text: prettyPlatform)
-                }
+                    .layoutPriority(1)
 
-                // Last local input is helpful for interactive nodes, but noisy/meaningless for the gateway.
-                if !isGateway, let secs = inst.lastInputSeconds {
-                    self.label(icon: "clock", text: "\(secs)s ago")
-                }
-                if let mode = inst.mode { self.label(icon: "network", text: mode) }
+                    Spacer(minLength: 0)
 
-                if let update = self.updateSummaryText(inst, isGateway: isGateway) {
-                    self.label(icon: "arrow.clockwise", text: update)
-                        .help(self.presenceUpdateSourceHelp(inst.reason ?? ""))
+                    HStack(spacing: 8) {
+                        // Last local input is helpful for interactive nodes, but noisy/meaningless for the gateway.
+                        if !isGateway, let secs = inst.lastInputSeconds {
+                            self.label(icon: "clock", text: "\(secs)s ago")
+                        }
+
+                        if let update = self.updateSummaryText(inst, isGateway: isGateway) {
+                            self.label(icon: "arrow.clockwise", text: update)
+                                .help(self.presenceUpdateSourceHelp(inst.reason ?? ""))
+                        }
+                    }
+                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -116,12 +136,53 @@ struct InstancesSettings: View {
 
     private func label(icon: String?, text: String) -> some View {
         HStack(spacing: 4) {
-            if let icon {
+            if let icon, self.isSystemSymbolAvailable(icon) {
                 Image(systemName: icon).foregroundStyle(.secondary).font(.caption)
             }
             Text(text)
         }
         .font(.footnote)
+    }
+
+    private func leadingDeviceSymbol(_ inst: InstanceInfo, device: DevicePresentation?) -> String {
+        let family = (inst.deviceFamily ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if family == "android" {
+            return self.safeSystemSymbol("logo.android", fallback: "cpu")
+        }
+
+        if let title = device?.title.lowercased() {
+            if title.contains("mac studio") {
+                return self.safeSystemSymbol("macstudio", fallback: "desktopcomputer")
+            }
+            if title.contains("macbook") {
+                return self.safeSystemSymbol("laptopcomputer", fallback: "laptopcomputer")
+            }
+            if title.contains("ipad") {
+                return self.safeSystemSymbol("ipad", fallback: "ipad")
+            }
+            if title.contains("iphone") {
+                return self.safeSystemSymbol("iphone", fallback: "iphone")
+            }
+        }
+
+        if let symbol = device?.symbol {
+            return self.safeSystemSymbol(symbol, fallback: "cpu")
+        }
+
+        if let platform = inst.platform {
+            return self.safeSystemSymbol(self.platformIcon(platform), fallback: "cpu")
+        }
+
+        return "cpu"
+    }
+
+    private func safeSystemSymbol(_ preferred: String, fallback: String) -> String {
+        if self.isSystemSymbolAvailable(preferred) { return preferred }
+        return fallback
+    }
+
+    private func isSystemSymbolAvailable(_ name: String) -> Bool {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
     }
 
     private func platformIcon(_ raw: String) -> String {
