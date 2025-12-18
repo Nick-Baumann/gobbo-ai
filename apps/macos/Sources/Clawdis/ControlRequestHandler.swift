@@ -1,4 +1,5 @@
 import ClawdisIPC
+import ClawdisKit
 import Foundation
 import OSLog
 
@@ -319,22 +320,20 @@ enum ControlRequestHandler {
                 guard let jsonl, !jsonl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     return Response(ok: false, message: "missing jsonl")
                 }
-                let items: [ParsedJSONLItem]
-                do {
-                    items = try Self.parseJSONL(jsonl)
-                } catch {
-                    return Response(ok: false, message: "invalid jsonl: \(error.localizedDescription)")
-                }
 
+                let messages: [ClawdisKit.AnyCodable]
                 do {
-                    try Self.validateA2UIV0_8(items)
+                    messages = try ClawdisCanvasA2UIJSONL.decodeMessagesFromJSONL(jsonl)
                 } catch {
                     return Response(ok: false, message: error.localizedDescription)
                 }
 
-                let messages = items.map(\.value)
-                let data = try JSONSerialization.data(withJSONObject: messages, options: [])
-                let json = String(data: data, encoding: .utf8) ?? "[]"
+                let json: String
+                do {
+                    json = try ClawdisCanvasA2UIJSONL.encodeMessagesJSONArray(messages)
+                } catch {
+                    return Response(ok: false, message: error.localizedDescription)
+                }
                 js = """
                 (() => {
                   try {
@@ -361,56 +360,6 @@ enum ControlRequestHandler {
             return Response(ok: true, payload: payload)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
-        }
-    }
-
-    private struct ParsedJSONLItem {
-        let lineNumber: Int
-        let value: Any
-    }
-
-    private static func parseJSONL(_ text: String) throws -> [ParsedJSONLItem] {
-        var out: [ParsedJSONLItem] = []
-        var lineNumber = 0
-        for rawLine in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
-            lineNumber += 1
-            let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty { continue }
-            let data = Data(line.utf8)
-            let obj = try JSONSerialization.jsonObject(with: data, options: [])
-            out.append(ParsedJSONLItem(lineNumber: lineNumber, value: obj))
-        }
-        return out
-    }
-
-    private static func validateA2UIV0_8(_ items: [ParsedJSONLItem]) throws {
-        let allowed = Set(["beginRendering", "surfaceUpdate", "dataModelUpdate", "deleteSurface"])
-        for item in items {
-            guard let dict = item.value as? [String: Any] else {
-                throw NSError(domain: "A2UI", code: 1, userInfo: [
-                    NSLocalizedDescriptionKey: "A2UI JSONL line \(item.lineNumber): expected a JSON object",
-                ])
-            }
-
-            if dict.keys.contains("createSurface") {
-                throw NSError(domain: "A2UI", code: 2, userInfo: [
-                    NSLocalizedDescriptionKey: """
-                    A2UI JSONL line \(item.lineNumber): looks like A2UI v0.9 (`createSurface`).
-                    Canvas currently supports A2UI v0.8 server→client messages (`beginRendering`, `surfaceUpdate`, `dataModelUpdate`, `deleteSurface`).
-                    """,
-                ])
-            }
-
-            let matched = dict.keys.filter { allowed.contains($0) }
-            if matched.count != 1 {
-                let found = dict.keys.sorted().joined(separator: ", ")
-                throw NSError(domain: "A2UI", code: 3, userInfo: [
-                    NSLocalizedDescriptionKey: """
-                    A2UI JSONL line \(item.lineNumber): expected exactly one of \(allowed.sorted()
-                        .joined(separator: ", ")); found: \(found)
-                    """,
-                ])
-            }
         }
     }
 

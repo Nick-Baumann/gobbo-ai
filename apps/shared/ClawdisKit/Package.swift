@@ -16,6 +16,9 @@ let package = Package(
         .target(
             name: "ClawdisKit",
             dependencies: [],
+            resources: [
+                .process("Resources"),
+            ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
             ]),

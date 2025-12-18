@@ -1,4 +1,5 @@
 import Foundation
+import ClawdisKit
 import OSLog
 import WebKit
 
@@ -243,7 +244,7 @@ final class CanvasSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func loadBundledResourceData(subdirectory: String, relativePath: String) -> Data? {
-        guard let base = Bundle.module.resourceURL?.appendingPathComponent(subdirectory, isDirectory: true) else {
+        guard let base = ClawdisKitResources.bundle.resourceURL?.appendingPathComponent(subdirectory, isDirectory: true) else {
             return nil
         }
         let url = base.appendingPathComponent(relativePath, isDirectory: false)

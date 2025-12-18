@@ -4,6 +4,7 @@ import { defineConfig } from "rolldown";
 const here = path.dirname(new URL(import.meta.url).pathname);
 const repoRoot = path.resolve(here, "../../../../../..");
 const fromHere = (p) => path.resolve(here, p);
+const outputFile = path.resolve(here, "../../Sources/ClawdisKit/Resources/CanvasA2UI/a2ui.bundle.js");
 
 const a2uiLitDist = path.resolve(repoRoot, "vendor/a2ui/renderers/lit/dist/src");
 const a2uiThemeContext = path.resolve(a2uiLitDist, "0.8/ui/context/theme.js");
@@ -25,7 +26,7 @@ export default defineConfig({
     },
   },
   output: {
-    file: fromHere("a2ui.bundle.js"),
+    file: outputFile,
     format: "esm",
     inlineDynamicImports: true,
     sourcemap: false,

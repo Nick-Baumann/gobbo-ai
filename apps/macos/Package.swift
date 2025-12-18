@@ -50,7 +50,6 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources/Clawdis.icns"),
-                .copy("Resources/CanvasA2UI"),
                 .copy("Resources/DeviceModels"),
             ],
             swiftSettings: [
