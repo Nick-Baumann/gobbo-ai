@@ -7,6 +7,8 @@ read_when:
 
 Date: 2025-12-06 · Status: draft · Owner: steipete
 
+Note (2025-12-19): the current implementation prefers a **launchd LaunchAgent** that runs the **bundled bun-compiled gateway**. This doc remains as an alternative mode for tighter coupling to the UI.
+
 ## Goal
 Run the Node-based Clawdis/clawdis gateway as a direct child of the LSUIElement app (instead of a launchd agent) while keeping all TCC-sensitive work inside the Swift app/broker layer and wiring the existing “Clawdis Active” toggle to start/stop the child.
 

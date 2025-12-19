@@ -23,6 +23,8 @@ First question: where does the **Gateway** run?
 - **Local (this Mac):** onboarding can run the Anthropic OAuth flow and write Pi’s token store locally.
 - **Remote (over SSH/tailnet):** onboarding must not run OAuth locally, because credentials must exist on the **gateway host**.
 
+Implementation note (2025-12-19): in local mode, the macOS app bundles the Gateway and enables it via a per-user launchd LaunchAgent (no global npm install/Node requirement for the user).
+
 ## 2) Local-only: Connect Claude (Anthropic OAuth)
 
 This is the “bind Pi to Clawdis” step. It is explicitly the **Anthropic (Claude Pro/Max) OAuth flow**, not a generic “login”.
