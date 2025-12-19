@@ -185,6 +185,8 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
             self.handleVideo(sampleBuffer: sampleBuffer)
         case .audio:
             self.handleAudio(sampleBuffer: sampleBuffer)
+        case .microphone:
+            break
         @unknown default:
             break
         }
