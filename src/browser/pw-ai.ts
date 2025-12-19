@@ -1,153 +1,47 @@
-import type { Browser, Page } from "playwright-core";
-import { chromium } from "playwright-core";
+export {
+  type BrowserConsoleMessage,
+  type BrowserNetworkRequest,
+  closePlaywrightBrowserConnection,
+  ensurePageState,
+  getPageForTargetId,
+  refLocator,
+  type WithSnapshotForAI,
+} from "./pw-session.js";
 
-type SnapshotForAIResult = { full: string; incremental?: string };
-type SnapshotForAIOptions = { timeout?: number; track?: string };
+export {
+  clickRefViaPlaywright,
+  clickViaPlaywright,
+  closePageViaPlaywright,
+  dragViaPlaywright,
+  evaluateViaPlaywright,
+  fileUploadViaPlaywright,
+  fillFormViaPlaywright,
+  handleDialogViaPlaywright,
+  hoverViaPlaywright,
+  navigateBackViaPlaywright,
+  navigateViaPlaywright,
+  pdfViaPlaywright,
+  pressKeyViaPlaywright,
+  resizeViewportViaPlaywright,
+  runCodeViaPlaywright,
+  selectOptionViaPlaywright,
+  snapshotAiViaPlaywright,
+  takeScreenshotViaPlaywright,
+  typeViaPlaywright,
+  waitForViaPlaywright,
+} from "./pw-tools-core.js";
 
-type WithSnapshotForAI = {
-  _snapshotForAI?: (
-    options?: SnapshotForAIOptions,
-  ) => Promise<SnapshotForAIResult>;
-};
-
-type TargetInfoResponse = {
-  targetInfo?: {
-    targetId?: string;
-  };
-};
-
-type ConnectedBrowser = {
-  browser: Browser;
-  endpoint: string;
-};
-
-let cached: ConnectedBrowser | null = null;
-let connecting: Promise<ConnectedBrowser> | null = null;
-
-function endpointForCdpPort(cdpPort: number) {
-  return `http://127.0.0.1:${cdpPort}`;
-}
-
-async function connectBrowser(endpoint: string): Promise<ConnectedBrowser> {
-  if (cached?.endpoint === endpoint) return cached;
-  if (connecting) return await connecting;
-
-  connecting = chromium
-    .connectOverCDP(endpoint, { timeout: 5000 })
-    .then((browser) => {
-      const connected: ConnectedBrowser = { browser, endpoint };
-      cached = connected;
-      browser.on("disconnected", () => {
-        if (cached?.browser === browser) cached = null;
-      });
-      return connected;
-    })
-    .finally(() => {
-      connecting = null;
-    });
-
-  return await connecting;
-}
-
-async function getAllPages(browser: Browser): Promise<Page[]> {
-  const contexts = browser.contexts();
-  const pages = contexts.flatMap((c) => c.pages());
-  return pages;
-}
-
-async function pageTargetId(page: Page): Promise<string | null> {
-  const session = await page.context().newCDPSession(page);
-  try {
-    const info = (await session.send(
-      "Target.getTargetInfo",
-    )) as TargetInfoResponse;
-    const targetId = String(info?.targetInfo?.targetId ?? "").trim();
-    return targetId || null;
-  } finally {
-    await session.detach().catch(() => {});
-  }
-}
-
-async function findPageByTargetId(
-  browser: Browser,
-  targetId: string,
-): Promise<Page | null> {
-  const pages = await getAllPages(browser);
-  for (const page of pages) {
-    const tid = await pageTargetId(page).catch(() => null);
-    if (tid && tid === targetId) return page;
-  }
-  return null;
-}
-
-async function getPageForTargetId(opts: {
-  cdpPort: number;
-  targetId?: string;
-}): Promise<Page> {
-  const endpoint = endpointForCdpPort(opts.cdpPort);
-  const { browser } = await connectBrowser(endpoint);
-  const pages = await getAllPages(browser);
-  if (!pages.length)
-    throw new Error("No pages available in the connected browser.");
-  const first = pages[0];
-  if (!opts.targetId) return first;
-  const found = await findPageByTargetId(browser, opts.targetId);
-  if (!found) throw new Error("tab not found");
-  return found;
-}
-
-export async function snapshotAiViaPlaywright(opts: {
-  cdpPort: number;
-  targetId?: string;
-  timeoutMs?: number;
-}): Promise<{ snapshot: string }> {
-  const page = await getPageForTargetId({
-    cdpPort: opts.cdpPort,
-    targetId: opts.targetId,
-  });
-
-  const maybe = page as unknown as WithSnapshotForAI;
-  if (!maybe._snapshotForAI) {
-    throw new Error(
-      "Playwright _snapshotForAI is not available. Upgrade playwright-core.",
-    );
-  }
-
-  const result = await maybe._snapshotForAI({
-    timeout: Math.max(
-      500,
-      Math.min(60_000, Math.floor(opts.timeoutMs ?? 5000)),
-    ),
-    track: "response",
-  });
-  return { snapshot: String(result?.full ?? "") };
-}
-
-export async function clickRefViaPlaywright(opts: {
-  cdpPort: number;
-  targetId?: string;
-  ref: string;
-  timeoutMs?: number;
-}): Promise<void> {
-  const ref = String(opts.ref ?? "").trim();
-  if (!ref) throw new Error("ref is required");
-
-  const page = await getPageForTargetId({
-    cdpPort: opts.cdpPort,
-    targetId: opts.targetId,
-  });
-
-  await page.locator(`aria-ref=${ref}`).click({
-    timeout: Math.max(
-      500,
-      Math.min(60_000, Math.floor(opts.timeoutMs ?? 8000)),
-    ),
-  });
-}
-
-export async function closePlaywrightBrowserConnection(): Promise<void> {
-  const cur = cached;
-  cached = null;
-  if (!cur) return;
-  await cur.browser.close().catch(() => {});
-}
+export {
+  generateLocatorForRef,
+  getConsoleMessagesViaPlaywright,
+  getNetworkRequestsViaPlaywright,
+  mouseClickViaPlaywright,
+  mouseDragViaPlaywright,
+  mouseMoveViaPlaywright,
+  startTracingViaPlaywright,
+  stopTracingViaPlaywright,
+  verifyElementVisibleViaPlaywright,
+  verifyListVisibleViaPlaywright,
+  verifyTextVisibleViaPlaywright,
+  verifyValueViaPlaywright,
+} from "./pw-tools-observe.js";

@@ -98,8 +98,45 @@ vi.mock("./cdp.js", () => ({
 
 vi.mock("./pw-ai.js", () => ({
   clickRefViaPlaywright: vi.fn(async () => {}),
+  clickViaPlaywright: vi.fn(async () => {}),
+  closePageViaPlaywright: vi.fn(async () => {}),
   closePlaywrightBrowserConnection: vi.fn(async () => {}),
+  evaluateViaPlaywright: vi.fn(async () => "ok"),
+  fileUploadViaPlaywright: vi.fn(async () => {}),
+  fillFormViaPlaywright: vi.fn(async () => {}),
+  generateLocatorForRef: vi.fn((ref: string) => `locator('aria-ref=${ref}')`),
+  getConsoleMessagesViaPlaywright: vi.fn(async () => []),
+  getNetworkRequestsViaPlaywright: vi.fn(async () => []),
+  handleDialogViaPlaywright: vi.fn(async () => ({
+    message: "ok",
+    type: "alert",
+  })),
+  hoverViaPlaywright: vi.fn(async () => {}),
+  mouseClickViaPlaywright: vi.fn(async () => {}),
+  mouseDragViaPlaywright: vi.fn(async () => {}),
+  mouseMoveViaPlaywright: vi.fn(async () => {}),
+  navigateBackViaPlaywright: vi.fn(async () => ({ url: "about:blank" })),
+  navigateViaPlaywright: vi.fn(async () => ({ url: "https://example.com" })),
+  pdfViaPlaywright: vi.fn(async () => ({ buffer: Buffer.from("pdf") })),
+  pressKeyViaPlaywright: vi.fn(async () => {}),
+  resizeViewportViaPlaywright: vi.fn(async () => {}),
+  runCodeViaPlaywright: vi.fn(async () => "ok"),
+  selectOptionViaPlaywright: vi.fn(async () => {}),
   snapshotAiViaPlaywright: vi.fn(async () => ({ snapshot: "ok" })),
+  startTracingViaPlaywright: vi.fn(async () => {}),
+  stopTracingViaPlaywright: vi.fn(async () => ({
+    buffer: Buffer.from("trace"),
+  })),
+  takeScreenshotViaPlaywright: vi.fn(async () => ({
+    buffer: Buffer.from("png"),
+  })),
+  typeViaPlaywright: vi.fn(async () => {}),
+  verifyElementVisibleViaPlaywright: vi.fn(async () => {}),
+  verifyListVisibleViaPlaywright: vi.fn(async () => {}),
+  verifyTextVisibleViaPlaywright: vi.fn(async () => {}),
+  verifyValueViaPlaywright: vi.fn(async () => {}),
+  waitForViaPlaywright: vi.fn(async () => {}),
+  dragViaPlaywright: vi.fn(async () => {}),
 }));
 
 vi.mock("../media/store.js", () => ({

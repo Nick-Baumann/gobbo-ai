@@ -28,11 +28,13 @@ function createPage(opts: {
   };
 
   const click = vi.fn().mockResolvedValue(undefined);
-  const locator = vi.fn().mockReturnValue({ click });
+  const dblclick = vi.fn().mockResolvedValue(undefined);
+  const locator = vi.fn().mockReturnValue({ click, dblclick });
 
   const page = {
     context: () => context,
     locator,
+    on: vi.fn(),
     ...(opts.hasSnapshotForAI === false
       ? {}
       : {
@@ -48,6 +50,7 @@ function createPage(opts: {
 function createBrowser(pages: unknown[]) {
   const ctx = {
     pages: () => pages,
+    on: vi.fn(),
   };
   return {
     contexts: () => [ctx],

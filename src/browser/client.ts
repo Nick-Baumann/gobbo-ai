@@ -21,6 +21,11 @@ export type BrowserTab = {
   type?: string;
 };
 
+export type BrowserToolResponse = {
+  ok: true;
+  [key: string]: unknown;
+};
+
 export type ScreenshotResult = {
   ok: true;
   path: string;
@@ -353,4 +358,24 @@ export async function browserClickRef(
       timeoutMs: 20000,
     },
   );
+}
+
+export async function browserTool(
+  baseUrl: string,
+  opts: {
+    name: string;
+    args?: Record<string, unknown>;
+    targetId?: string;
+  },
+): Promise<BrowserToolResponse> {
+  return await fetchJson<BrowserToolResponse>(`${baseUrl}/tool`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: opts.name,
+      args: opts.args ?? {},
+      targetId: opts.targetId,
+    }),
+    timeoutMs: 20000,
+  });
 }
