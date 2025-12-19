@@ -81,12 +81,14 @@ Nodes expose `screen.record` (mp4). Example:
 
 ```bash
 clawdis nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
+clawdis nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10 --no-audio
 ```
 
 Notes:
 - `screen.record` requires the node app to be foregrounded.
 - Android will show the system screen-capture prompt before recording.
 - Screen recordings are clamped to `<= 60s`.
+- `--no-audio` disables microphone capture (supported on iOS/Android; macOS uses system capture audio).
 
 ## Mac node mode
 

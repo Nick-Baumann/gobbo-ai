@@ -539,6 +539,7 @@ final class NodeAppModel {
                     screenIndex: params.screenIndex,
                     durationMs: params.durationMs,
                     fps: params.fps,
+                    includeAudio: params.includeAudio,
                     outPath: nil)
                 defer { try? FileManager.default.removeItem(atPath: path) }
                 let data = try Data(contentsOf: URL(fileURLWithPath: path))
@@ -548,13 +549,15 @@ final class NodeAppModel {
                     var durationMs: Int?
                     var fps: Double?
                     var screenIndex: Int?
+                    var hasAudio: Bool
                 }
                 let payload = try Self.encodePayload(Payload(
                     format: "mp4",
                     base64: data.base64EncodedString(),
                     durationMs: params.durationMs,
                     fps: params.fps,
-                    screenIndex: params.screenIndex))
+                    screenIndex: params.screenIndex,
+                    hasAudio: params.includeAudio ?? true))
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
 
             default:

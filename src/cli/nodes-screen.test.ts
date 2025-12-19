@@ -13,12 +13,14 @@ describe("nodes screen helpers", () => {
       durationMs: 1000,
       fps: 12,
       screenIndex: 0,
+      hasAudio: true,
     });
     expect(payload.format).toBe("mp4");
     expect(payload.base64).toBe("Zm9v");
     expect(payload.durationMs).toBe(1000);
     expect(payload.fps).toBe(12);
     expect(payload.screenIndex).toBe(0);
+    expect(payload.hasAudio).toBe(true);
   });
 
   it("rejects invalid screen.record payload", () => {

@@ -16,9 +16,14 @@ class ScreenRecordManager(private val context: Context) {
   data class Payload(val payloadJson: String)
 
   @Volatile private var screenCaptureRequester: ScreenCaptureRequester? = null
+  @Volatile private var permissionRequester: com.steipete.clawdis.node.PermissionRequester? = null
 
   fun attachScreenCaptureRequester(requester: ScreenCaptureRequester) {
     screenCaptureRequester = requester
+  }
+
+  fun attachPermissionRequester(requester: com.steipete.clawdis.node.PermissionRequester) {
+    permissionRequester = requester
   }
 
   suspend fun record(paramsJson: String?): Payload =
@@ -33,6 +38,7 @@ class ScreenRecordManager(private val context: Context) {
       val fps = (parseFps(paramsJson) ?: 10.0).coerceIn(1.0, 60.0)
       val fpsInt = fps.roundToInt().coerceIn(1, 60)
       val screenIndex = parseScreenIndex(paramsJson)
+      val includeAudio = parseIncludeAudio(paramsJson) ?: true
       val format = parseString(paramsJson, key = "format")
       if (format != null && format.lowercase() != "mp4") {
         throw IllegalArgumentException("INVALID_REQUEST: screen format must be mp4")
@@ -57,12 +63,23 @@ class ScreenRecordManager(private val context: Context) {
       val densityDpi = metrics.densityDpi
 
       val file = File.createTempFile("clawdis-screen-", ".mp4")
+      if (includeAudio) ensureMicPermission()
+
       val recorder = MediaRecorder()
       var virtualDisplay: android.hardware.display.VirtualDisplay? = null
       try {
+        if (includeAudio) {
+          recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+        }
         recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
         recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
         recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+        if (includeAudio) {
+          recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+          recorder.setAudioChannels(1)
+          recorder.setAudioSamplingRate(44_100)
+          recorder.setAudioEncodingBitRate(96_000)
+        }
         recorder.setVideoSize(width, height)
         recorder.setVideoFrameRate(fpsInt)
         recorder.setVideoEncodingBitRate(estimateBitrate(width, height, fpsInt))
@@ -100,9 +117,26 @@ class ScreenRecordManager(private val context: Context) {
       file.delete()
       val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
       Payload(
-        """{"format":"mp4","base64":"$base64","durationMs":$durationMs,"fps":$fpsInt,"screenIndex":0}""",
+        """{"format":"mp4","base64":"$base64","durationMs":$durationMs,"fps":$fpsInt,"screenIndex":0,"hasAudio":$includeAudio}""",
       )
     }
+
+  private suspend fun ensureMicPermission() {
+    val granted =
+      androidx.core.content.ContextCompat.checkSelfPermission(
+        context,
+        android.Manifest.permission.RECORD_AUDIO,
+      ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    if (granted) return
+
+    val requester =
+      permissionRequester
+        ?: throw IllegalStateException("MIC_PERMISSION_REQUIRED: grant Microphone permission")
+    val results = requester.requestIfMissing(listOf(android.Manifest.permission.RECORD_AUDIO))
+    if (results[android.Manifest.permission.RECORD_AUDIO] != true) {
+      throw IllegalStateException("MIC_PERMISSION_REQUIRED: grant Microphone permission")
+    }
+  }
 
   private fun parseDurationMs(paramsJson: String?): Int? =
     parseNumber(paramsJson, key = "durationMs")?.toIntOrNull()
@@ -112,6 +146,21 @@ class ScreenRecordManager(private val context: Context) {
 
   private fun parseScreenIndex(paramsJson: String?): Int? =
     parseNumber(paramsJson, key = "screenIndex")?.toIntOrNull()
+
+  private fun parseIncludeAudio(paramsJson: String?): Boolean? {
+    val raw = paramsJson ?: return null
+    val key = "\"includeAudio\""
+    val idx = raw.indexOf(key)
+    if (idx < 0) return null
+    val colon = raw.indexOf(':', idx + key.length)
+    if (colon < 0) return null
+    val tail = raw.substring(colon + 1).trimStart()
+    return when {
+      tail.startsWith("true") -> true
+      tail.startsWith("false") -> false
+      else -> null
+    }
+  }
 
   private fun parseNumber(paramsJson: String?, key: String): String? {
     val raw = paramsJson ?: return null

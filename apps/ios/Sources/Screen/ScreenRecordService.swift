@@ -1,20 +1,17 @@
 import AVFoundation
-import UIKit
+import ReplayKit
 
 @MainActor
 final class ScreenRecordService {
     enum ScreenRecordError: LocalizedError {
-        case noWindow
         case invalidScreenIndex(Int)
         case captureFailed(String)
         case writeFailed(String)
 
         var errorDescription: String? {
             switch self {
-            case .noWindow:
-                return "Screen capture unavailable"
-            case let .invalidScreenIndex(idx):
-                return "Invalid screen index \(idx)"
+        case let .invalidScreenIndex(idx):
+            return "Invalid screen index \(idx)"
             case let .captureFailed(msg):
                 return msg
             case let .writeFailed(msg):
@@ -27,12 +24,18 @@ final class ScreenRecordService {
         screenIndex: Int?,
         durationMs: Int?,
         fps: Double?,
+        includeAudio: Bool?,
         outPath: String?) async throws -> String
     {
         let durationMs = Self.clampDurationMs(durationMs)
         let fps = Self.clampFps(fps)
         let fpsInt = Int32(fps.rounded())
         let fpsValue = Double(fpsInt)
+        let includeAudio = includeAudio ?? true
+
+        if let idx = screenIndex, idx != 0 {
+            throw ScreenRecordError.invalidScreenIndex(idx)
+        }
 
         let outURL: URL = {
             if let outPath, !outPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -43,83 +46,124 @@ final class ScreenRecordService {
         }()
         try? FileManager.default.removeItem(at: outURL)
 
-        if let idx = screenIndex, idx != 0 {
-            throw ScreenRecordError.invalidScreenIndex(idx)
+        let recorder = RPScreenRecorder.shared()
+        recorder.isMicrophoneEnabled = includeAudio
+
+        var writer: AVAssetWriter?
+        var videoInput: AVAssetWriterInput?
+        var audioInput: AVAssetWriterInput?
+        var started = false
+        var sawVideo = false
+        var lastVideoTime: CMTime?
+        var handlerError: Error?
+        let lock = NSLock()
+
+        func setHandlerError(_ error: Error) {
+            lock.lock()
+            defer { lock.unlock() }
+            if handlerError == nil { handlerError = error }
         }
 
-        guard let window = Self.resolveKeyWindow() else {
-            throw ScreenRecordError.noWindow
-        }
-
-        let size = window.bounds.size
-        let scale = window.screen.scale
-        let widthPx = max(1, Int(size.width * scale))
-        let heightPx = max(1, Int(size.height * scale))
-
-        let writer = try AVAssetWriter(outputURL: outURL, fileType: .mp4)
-        let settings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: widthPx,
-            AVVideoHeightKey: heightPx,
-        ]
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
-        input.expectsMediaDataInRealTime = false
-
-        let attrs: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: widthPx,
-            kCVPixelBufferHeightKey as String: heightPx,
-            kCVPixelBufferCGImageCompatibilityKey as String: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
-        ]
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: input,
-            sourcePixelBufferAttributes: attrs)
-
-        guard writer.canAdd(input) else {
-            throw ScreenRecordError.writeFailed("Cannot add video input")
-        }
-        writer.add(input)
-
-        guard writer.startWriting() else {
-            throw ScreenRecordError.writeFailed(writer.error?.localizedDescription ?? "Failed to start writer")
-        }
-        writer.startSession(atSourceTime: .zero)
-
-        let frameCount = max(1, Int((Double(durationMs) / 1000.0 * fpsValue).rounded(.up)))
-        let frameDuration = CMTime(value: 1, timescale: fpsInt)
-        let frameSleepNs = UInt64(1_000_000_000.0 / fpsValue)
-
-        for frame in 0..<frameCount {
-            while !input.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 10_000_000)
-            }
-
-            var frameError: Error?
-            autoreleasepool {
-                do {
-                    guard let image = Self.captureImage(window: window, size: size) else {
-                        throw ScreenRecordError.captureFailed("Failed to capture frame")
-                    }
-                    guard let buffer = Self.pixelBuffer(from: image, width: widthPx, height: heightPx) else {
-                        throw ScreenRecordError.captureFailed("Failed to render frame")
-                    }
-                    let time = CMTimeMultiply(frameDuration, multiplier: Int32(frame))
-                    if !adaptor.append(buffer, withPresentationTime: time) {
-                        throw ScreenRecordError.writeFailed("Failed to append frame")
-                    }
-                } catch {
-                    frameError = error
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            recorder.startCapture(handler: { sample, type, error in
+                if let error {
+                    setHandlerError(error)
+                    return
                 }
-            }
-            if let frameError { throw frameError }
+                guard CMSampleBufferDataIsReady(sample) else { return }
 
-            if frame < frameCount - 1 {
-                try await Task.sleep(nanoseconds: frameSleepNs)
-            }
+                switch type {
+                case .video:
+                    let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+                    if let lastVideoTime {
+                        let delta = CMTimeSubtract(pts, lastVideoTime)
+                        if delta.seconds < (1.0 / fpsValue) { return }
+                    }
+
+                    if writer == nil {
+                        guard let imageBuffer = CMSampleBufferGetImageBuffer(sample) else {
+                            setHandlerError(ScreenRecordError.captureFailed("Missing image buffer"))
+                            return
+                        }
+                        let width = CVPixelBufferGetWidth(imageBuffer)
+                        let height = CVPixelBufferGetHeight(imageBuffer)
+                        do {
+                            let w = try AVAssetWriter(outputURL: outURL, fileType: .mp4)
+                            let settings: [String: Any] = [
+                                AVVideoCodecKey: AVVideoCodecType.h264,
+                                AVVideoWidthKey: width,
+                                AVVideoHeightKey: height,
+                            ]
+                            let vInput = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+                            vInput.expectsMediaDataInRealTime = true
+                            guard w.canAdd(vInput) else {
+                                throw ScreenRecordError.writeFailed("Cannot add video input")
+                            }
+                            w.add(vInput)
+
+                            if includeAudio {
+                                let aInput = AVAssetWriterInput(mediaType: .audio, outputSettings: nil)
+                                aInput.expectsMediaDataInRealTime = true
+                                if w.canAdd(aInput) {
+                                    w.add(aInput)
+                                    audioInput = aInput
+                                }
+                            }
+
+                            guard w.startWriting() else {
+                                throw ScreenRecordError.writeFailed(w.error?.localizedDescription ?? "Failed to start writer")
+                            }
+                            w.startSession(atSourceTime: pts)
+                            writer = w
+                            videoInput = vInput
+                            started = true
+                        } catch {
+                            setHandlerError(error)
+                            return
+                        }
+                    }
+
+                    guard let vInput = videoInput, started else { return }
+                    if vInput.isReadyForMoreMediaData {
+                        if vInput.append(sample) {
+                            sawVideo = true
+                            lastVideoTime = pts
+                        } else {
+                            if let err = writer?.error {
+                                setHandlerError(ScreenRecordError.writeFailed(err.localizedDescription))
+                            }
+                        }
+                    }
+
+                case .audioApp, .audioMic:
+                    guard includeAudio, let aInput = audioInput, started else { return }
+                    if aInput.isReadyForMoreMediaData {
+                        _ = aInput.append(sample)
+                    }
+
+                @unknown default:
+                    break
+                }
+            }, completionHandler: { error in
+                if let error { cont.resume(throwing: error) } else { cont.resume() }
+            })
         }
 
-        input.markAsFinished()
+        try await Task.sleep(nanoseconds: UInt64(durationMs) * 1_000_000)
+
+        let stopError = await withCheckedContinuation { cont in
+            recorder.stopCapture { error in cont.resume(returning: error) }
+        }
+        if let stopError { throw stopError }
+
+        if let handlerError { throw handlerError }
+        guard let writer, let videoInput, sawVideo else {
+            throw ScreenRecordError.captureFailed("No frames captured")
+        }
+
+        videoInput.markAsFinished()
+        audioInput?.markAsFinished()
+
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             writer.finishWriting {
                 if let err = writer.error {
@@ -146,60 +190,4 @@ final class ScreenRecordService {
         return min(30, max(1, v))
     }
 
-    private nonisolated static func resolveKeyWindow() -> UIWindow? {
-        let scenes = UIApplication.shared.connectedScenes
-        for scene in scenes {
-            guard let windowScene = scene as? UIWindowScene else { continue }
-            if let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                return window
-            }
-            if let window = windowScene.windows.first {
-                return window
-            }
-        }
-        return nil
-    }
-
-    private nonisolated static func captureImage(window: UIWindow, size: CGSize) -> CGImage? {
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = window.screen.scale
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let image = renderer.image { _ in
-            window.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false)
-        }
-        return image.cgImage
-    }
-
-    private nonisolated static func pixelBuffer(from image: CGImage, width: Int, height: Int) -> CVPixelBuffer? {
-        var buffer: CVPixelBuffer?
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            width,
-            height,
-            kCVPixelFormatType_32BGRA,
-            [
-                kCVPixelBufferCGImageCompatibilityKey: true,
-                kCVPixelBufferCGBitmapContextCompatibilityKey: true,
-            ] as CFDictionary,
-            &buffer)
-        guard status == kCVReturnSuccess, let buffer else { return nil }
-
-        CVPixelBufferLockBaseAddress(buffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-
-        guard let context = CGContext(
-            data: CVPixelBufferGetBaseAddress(buffer),
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-        ) else {
-            return nil
-        }
-
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return buffer
-    }
 }

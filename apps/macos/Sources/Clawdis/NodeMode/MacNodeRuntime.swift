@@ -9,6 +9,14 @@ actor MacNodeRuntime {
 
     func handleInvoke(_ req: BridgeInvokeRequest) async -> BridgeInvokeResponse {
         let command = req.command
+        if (command.hasPrefix("canvas.") || command.hasPrefix("canvas.a2ui.")) && !Self.canvasEnabled() {
+            return BridgeInvokeResponse(
+                id: req.id,
+                ok: false,
+                error: ClawdisNodeError(
+                    code: .unavailable,
+                    message: "CANVAS_DISABLED: enable Canvas in Settings"))
+        }
         do {
             switch command {
             case ClawdisCanvasCommand.show.rawValue:
@@ -141,26 +149,29 @@ actor MacNodeRuntime {
                         code: .invalidRequest,
                         message: "INVALID_REQUEST: screen format must be mp4")
                 }
-                let path = try await self.screenRecorder.record(
+                let res = try await self.screenRecorder.record(
                     screenIndex: params.screenIndex,
                     durationMs: params.durationMs,
                     fps: params.fps,
+                    includeAudio: params.includeAudio,
                     outPath: nil)
-                defer { try? FileManager.default.removeItem(atPath: path) }
-                let data = try Data(contentsOf: URL(fileURLWithPath: path))
+                defer { try? FileManager.default.removeItem(atPath: res.path) }
+                let data = try Data(contentsOf: URL(fileURLWithPath: res.path))
                 struct ScreenPayload: Encodable {
                     var format: String
                     var base64: String
                     var durationMs: Int?
                     var fps: Double?
                     var screenIndex: Int?
+                    var hasAudio: Bool
                 }
                 let payload = try Self.encodePayload(ScreenPayload(
                     format: "mp4",
                     base64: data.base64EncodedString(),
                     durationMs: params.durationMs,
                     fps: params.fps,
-                    screenIndex: params.screenIndex))
+                    screenIndex: params.screenIndex,
+                    hasAudio: res.hasAudio))
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
 
             default:
@@ -244,6 +255,10 @@ actor MacNodeRuntime {
             ])
         }
         return json
+    }
+
+    private nonisolated static func canvasEnabled() -> Bool {
+        UserDefaults.standard.object(forKey: canvasEnabledKey) as? Bool ?? true
     }
 
     private nonisolated static func cameraEnabled() -> Bool {

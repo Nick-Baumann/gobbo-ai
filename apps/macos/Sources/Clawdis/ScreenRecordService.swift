@@ -31,10 +31,12 @@ final class ScreenRecordService {
         screenIndex: Int?,
         durationMs: Int?,
         fps: Double?,
-        outPath: String?) async throws -> String
+        includeAudio: Bool?,
+        outPath: String?) async throws -> (path: String, hasAudio: Bool)
     {
         let durationMs = Self.clampDurationMs(durationMs)
         let fps = Self.clampFps(fps)
+        let includeAudio = includeAudio ?? false
 
         let outURL: URL = {
             if let outPath, !outPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -60,15 +62,22 @@ final class ScreenRecordService {
         config.queueDepth = 8
         config.showsCursor = true
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(max(1, Int32(fps.rounded()))))
+        if includeAudio {
+            config.capturesAudio = true
+        }
 
         let recorder = try StreamRecorder(
             outputURL: outURL,
             width: display.width,
             height: display.height,
+            includeAudio: includeAudio,
             logger: self.logger)
 
         let stream = SCStream(filter: filter, configuration: config, delegate: recorder)
         try stream.addStreamOutput(recorder, type: .screen, sampleHandlerQueue: recorder.queue)
+        if includeAudio {
+            try stream.addStreamOutput(recorder, type: .audio, sampleHandlerQueue: recorder.queue)
+        }
 
         self.logger.info(
             "screen record start idx=\(idx) durationMs=\(durationMs) fps=\(fps) out=\(outURL.path, privacy: .public)")
@@ -85,7 +94,7 @@ final class ScreenRecordService {
         }
 
         try await recorder.finish()
-        return outURL.path
+        return (path: outURL.path, hasAudio: recorder.hasAudio)
     }
 
     private nonisolated static func clampDurationMs(_ ms: Int?) -> Int {
@@ -106,13 +115,15 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
     private let logger: Logger
     private let writer: AVAssetWriter
     private let input: AVAssetWriterInput
+    private let audioInput: AVAssetWriterInput?
+    let hasAudio: Bool
 
     private var started = false
     private var sawFrame = false
     private var didFinish = false
     private var pendingErrorMessage: String?
 
-    init(outputURL: URL, width: Int, height: Int, logger: Logger) throws {
+    init(outputURL: URL, width: Int, height: Int, includeAudio: Bool, logger: Logger) throws {
         self.logger = logger
         self.writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
@@ -128,6 +139,28 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
             throw ScreenRecordService.ScreenRecordError.writeFailed("Cannot add video input")
         }
         self.writer.add(self.input)
+
+        if includeAudio {
+            let audioSettings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVNumberOfChannelsKey: 1,
+                AVSampleRateKey: 44_100,
+                AVEncoderBitRateKey: 96_000,
+            ]
+            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            audioInput.expectsMediaDataInRealTime = true
+            if self.writer.canAdd(audioInput) {
+                self.writer.add(audioInput)
+                self.audioInput = audioInput
+                self.hasAudio = true
+            } else {
+                self.audioInput = nil
+                self.hasAudio = false
+            }
+        } else {
+            self.audioInput = nil
+            self.hasAudio = false
+        }
         super.init()
     }
 
@@ -145,14 +178,20 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
         didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
         of type: SCStreamOutputType)
     {
-        guard type == .screen else { return }
         guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
         // Callback runs on `sampleHandlerQueue` (`self.queue`).
-        self.handle(sampleBuffer: sampleBuffer)
+        switch type {
+        case .screen:
+            self.handleVideo(sampleBuffer: sampleBuffer)
+        case .audio:
+            self.handleAudio(sampleBuffer: sampleBuffer)
+        @unknown default:
+            break
+        }
         _ = stream
     }
 
-    private func handle(sampleBuffer: CMSampleBuffer) {
+    private func handleVideo(sampleBuffer: CMSampleBuffer) {
         if let msg = self.pendingErrorMessage {
             self.logger.error("screen record aborting due to prior error: \(msg, privacy: .public)")
             return
@@ -175,6 +214,18 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
         }
     }
 
+    private func handleAudio(sampleBuffer: CMSampleBuffer) {
+        guard let audioInput else { return }
+        if let msg = self.pendingErrorMessage {
+            self.logger.error("screen record audio aborting due to prior error: \(msg, privacy: .public)")
+            return
+        }
+        if self.didFinish || !self.started { return }
+        if audioInput.isReadyForMoreMediaData {
+            _ = audioInput.append(sampleBuffer)
+        }
+    }
+
     func finish() async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             self.queue.async {
@@ -193,6 +244,7 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
                 self.didFinish = true
 
                 self.input.markAsFinished()
+                self.audioInput?.markAsFinished()
                 self.writer.finishWriting {
                     if let err = self.writer.error {
                         cont.resume(throwing: ScreenRecordService.ScreenRecordError.writeFailed(err.localizedDescription))
@@ -206,4 +258,3 @@ private final class StreamRecorder: NSObject, SCStreamOutput, SCStreamDelegate, 
         }
     }
 }
-

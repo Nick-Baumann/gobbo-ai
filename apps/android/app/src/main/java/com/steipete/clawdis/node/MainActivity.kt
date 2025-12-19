@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
     viewModel.camera.attachLifecycleOwner(this)
     viewModel.camera.attachPermissionRequester(permissionRequester)
     viewModel.screenRecorder.attachScreenCaptureRequester(screenCaptureRequester)
+    viewModel.screenRecorder.attachPermissionRequester(permissionRequester)
 
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {

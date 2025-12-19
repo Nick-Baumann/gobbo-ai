@@ -4,8 +4,6 @@ import Foundation
 import OSLog
 
 enum ControlRequestHandler {
-    private static let cameraCapture = CameraCaptureService()
-    @MainActor private static let screenRecorder = ScreenRecordService()
 
     struct NodeListNode: Codable {
         var nodeId: String
@@ -135,11 +133,12 @@ enum ControlRequestHandler {
                 includeAudio: includeAudio,
                 outPath: outPath)
 
-        case let .screenRecord(screenIndex, durationMs, fps, outPath):
+        case let .screenRecord(screenIndex, durationMs, fps, includeAudio, outPath):
             return await self.handleScreenRecord(
                 screenIndex: screenIndex,
                 durationMs: durationMs,
                 fps: fps,
+                includeAudio: includeAudio,
                 outPath: outPath)
         }
     }
@@ -242,50 +241,84 @@ enum ControlRequestHandler {
         placement: CanvasPlacement?) async -> Response
     {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
-        let logger = Logger(subsystem: "com.steipete.clawdis", category: "CanvasControl")
-        logger.info("canvas show start session=\(session, privacy: .public) path=\(path ?? "", privacy: .public)")
+        _ = session
         do {
-            logger.info("canvas show awaiting CanvasManager")
-            let res = try await CanvasManager.shared.showDetailed(
-                sessionKey: session,
-                target: path,
-                placement: placement)
-            logger
-                .info(
-                    "canvas show done dir=\(res.directory, privacy: .public) status=\(String(describing: res.status), privacy: .public)")
-            let payload = try? JSONEncoder().encode(res)
-            return Response(ok: true, message: res.directory, payload: payload)
+            if let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                _ = try await self.invokeLocalNode(
+                    command: ClawdisCanvasCommand.navigate.rawValue,
+                    params: ["url": path],
+                    timeoutMs: 20000)
+            } else {
+                _ = try await self.invokeLocalNode(
+                    command: ClawdisCanvasCommand.show.rawValue,
+                    params: nil,
+                    timeoutMs: 20000)
+            }
+            if placement != nil {
+                return Response(ok: true, message: "Canvas placement ignored (node mode)")
+            }
+            return Response(ok: true)
         } catch {
-            logger.error("canvas show failed \(error.localizedDescription, privacy: .public)")
             return Response(ok: false, message: error.localizedDescription)
         }
     }
 
     private static func handleCanvasHide(session: String) async -> Response {
-        await CanvasManager.shared.hide(sessionKey: session)
-        return Response(ok: true)
+        _ = session
+        do {
+            _ = try await self.invokeLocalNode(
+                command: ClawdisCanvasCommand.hide.rawValue,
+                params: nil,
+                timeoutMs: 10000)
+            return Response(ok: true)
+        } catch {
+            return Response(ok: false, message: error.localizedDescription)
+        }
     }
 
     private static func handleCanvasEval(session: String, javaScript: String) async -> Response {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
-        let logger = Logger(subsystem: "com.steipete.clawdis", category: "CanvasControl")
-        logger.info("canvas eval start session=\(session, privacy: .public) bytes=\(javaScript.utf8.count)")
+        _ = session
         do {
-            logger.info("canvas eval awaiting CanvasManager.eval")
-            let result = try await CanvasManager.shared.eval(sessionKey: session, javaScript: javaScript)
-            logger.info("canvas eval done bytes=\(result.utf8.count)")
-            return Response(ok: true, payload: Data(result.utf8))
+            let payload = try await self.invokeLocalNode(
+                command: ClawdisCanvasCommand.evalJS.rawValue,
+                params: ["javaScript": javaScript],
+                timeoutMs: 20000)
+            if let dict = payload as? [String: Any],
+               let result = dict["result"] as? String
+            {
+                return Response(ok: true, payload: Data(result.utf8))
+            }
+            return Response(ok: true)
         } catch {
-            logger.error("canvas eval failed \(error.localizedDescription, privacy: .public)")
             return Response(ok: false, message: error.localizedDescription)
         }
     }
 
     private static func handleCanvasSnapshot(session: String, outPath: String?) async -> Response {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
+        _ = session
         do {
-            let path = try await CanvasManager.shared.snapshot(sessionKey: session, outPath: outPath)
-            return Response(ok: true, message: path)
+            let payload = try await self.invokeLocalNode(
+                command: ClawdisCanvasCommand.snapshot.rawValue,
+                params: [:],
+                timeoutMs: 20000)
+            guard let dict = payload as? [String: Any],
+                  let format = dict["format"] as? String,
+                  let base64 = dict["base64"] as? String,
+                  let data = Data(base64Encoded: base64)
+            else {
+                return Response(ok: false, message: "invalid canvas snapshot payload")
+            }
+            let ext = (format.lowercased() == "jpeg" || format.lowercased() == "jpg") ? "jpg" : "png"
+            let url: URL = if let outPath, !outPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                URL(fileURLWithPath: outPath)
+            } else {
+                FileManager.default.temporaryDirectory
+                    .appendingPathComponent("clawdis-canvas-snapshot-\(UUID().uuidString).\(ext)")
+            }
+            try data.write(to: url, options: [.atomic])
+            return Response(ok: true, message: url.path)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
         }
@@ -297,110 +330,36 @@ enum ControlRequestHandler {
         jsonl: String?) async -> Response
     {
         guard self.canvasEnabled() else { return Response(ok: false, message: "Canvas disabled by user") }
+        _ = session
         do {
-            // Ensure the Canvas is visible without forcing a navigation/reload.
-            _ = try await CanvasManager.shared.show(sessionKey: session, path: nil)
-
-            // Wait for the in-page A2UI bridge. If it doesn't appear, force-load the bundled A2UI shell once.
-            var ready = await Self.waitForCanvasA2UI(session: session, requireBuiltinPath: false, timeoutMs: 2000)
-            if !ready {
-                _ = try await CanvasManager.shared.show(sessionKey: session, path: "/__clawdis__/a2ui/")
-                ready = await Self.waitForCanvasA2UI(session: session, requireBuiltinPath: true, timeoutMs: 5000)
-            }
-
-            guard ready else { return Response(ok: false, message: "A2UI not ready") }
-
-            let js: String
             switch command {
             case .reset:
-                js = """
-                (() => {
-                  try {
-                    if (!globalThis.clawdisA2UI) { return JSON.stringify({ ok: false, error: "missing clawdisA2UI" }); }
-                    return JSON.stringify(globalThis.clawdisA2UI.reset());
-                  } catch (e) {
-                    return JSON.stringify({ ok: false, error: String(e?.message ?? e), stack: e?.stack });
-                  }
-                })()
-                """
-
+                let payload = try await self.invokeLocalNode(
+                    command: ClawdisCanvasA2UICommand.reset.rawValue,
+                    params: nil,
+                    timeoutMs: 20000)
+                if let payload {
+                    let data = try JSONSerialization.data(withJSONObject: payload)
+                    return Response(ok: true, payload: data)
+                }
+                return Response(ok: true)
             case .pushJSONL:
                 guard let jsonl, !jsonl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     return Response(ok: false, message: "missing jsonl")
                 }
-
-                let messages: [ClawdisKit.AnyCodable]
-                do {
-                    messages = try ClawdisCanvasA2UIJSONL.decodeMessagesFromJSONL(jsonl)
-                } catch {
-                    return Response(ok: false, message: error.localizedDescription)
+                let payload = try await self.invokeLocalNode(
+                    command: ClawdisCanvasA2UICommand.pushJSONL.rawValue,
+                    params: ["jsonl": jsonl],
+                    timeoutMs: 30000)
+                if let payload {
+                    let data = try JSONSerialization.data(withJSONObject: payload)
+                    return Response(ok: true, payload: data)
                 }
-
-                let json: String
-                do {
-                    json = try ClawdisCanvasA2UIJSONL.encodeMessagesJSONArray(messages)
-                } catch {
-                    return Response(ok: false, message: error.localizedDescription)
-                }
-                js = """
-                (() => {
-                  try {
-                    if (!globalThis.clawdisA2UI) { return JSON.stringify({ ok: false, error: "missing clawdisA2UI" }); }
-                    const messages = \(json);
-                    return JSON.stringify(globalThis.clawdisA2UI.applyMessages(messages));
-                  } catch (e) {
-                    return JSON.stringify({ ok: false, error: String(e?.message ?? e), stack: e?.stack });
-                  }
-                })()
-                """
+                return Response(ok: true)
             }
-
-            let result = try await CanvasManager.shared.eval(sessionKey: session, javaScript: js)
-
-            let payload = Data(result.utf8)
-            if let obj = try? JSONSerialization.jsonObject(with: payload, options: []) as? [String: Any],
-               let ok = obj["ok"] as? Bool
-            {
-                let error = obj["error"] as? String
-                return Response(ok: ok, message: ok ? "" : (error ?? "A2UI error"), payload: payload)
-            }
-
-            return Response(ok: true, payload: payload)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
         }
-    }
-
-    private static func waitForCanvasA2UI(session: String, requireBuiltinPath: Bool, timeoutMs: Int) async -> Bool {
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .milliseconds(timeoutMs))
-        while clock.now < deadline {
-            do {
-                let res = try await CanvasManager.shared.eval(
-                    sessionKey: session,
-                    javaScript: """
-                    (() => {
-                      try {
-                        if (document?.readyState !== 'complete') { return ''; }
-                        if (!globalThis.clawdisA2UI) { return ''; }
-                        if (typeof globalThis.clawdisA2UI.applyMessages !== 'function') { return ''; }
-                        if (\(requireBuiltinPath ? "true" : "false")) {
-                          const p = String(location?.pathname ?? '');
-                          if (!p.startsWith('/__clawdis__/a2ui')) { return ''; }
-                        }
-                        return 'ready';
-                      } catch {
-                        return '';
-                      }
-                    })()
-                    """)
-                if res == "ready" { return true }
-            } catch {
-                // Ignore; keep waiting.
-            }
-            try? await Task.sleep(nanoseconds: 60_000_000)
-        }
-        return false
     }
 
     private static func handleNodeList() async -> Response {
@@ -509,15 +468,33 @@ enum ControlRequestHandler {
     {
         guard self.cameraEnabled() else { return Response(ok: false, message: "Camera disabled by user") }
         do {
-            let res = try await self.cameraCapture.snap(facing: facing, maxWidth: maxWidth, quality: quality)
+            var params: [String: Any] = [:]
+            if let facing { params["facing"] = facing.rawValue }
+            if let maxWidth { params["maxWidth"] = maxWidth }
+            if let quality { params["quality"] = quality }
+            params["format"] = "jpg"
+
+            let payload = try await self.invokeLocalNode(
+                command: ClawdisCameraCommand.snap.rawValue,
+                params: params,
+                timeoutMs: 30000)
+            guard let dict = payload as? [String: Any],
+                  let format = dict["format"] as? String,
+                  let base64 = dict["base64"] as? String,
+                  let data = Data(base64Encoded: base64)
+            else {
+                return Response(ok: false, message: "invalid camera snapshot payload")
+            }
+
+            let ext = (format.lowercased() == "jpeg" || format.lowercased() == "jpg") ? "jpg" : format.lowercased()
             let url: URL = if let outPath, !outPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 URL(fileURLWithPath: outPath)
             } else {
                 FileManager.default.temporaryDirectory
-                    .appendingPathComponent("clawdis-camera-snap-\(UUID().uuidString).jpg")
+                    .appendingPathComponent("clawdis-camera-snap-\(UUID().uuidString).\(ext)")
             }
 
-            try res.data.write(to: url, options: [.atomic])
+            try data.write(to: url, options: [.atomic])
             return Response(ok: true, message: url.path)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
@@ -532,12 +509,31 @@ enum ControlRequestHandler {
     {
         guard self.cameraEnabled() else { return Response(ok: false, message: "Camera disabled by user") }
         do {
-            let res = try await self.cameraCapture.clip(
-                facing: facing,
-                durationMs: durationMs,
-                includeAudio: includeAudio,
-                outPath: outPath)
-            return Response(ok: true, message: res.path)
+            var params: [String: Any] = ["includeAudio": includeAudio, "format": "mp4"]
+            if let facing { params["facing"] = facing.rawValue }
+            if let durationMs { params["durationMs"] = durationMs }
+
+            let payload = try await self.invokeLocalNode(
+                command: ClawdisCameraCommand.clip.rawValue,
+                params: params,
+                timeoutMs: 90000)
+            guard let dict = payload as? [String: Any],
+                  let format = dict["format"] as? String,
+                  let base64 = dict["base64"] as? String,
+                  let data = Data(base64Encoded: base64)
+            else {
+                return Response(ok: false, message: "invalid camera clip payload")
+            }
+
+            let ext = format.lowercased()
+            let url: URL = if let outPath, !outPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                URL(fileURLWithPath: outPath)
+            } else {
+                FileManager.default.temporaryDirectory
+                    .appendingPathComponent("clawdis-camera-clip-\(UUID().uuidString).\(ext)")
+            }
+            try data.write(to: url, options: [.atomic])
+            return Response(ok: true, message: url.path)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
         }
@@ -547,23 +543,69 @@ enum ControlRequestHandler {
         screenIndex: Int?,
         durationMs: Int?,
         fps: Double?,
+        includeAudio: Bool,
         outPath: String?) async -> Response
     {
-        let authorized = await PermissionManager
-            .ensure([.screenRecording], interactive: false)[.screenRecording] ?? false
-        guard authorized else { return Response(ok: false, message: "screen recording permission missing") }
-
         do {
-            let path = try await Task { @MainActor in
-                try await self.screenRecorder.record(
-                    screenIndex: screenIndex,
-                    durationMs: durationMs,
-                    fps: fps,
-                    outPath: outPath)
-            }.value
-            return Response(ok: true, message: path)
+            var params: [String: Any] = ["format": "mp4", "includeAudio": includeAudio]
+            if let screenIndex { params["screenIndex"] = screenIndex }
+            if let durationMs { params["durationMs"] = durationMs }
+            if let fps { params["fps"] = fps }
+
+            let payload = try await self.invokeLocalNode(
+                command: "screen.record",
+                params: params,
+                timeoutMs: 120000)
+            guard let dict = payload as? [String: Any],
+                  let base64 = dict["base64"] as? String,
+                  let data = Data(base64Encoded: base64)
+            else {
+                return Response(ok: false, message: "invalid screen record payload")
+            }
+            let url: URL = if let outPath, !outPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                URL(fileURLWithPath: outPath)
+            } else {
+                FileManager.default.temporaryDirectory
+                    .appendingPathComponent("clawdis-screen-record-\(UUID().uuidString).mp4")
+            }
+            try data.write(to: url, options: [.atomic])
+            return Response(ok: true, message: url.path)
         } catch {
             return Response(ok: false, message: error.localizedDescription)
         }
+    }
+
+    private static func invokeLocalNode(
+        command: String,
+        params: [String: Any]?,
+        timeoutMs: Int) async throws -> Any?
+    {
+        var gatewayParams: [String: AnyCodable] = [
+            "nodeId": AnyCodable(Self.localNodeId()),
+            "command": AnyCodable(command),
+            "idempotencyKey": AnyCodable(UUID().uuidString),
+        ]
+        if let params {
+            gatewayParams["params"] = AnyCodable(params)
+        }
+        let data = try await GatewayConnection.shared.request(
+            method: "node.invoke",
+            params: gatewayParams,
+            timeoutMs: timeoutMs)
+        return try Self.decodeNodeInvokePayload(data: data)
+    }
+
+    private static func decodeNodeInvokePayload(data: Data) throws -> Any? {
+        let obj = try JSONSerialization.jsonObject(with: data)
+        guard let dict = obj as? [String: Any] else {
+            throw NSError(domain: "Node", code: 30, userInfo: [
+                NSLocalizedDescriptionKey: "invalid node invoke response",
+            ])
+        }
+        return dict["payload"]
+    }
+
+    private static func localNodeId() -> String {
+        "mac-\(InstanceIdentity.instanceId)"
     }
 }

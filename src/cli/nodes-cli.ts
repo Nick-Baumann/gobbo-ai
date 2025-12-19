@@ -782,6 +782,7 @@ export function registerNodesCli(program: Command) {
       .option("--screen <index>", "Screen index (0 = primary)", "0")
       .option("--duration <ms|10s>", "Clip duration (ms or 10s)", "10000")
       .option("--fps <fps>", "Frames per second", "10")
+      .option("--no-audio", "Disable microphone audio capture")
       .option("--out <path>", "Output path")
       .option(
         "--invoke-timeout <ms>",
@@ -808,6 +809,7 @@ export function registerNodesCli(program: Command) {
                 : undefined,
               fps: Number.isFinite(fps) ? fps : undefined,
               format: "mp4",
+              includeAudio: opts.audio !== false,
             },
             idempotencyKey: randomIdempotencyKey(),
           };
@@ -844,6 +846,7 @@ export function registerNodesCli(program: Command) {
                     durationMs: parsed.durationMs,
                     fps: parsed.fps,
                     screenIndex: parsed.screenIndex,
+                    hasAudio: parsed.hasAudio,
                   },
                 },
                 null,

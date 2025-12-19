@@ -132,7 +132,7 @@ public enum Request: Sendable {
     case nodeInvoke(nodeId: String, command: String, paramsJSON: String?)
     case cameraSnap(facing: CameraFacing?, maxWidth: Int?, quality: Double?, outPath: String?)
     case cameraClip(facing: CameraFacing?, durationMs: Int?, includeAudio: Bool, outPath: String?)
-    case screenRecord(screenIndex: Int?, durationMs: Int?, fps: Double?, outPath: String?)
+    case screenRecord(screenIndex: Int?, durationMs: Int?, fps: Double?, includeAudio: Bool, outPath: String?)
 }
 
 // MARK: - Responses
@@ -289,11 +289,12 @@ extension Request: Codable {
             try container.encode(includeAudio, forKey: .includeAudio)
             try container.encodeIfPresent(outPath, forKey: .outPath)
 
-        case let .screenRecord(screenIndex, durationMs, fps, outPath):
+        case let .screenRecord(screenIndex, durationMs, fps, includeAudio, outPath):
             try container.encode(Kind.screenRecord, forKey: .type)
             try container.encodeIfPresent(screenIndex, forKey: .screenIndex)
             try container.encodeIfPresent(durationMs, forKey: .durationMs)
             try container.encodeIfPresent(fps, forKey: .fps)
+            try container.encode(includeAudio, forKey: .includeAudio)
             try container.encodeIfPresent(outPath, forKey: .outPath)
         }
     }
@@ -394,8 +395,14 @@ extension Request: Codable {
             let screenIndex = try container.decodeIfPresent(Int.self, forKey: .screenIndex)
             let durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs)
             let fps = try container.decodeIfPresent(Double.self, forKey: .fps)
+            let includeAudio = (try? container.decode(Bool.self, forKey: .includeAudio)) ?? true
             let outPath = try container.decodeIfPresent(String.self, forKey: .outPath)
-            self = .screenRecord(screenIndex: screenIndex, durationMs: durationMs, fps: fps, outPath: outPath)
+            self = .screenRecord(
+                screenIndex: screenIndex,
+                durationMs: durationMs,
+                fps: fps,
+                includeAudio: includeAudio,
+                outPath: outPath)
         }
     }
 }

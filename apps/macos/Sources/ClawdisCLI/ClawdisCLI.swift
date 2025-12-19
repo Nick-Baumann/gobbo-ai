@@ -476,6 +476,7 @@ struct ClawdisCLI {
             var durationMs: Int?
             var fps: Double?
             var outPath: String?
+            var includeAudio = true
             while !args.isEmpty {
                 let arg = args.removeFirst()
                 switch arg {
@@ -487,6 +488,8 @@ struct ClawdisCLI {
                     durationMs = args.popFirst().flatMap(Int.init)
                 case "--fps":
                     fps = args.popFirst().flatMap(Double.init)
+                case "--no-audio":
+                    includeAudio = false
                 case "--out":
                     outPath = args.popFirst()
                 default:
@@ -494,7 +497,12 @@ struct ClawdisCLI {
                 }
             }
             return ParsedCLIRequest(
-                request: .screenRecord(screenIndex: screenIndex, durationMs: durationMs, fps: fps, outPath: outPath),
+                request: .screenRecord(
+                    screenIndex: screenIndex,
+                    durationMs: durationMs,
+                    fps: fps,
+                    includeAudio: includeAudio,
+                    outPath: outPath),
                 kind: .mediaPath)
 
         default:
@@ -766,7 +774,7 @@ struct ClawdisCLI {
 
           Screen:
             clawdis-mac screen record [--screen <index>]
-              [--duration <ms|10s|1m>|--duration-ms <ms>] [--fps <n>] [--out <path>]
+              [--duration <ms|10s|1m>|--duration-ms <ms>] [--fps <n>] [--no-audio] [--out <path>]
 
           Browser (clawd):
             clawdis-mac browser status|start|stop|tabs|open|focus|close|screenshot|eval|query|dom|snapshot
@@ -1000,7 +1008,7 @@ struct ClawdisCLI {
         case let .cameraClip(_, durationMs, _, _):
             let ms = durationMs ?? 3000
             return min(180, max(10, TimeInterval(ms) / 1000.0 + 10))
-        case let .screenRecord(_, durationMs, _, _):
+        case let .screenRecord(_, durationMs, _, _, _):
             let ms = durationMs ?? 10_000
             return min(180, max(10, TimeInterval(ms) / 1000.0 + 10))
         default:

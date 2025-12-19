@@ -10,6 +10,7 @@ export type ScreenRecordPayload = {
   durationMs?: number;
   fps?: number;
   screenIndex?: number;
+  hasAudio?: boolean;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -36,6 +37,7 @@ export function parseScreenRecordPayload(value: unknown): ScreenRecordPayload {
     fps: typeof obj.fps === "number" ? obj.fps : undefined,
     screenIndex:
       typeof obj.screenIndex === "number" ? obj.screenIndex : undefined,
+    hasAudio: typeof obj.hasAudio === "boolean" ? obj.hasAudio : undefined,
   };
 }
 
