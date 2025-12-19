@@ -6,6 +6,7 @@ IDENTITY="${SIGN_IDENTITY:-}"
 ENT_TMP_BASE=$(mktemp -t clawdis-entitlements-base)
 ENT_TMP_APP=$(mktemp -t clawdis-entitlements-app)
 ENT_TMP_APP_BASE=$(mktemp -t clawdis-entitlements-app-base)
+ENT_TMP_BUN=$(mktemp -t clawdis-entitlements-bun)
 
 if [ ! -d "$APP_BUNDLE" ]; then
   echo "App bundle not found: $APP_BUNDLE" >&2
@@ -72,6 +73,19 @@ cat > "$ENT_TMP_APP_BASE" <<'PLIST'
 </plist>
 PLIST
 
+cat > "$ENT_TMP_BUN" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+
 cat > "$ENT_TMP_APP" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -126,7 +140,7 @@ if [ -d "$APP_BUNDLE/Contents/Resources/Relay" ]; then
     echo "Signing gateway payload: $f"; sign_item "$f" "$ENT_TMP_BASE"
   done
   if [ -f "$APP_BUNDLE/Contents/Resources/Relay/clawdis-gateway" ]; then
-    echo "Signing embedded gateway"; sign_item "$APP_BUNDLE/Contents/Resources/Relay/clawdis-gateway" "$ENT_TMP_BASE"
+    echo "Signing embedded gateway"; sign_item "$APP_BUNDLE/Contents/Resources/Relay/clawdis-gateway" "$ENT_TMP_BUN"
   fi
 fi
 
@@ -156,5 +170,5 @@ fi
 # Finally sign the bundle
 sign_item "$APP_BUNDLE" "$APP_ENTITLEMENTS"
 
-rm -f "$ENT_TMP_BASE" "$ENT_TMP_APP_BASE" "$ENT_TMP_APP"
+rm -f "$ENT_TMP_BASE" "$ENT_TMP_APP_BASE" "$ENT_TMP_APP" "$ENT_TMP_BUN"
 echo "Codesign complete for $APP_BUNDLE"
