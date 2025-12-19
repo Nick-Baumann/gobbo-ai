@@ -1,11 +1,12 @@
 ---
-summary: "Step-by-step npm release checklist for the Clawdis CLI"
+summary: "Step-by-step release checklist for npm + macOS app"
 read_when:
   - Cutting a new npm release
+  - Cutting a new macOS app release
   - Verifying metadata before publishing
 ---
 
-# Release Checklist (npm)
+# Release Checklist (npm + macOS)
 
 Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tagging/publishing.
 
@@ -29,14 +30,22 @@ Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tag
 - [ ] `pnpm run build` (last sanity check after tests)
 - [ ] (Optional) Spot-check the web gateway if your changes affect send/receive paths.
 
-5) **Publish**
+5) **macOS app (Sparkle)**
+- [ ] Build + sign the macOS app, then zip it for distribution.
+- [ ] Generate the Sparkle signature and update `appcast.xml`.
+- [ ] Keep the app zip (and optional dSYM zip) ready to attach to the GitHub release.
+- [ ] Follow `docs/mac/release.md` for the exact commands and required env vars.
+
+6) **Publish (npm)**
 - [ ] Confirm git status is clean; commit and push as needed.
 - [ ] `npm login` (verify 2FA) if needed.
 - [ ] `npm publish --access public` (use `--tag beta` for pre-releases).
 - [ ] Verify the registry: `npm view clawdis version` and `npx -y clawdis@X.Y.Z --version` (or `--help`).
 
-6) **Post-publish**
+7) **GitHub release + appcast**
 - [ ] Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z` (or `git push --tags`).
-- [ ] Create/refresh the GitHub release for `vX.Y.Z` with **title `clawdis X.Y.Z`** (not just the tag); body should inline the product-facing bullets from the changelog (no bare links) **and must not repeat the title inside the body**; attach the `npm pack` tarball + checksums if you generated them.
+- [ ] Create/refresh the GitHub release for `vX.Y.Z` with **title `clawdis X.Y.Z`** (not just the tag); body should inline the product-facing bullets from the changelog (no bare links) **and must not repeat the title inside the body**.
+- [ ] Attach artifacts: `npm pack` tarball (optional), `Clawdis-X.Y.Z.zip`, and `Clawdis-X.Y.Z.dSYM.zip` (if generated).
+- [ ] Commit the updated `appcast.xml` and push it (Sparkle feeds from main).
 - [ ] From a clean temp directory (no `package.json`), run `npx -y clawdis@X.Y.Z send --help` to confirm install/CLI entrypoints work.
 - [ ] Announce/share release notes.

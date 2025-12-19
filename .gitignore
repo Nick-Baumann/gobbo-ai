@@ -10,6 +10,7 @@ coverage
 apps/macos/.build/
 apps/shared/ClawdisKit/.build/
 bin/clawdis-mac
+bin/docs-list
 apps/macos/.build-local/
 apps/macos/.swiftpm/
 Core/

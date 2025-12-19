@@ -4,6 +4,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+process.stdout.on('error', (error) => {
+  if ((error as NodeJS.ErrnoException).code === 'EPIPE') {
+    process.exit(0);
+  }
+  throw error;
+});
+
 const docsListFile = fileURLToPath(import.meta.url);
 const docsListDir = dirname(docsListFile);
 const DOCS_DIR = join(docsListDir, '..', 'docs');
