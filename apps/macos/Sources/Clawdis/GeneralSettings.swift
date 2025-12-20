@@ -1,4 +1,5 @@
 import AppKit
+import ClawdisIPC
 import Observation
 import SwiftUI
 
