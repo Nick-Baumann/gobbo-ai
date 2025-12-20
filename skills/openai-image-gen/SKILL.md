@@ -6,31 +6,25 @@ metadata: {"clawdis":{"requires":{"bins":["python3"],"env":["OPENAI_API_KEY"]},"
 
 # OpenAI Image Gen
 
-Generate a handful of "random but structured" prompts and render them via OpenAI Images API.
-
-## Setup
-
-- Needs env: `OPENAI_API_KEY`
+Generate a handful of “random but structured” prompts and render them via the OpenAI Images API.
 
 ## Run
 
-From any directory (outputs to `~/Projects/tmp/...` when present; else `./tmp/...`):
-
 ```bash
-python3 ~/Projects/agent-scripts/skills/openai-image-gen/scripts/gen.py
-open ~/Projects/tmp/openai-image-gen-*/index.html
+python3 {baseDir}/scripts/gen.py
+open ./tmp/openai-image-gen-*/index.html
 ```
 
 Useful flags:
 
 ```bash
-python3 ~/Projects/agent-scripts/skills/openai-image-gen/scripts/gen.py --count 16 --model gpt-image-1.5
-python3 ~/Projects/agent-scripts/skills/openai-image-gen/scripts/gen.py --prompt "ultra-detailed studio photo of a lobster astronaut" --count 4
-python3 ~/Projects/agent-scripts/skills/openai-image-gen/scripts/gen.py --size 1536x1024 --quality high --out-dir ./out/images
+python3 {baseDir}/scripts/gen.py --count 16 --model gpt-image-1
+python3 {baseDir}/scripts/gen.py --prompt "ultra-detailed studio photo of a lobster astronaut" --count 4
+python3 {baseDir}/scripts/gen.py --size 1536x1024 --quality high --out-dir ./out/images
 ```
 
 ## Output
 
 - `*.png` images
-- `prompts.json` (prompt to file mapping)
+- `prompts.json` (prompt → file mapping)
 - `index.html` (thumbnail gallery)
