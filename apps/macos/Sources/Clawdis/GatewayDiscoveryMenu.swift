@@ -86,7 +86,7 @@ struct GatewayDiscoveryInlineList: View {
     }
 
     private func suggestedSSHTarget(_ gateway: GatewayDiscoveryModel.DiscoveredGateway) -> String? {
-        let host = gateway.tailnetDns ?? gateway.lanHost
+        let host = self.sanitizedTailnetHost(gateway.tailnetDns) ?? gateway.lanHost
         guard let host else { return nil }
         let user = NSUserName()
         var target = "\(user)@\(host)"
@@ -94,6 +94,16 @@ struct GatewayDiscoveryInlineList: View {
             target += ":\(gateway.sshPort)"
         }
         return target
+    }
+
+    private func sanitizedTailnetHost(_ host: String?) -> String? {
+        guard let host else { return nil }
+        let trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+        if trimmed.hasSuffix(".internal.") || trimmed.hasSuffix(".internal") {
+            return nil
+        }
+        return trimmed
     }
 
     private func rowBackground(selected: Bool, hovered: Bool) -> Color {

@@ -93,7 +93,7 @@ The Gateway advertises small non-secret hints to make UI flows convenient:
 - `gatewayPort=<port>` (informational; the Gateway WS is typically loopback-only)
 - `bridgePort=<port>` (only when bridge is enabled)
 - `canvasPort=<port>` (only when the canvas host is running; enabled by default; default `18793`)
-- `tailnetDns=<magicdns>` (optional hint; may be absent)
+- `tailnetDns=<magicdns>` (optional hint; auto-detected from Tailscale when available; may be absent)
 
 ## Debugging on macOS
 
@@ -149,7 +149,7 @@ Bonjour/DNS-SD often escapes bytes in service instance names as decimal `\\DDD` 
 - `bridge.bind` / `bridge.port` in `~/.clawdis/clawdis.json` control bridge bind/port (preferred).
 - `CLAWDIS_BRIDGE_HOST` / `CLAWDIS_BRIDGE_PORT` still work as a back-compat override when `bridge.bind` / `bridge.port` are not set.
 - `CLAWDIS_SSH_PORT` overrides the SSH port advertised in `_clawdis-bridge._tcp`.
-- `CLAWDIS_TAILNET_DNS` publishes a `tailnetDns` hint (MagicDNS) in `_clawdis-bridge._tcp` (wide-area discovery uses `clawdis.internal.` automatically when enabled).
+- `CLAWDIS_TAILNET_DNS` publishes a `tailnetDns` hint (MagicDNS) in `_clawdis-bridge._tcp`. If unset, the gateway auto-detects Tailscale and publishes the MagicDNS name when possible.
 
 ## Related docs
 
