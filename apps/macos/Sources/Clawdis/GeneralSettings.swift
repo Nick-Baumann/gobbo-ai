@@ -200,7 +200,7 @@ struct GeneralSettings: View {
                 if !self.isControlStatusDuplicate || ControlChannel.shared.lastPingMs != nil {
                     let status = self.isControlStatusDuplicate ? nil : self.controlStatusLine
                     let ping = ControlChannel.shared.lastPingMs.map { "Ping \(Int($0)) ms" }
-                    let line = [status, ping].compactMap { $0 }.joined(separator: " · ")
+                    let line = [status, ping].compactMap(\.self).joined(separator: " · ")
                     if !line.isEmpty {
                         Text(line)
                             .font(.caption)

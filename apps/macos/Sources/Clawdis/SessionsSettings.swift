@@ -173,7 +173,6 @@ struct SessionsSettings: View {
 
         self.loading = false
     }
-
 }
 
 private struct SessionKindBadge: View {
