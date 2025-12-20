@@ -38,7 +38,7 @@ export function attachMediaRoutes(
         return;
       }
       const data = await fs.readFile(realPath);
-      const mime = detectMime({ buffer: data, filePath: realPath });
+      const mime = await detectMime({ buffer: data, filePath: realPath });
       if (mime) res.type(mime);
       res.send(data);
       // best-effort single-use cleanup after response ends

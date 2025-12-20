@@ -8,7 +8,7 @@ import {
   mediaKindFromMime,
 } from "../media/constants.js";
 import { resizeToJpeg } from "../media/image-ops.js";
-import { detectMime } from "../media/mime.js";
+import { detectMime, extensionForMime } from "../media/mime.js";
 
 export async function loadWebMedia(
   mediaUrl: string,
@@ -59,11 +59,15 @@ export async function loadWebMedia(
       throw new Error(`Failed to fetch media: HTTP ${res.status}`);
     }
     const array = Buffer.from(await res.arrayBuffer());
-    const contentType = detectMime({
+    const contentType = await detectMime({
       buffer: array,
       headerMime: res.headers.get("content-type"),
       filePath: mediaUrl,
     });
+    if (fileName && !path.extname(fileName) && contentType) {
+      const ext = extensionForMime(contentType);
+      if (ext) fileName = `${fileName}${ext}`;
+    }
     const kind = mediaKindFromMime(contentType);
     const cap = Math.min(
       maxBytes ?? maxBytesForKind(kind),
@@ -89,9 +93,13 @@ export async function loadWebMedia(
 
   // Local path
   const data = await fs.readFile(mediaUrl);
-  const mime = detectMime({ buffer: data, filePath: mediaUrl });
+  const mime = await detectMime({ buffer: data, filePath: mediaUrl });
   const kind = mediaKindFromMime(mime);
-  const fileName = path.basename(mediaUrl) || undefined;
+  let fileName = path.basename(mediaUrl) || undefined;
+  if (fileName && !path.extname(fileName) && mime) {
+    const ext = extensionForMime(mime);
+    if (ext) fileName = `${fileName}${ext}`;
+  }
   const cap = Math.min(
     maxBytes ?? maxBytesForKind(kind),
     maxBytesForKind(kind),

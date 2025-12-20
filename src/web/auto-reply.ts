@@ -624,7 +624,7 @@ async function deliverWebReply(params: {
           "media:video",
         );
       } else {
-        const fileName = mediaUrl.split("/").pop() ?? "file";
+        const fileName = media.fileName ?? mediaUrl.split("/").pop() ?? "file";
         const mimetype = media.contentType ?? "application/octet-stream";
         await sendWithRetry(
           () =>

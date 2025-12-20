@@ -55,6 +55,7 @@
     "detect-libc": "^2.1.2",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "file-type": "^21.1.1",
     "grammy": "^1.38.4",
     "json5": "^2.2.3",
     "playwright-core": "1.57.0",

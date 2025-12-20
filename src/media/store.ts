@@ -126,7 +126,7 @@ export async function saveMediaSource(
       tempDest,
       headers,
     );
-    const mime = detectMime({
+    const mime = await detectMime({
       buffer: sniffBuffer,
       headerMime,
       filePath: source,
@@ -147,7 +147,7 @@ export async function saveMediaSource(
     throw new Error("Media exceeds 5MB limit");
   }
   const buffer = await fs.readFile(source);
-  const mime = detectMime({ buffer, filePath: source });
+  const mime = await detectMime({ buffer, filePath: source });
   const ext = extensionForMime(mime) ?? path.extname(source);
   const id = ext ? `${baseId}${ext}` : baseId;
   const dest = path.join(dir, id);
@@ -169,7 +169,7 @@ export async function saveMediaBuffer(
   const dir = path.join(MEDIA_DIR, subdir);
   await fs.mkdir(dir, { recursive: true });
   const baseId = crypto.randomUUID();
-  const mime = detectMime({ buffer, headerMime: contentType });
+  const mime = await detectMime({ buffer, headerMime: contentType });
   const ext = extensionForMime(mime);
   const id = ext ? `${baseId}${ext}` : baseId;
   const dest = path.join(dir, id);

@@ -37,7 +37,7 @@ export async function downloadTelegramFile(
     throw new Error(`Failed to download telegram file: HTTP ${res.status}`);
   }
   const array = Buffer.from(await res.arrayBuffer());
-  const mime = detectMime({
+  const mime = await detectMime({
     buffer: array,
     headerMime: res.headers.get("content-type"),
     filePath: info.file_path,

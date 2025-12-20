@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import JSZip from "jszip";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -70,6 +71,18 @@ describe("media store", () => {
     await expect(fs.stat(saved.path)).rejects.toThrow();
   });
 
+  it("sets correct mime for xlsx by extension", async () => {
+    const xlsxPath = path.join(HOME, "sheet.xlsx");
+    await fs.mkdir(HOME, { recursive: true });
+    await fs.writeFile(xlsxPath, "not really an xlsx");
+
+    const saved = await store.saveMediaSource(xlsxPath);
+    expect(saved.contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    expect(path.extname(saved.path)).toBe(".xlsx");
+  });
+
   it("renames media based on detected mime even when extension is wrong", async () => {
     const pngBytes = await sharp({
       create: { width: 2, height: 2, channels: 3, background: "#00ff00" },
@@ -85,5 +98,23 @@ describe("media store", () => {
 
     const buf = await fs.readFile(saved.path);
     expect(buf.equals(pngBytes)).toBe(true);
+  });
+
+  it("sniffs xlsx mime for zip buffers and renames extension", async () => {
+    const zip = new JSZip();
+    zip.file(
+      "[Content_Types].xml",
+      '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>',
+    );
+    zip.file("xl/workbook.xml", "<workbook/>");
+    const fakeXlsx = await zip.generateAsync({ type: "nodebuffer" });
+    const bogusExt = path.join(HOME, "sheet.bin");
+    await fs.writeFile(bogusExt, fakeXlsx);
+
+    const saved = await store.saveMediaSource(bogusExt);
+    expect(saved.contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    expect(path.extname(saved.path)).toBe(".xlsx");
   });
 });

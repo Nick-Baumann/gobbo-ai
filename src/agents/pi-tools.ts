@@ -20,7 +20,9 @@ type TextContentBlock = Extract<ToolContentBlock, { type: "text" }>;
 // all base64 image blocks above this limit while preserving aspect ratio.
 const MAX_IMAGE_DIMENSION_PX = 2000;
 
-function sniffMimeFromBase64(base64: string): string | undefined {
+async function sniffMimeFromBase64(
+  base64: string,
+): Promise<string | undefined> {
   const trimmed = base64.trim();
   if (!trimmed) return undefined;
 
@@ -30,7 +32,7 @@ function sniffMimeFromBase64(base64: string): string | undefined {
 
   try {
     const head = Buffer.from(trimmed.slice(0, sliceLen), "base64");
-    return detectMime({ buffer: head });
+    return await detectMime({ buffer: head });
   } catch {
     return undefined;
   }
@@ -44,10 +46,10 @@ function rewriteReadImageHeader(text: string, mimeType: string): string {
   return text;
 }
 
-function normalizeReadImageResult(
+async function normalizeReadImageResult(
   result: AgentToolResult<unknown>,
   filePath: string,
-): AgentToolResult<unknown> {
+): Promise<AgentToolResult<unknown>> {
   const content = Array.isArray(result.content) ? result.content : [];
 
   const image = content.find(
@@ -64,7 +66,7 @@ function normalizeReadImageResult(
     throw new Error(`read: image payload is empty (${filePath})`);
   }
 
-  const sniffed = sniffMimeFromBase64(image.data);
+  const sniffed = await sniffMimeFromBase64(image.data);
   if (!sniffed) return result;
 
   if (!sniffed.startsWith("image/")) {
@@ -233,7 +235,7 @@ async function resizeImageBase64IfNeeded(params: {
     });
   }
 
-  const sniffed = detectMime({ buffer: out.slice(0, 256) });
+  const sniffed = await detectMime({ buffer: out.slice(0, 256) });
   const nextMime = sniffed?.startsWith("image/") ? sniffed : params.mimeType;
 
   return { base64: out.toString("base64"), mimeType: nextMime, resized: true };
@@ -310,7 +312,7 @@ function createClawdisReadTool(base: AnyAgentTool): AnyAgentTool {
           : undefined;
       const filePath =
         typeof record?.path === "string" ? String(record.path) : "<unknown>";
-      const normalized = normalizeReadImageResult(result, filePath);
+      const normalized = await normalizeReadImageResult(result, filePath);
       return sanitizeToolResultImages(normalized, `read:${filePath}`);
     },
   };

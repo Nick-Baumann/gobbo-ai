@@ -2,7 +2,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import JSZip from "jszip";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const realOs = await vi.importActual<typeof import("node:os")>("node:os");
 const HOME = path.join(realOs.tmpdir(), "clawdis-home-redirect");
@@ -23,6 +32,10 @@ const { saveMediaSource } = await import("./store.js");
 describe("media store redirects", () => {
   beforeAll(async () => {
     await fs.rm(HOME, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    mockRequest.mockReset();
   });
 
   afterAll(async () => {
@@ -70,5 +83,48 @@ describe("media store redirects", () => {
     expect(saved.contentType).toBe("text/plain");
     expect(path.extname(saved.path)).toBe(".txt");
     expect(await fs.readFile(saved.path, "utf8")).toBe("redirected");
+  });
+
+  it("sniffs xlsx from zip content when headers and url extension are missing", async () => {
+    mockRequest.mockImplementationOnce((_url, _opts, cb) => {
+      const res = new PassThrough();
+      const req = {
+        on: (event: string, handler: (...args: unknown[]) => void) => {
+          if (event === "error") res.on("error", handler);
+          return req;
+        },
+        end: () => undefined,
+        destroy: () => res.destroy(),
+      } as const;
+
+      res.statusCode = 200;
+      res.headers = {};
+      setImmediate(() => {
+        cb(res as unknown as Parameters<typeof cb>[0]);
+        const zip = new JSZip();
+        zip.file(
+          "[Content_Types].xml",
+          '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>',
+        );
+        zip.file("xl/workbook.xml", "<workbook/>");
+        void zip
+          .generateAsync({ type: "nodebuffer" })
+          .then((buf) => {
+            res.write(buf);
+            res.end();
+          })
+          .catch((err) => {
+            res.destroy(err);
+          });
+      });
+
+      return req;
+    });
+
+    const saved = await saveMediaSource("https://example.com/download");
+    expect(saved.contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    expect(path.extname(saved.path)).toBe(".xlsx");
   });
 });

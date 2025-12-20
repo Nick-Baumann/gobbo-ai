@@ -319,7 +319,7 @@ async function resolveMedia(
     );
   }
   const data = Buffer.from(await res.arrayBuffer());
-  const mime = detectMime({
+  const mime = await detectMime({
     buffer: data,
     headerMime: res.headers.get("content-type"),
     filePath: file.file_path,
