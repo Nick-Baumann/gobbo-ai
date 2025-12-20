@@ -11,11 +11,6 @@ struct ClawdisCLI {
             let jsonOutput = args.contains("--json")
             args.removeAll(where: { $0 == "--json" })
 
-            if args.first == "browser" {
-                let code = try await BrowserCLI.run(args: Array(args.dropFirst()), jsonOutput: jsonOutput)
-                exit(code)
-            }
-
             let parsed = try parseCommandLine(args: args)
             let response = try await send(request: parsed.request)
 
@@ -778,33 +773,16 @@ struct ClawdisCLI {
             clawdis-mac screen record [--screen <index>]
               [--duration <ms|10s|1m>|--duration-ms <ms>] [--fps <n>] [--no-audio] [--out <path>]
 
-          Browser (clawd):
-            clawdis-mac browser status|start|stop|tabs|open|focus|close|screenshot|eval|query|dom|snapshot
-
         UI Automation (Peekaboo):
           Install and use the `peekaboo` CLI; it will connect to Peekaboo.app (preferred) or Clawdis.app
           (fallback) via PeekabooBridge. See `docs/mac/peekaboo.md`.
 
-        Browser notes:
-          - Uses clawd’s dedicated Chrome/Chromium profile (separate user-data dir).
-          - Talks to the gateway’s loopback browser-control server (config: ~/.clawdis/clawdis.json).
-          - Keys: browser.enabled, browser.controlUrl (default: http://127.0.0.1:18791).
-
         Examples:
           clawdis-mac status
           clawdis-mac agent --message "Hello from clawd" --thinking low
-          clawdis-mac browser start
-          clawdis-mac browser open https://example.com
-          clawdis-mac browser tabs
-          clawdis-mac browser screenshot --full-page
-          clawdis-mac browser eval \"location.href\"
-          clawdis-mac browser query \"a\" --limit 5
-          clawdis-mac browser dom --format text --max-chars 5000
-          clawdis-mac browser snapshot --format aria --limit 200
 
         Output:
           Default output is text. Use --json for machine-readable output.
-          In text mode, `browser screenshot` prints MEDIA:<path>.
           In text mode, `camera snap`, `camera clip`, and `screen record` print MEDIA:<path>.
         """
         print(usage)
