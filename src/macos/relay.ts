@@ -58,7 +58,10 @@ async function main() {
   });
 
   process.on("uncaughtException", (error) => {
-    console.error("[clawdis] Uncaught exception:", error.stack ?? error.message);
+    console.error(
+      "[clawdis] Uncaught exception:",
+      error.stack ?? error.message,
+    );
     process.exit(1);
   });
 
@@ -66,4 +69,3 @@ async function main() {
 }
 
 void main();
-
