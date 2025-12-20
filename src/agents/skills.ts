@@ -412,6 +412,20 @@ function loadSkillEntries(
     bundledSkillsDir?: string;
   },
 ): SkillEntry[] {
+  const loadSkills = (params: { dir: string; source: string }): Skill[] => {
+    const loaded = loadSkillsFromDir(params);
+    if (Array.isArray(loaded)) return loaded;
+    if (
+      loaded &&
+      typeof loaded === "object" &&
+      "skills" in loaded &&
+      Array.isArray((loaded as { skills?: unknown }).skills)
+    ) {
+      return (loaded as { skills: Skill[] }).skills;
+    }
+    return [];
+  };
+
   const managedSkillsDir =
     opts?.managedSkillsDir ?? path.join(CONFIG_DIR, "skills");
   const workspaceSkillsDir = path.join(workspaceDir, "skills");
@@ -422,23 +436,23 @@ function loadSkillEntries(
     .filter(Boolean);
 
   const bundledSkills = bundledSkillsDir
-    ? loadSkillsFromDir({
+    ? loadSkills({
         dir: bundledSkillsDir,
         source: "clawdis-bundled",
       })
     : [];
   const extraSkills = extraDirs.flatMap((dir) => {
     const resolved = resolveUserPath(dir);
-    return loadSkillsFromDir({
+    return loadSkills({
       dir: resolved,
       source: "clawdis-extra",
     });
   });
-  const managedSkills = loadSkillsFromDir({
+  const managedSkills = loadSkills({
     dir: managedSkillsDir,
     source: "clawdis-managed",
   });
-  const workspaceSkills = loadSkillsFromDir({
+  const workspaceSkills = loadSkills({
     dir: workspaceSkillsDir,
     source: "clawdis-workspace",
   });

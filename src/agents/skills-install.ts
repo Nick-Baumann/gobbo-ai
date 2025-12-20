@@ -147,12 +147,17 @@ export async function installSkill(
     };
   }
 
-  const result = command.shell
-    ? await runShell(command.shell, timeoutMs)
-    : await runCommandWithTimeout(command.argv, {
-        timeoutMs,
-        cwd: command.cwd,
-      });
+  const result = await (async () => {
+    if (command.shell) return runShell(command.shell, timeoutMs);
+    const argv = command.argv;
+    if (!argv || argv.length === 0) {
+      return { code: null, stdout: "", stderr: "invalid install command" };
+    }
+    return runCommandWithTimeout(argv, {
+      timeoutMs,
+      cwd: command.cwd,
+    });
+  })();
 
   const success = result.code === 0;
   return {
