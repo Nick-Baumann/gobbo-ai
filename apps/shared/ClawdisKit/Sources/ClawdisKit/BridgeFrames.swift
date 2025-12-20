@@ -99,10 +99,12 @@ public struct BridgeHello: Codable, Sendable {
 public struct BridgeHelloOk: Codable, Sendable {
     public let type: String
     public let serverName: String
+    public let canvasHostUrl: String?
 
-    public init(type: String = "hello-ok", serverName: String) {
+    public init(type: String = "hello-ok", serverName: String, canvasHostUrl: String? = nil) {
         self.type = type
         self.serverName = serverName
+        self.canvasHostUrl = canvasHostUrl
     }
 }
 

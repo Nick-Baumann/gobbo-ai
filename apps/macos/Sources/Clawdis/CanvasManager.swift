@@ -1,6 +1,5 @@
 import AppKit
 import ClawdisIPC
-import ClawdisKit
 import Foundation
 import OSLog
 
@@ -192,12 +191,12 @@ final class CanvasManager {
         if path.hasPrefix("/") { path.removeFirst() }
         path = path.removingPercentEncoding ?? path
 
-        // Root special-case: built-in shell page when no index exists.
+        // Root special-case: built-in scaffold page when no index exists.
         if path.isEmpty {
             let a = sessionDir.appendingPathComponent("index.html", isDirectory: false)
             let b = sessionDir.appendingPathComponent("index.htm", isDirectory: false)
             if fm.fileExists(atPath: a.path) || fm.fileExists(atPath: b.path) { return .ok }
-            return Self.hasBundledA2UIShell() ? .a2uiShell : .welcome
+            return .welcome
         }
 
         // Direct file or directory.
@@ -229,11 +228,5 @@ final class CanvasManager {
         return fm.fileExists(atPath: b.path)
     }
 
-    private static func hasBundledA2UIShell() -> Bool {
-        let bundle = ClawdisKitResources.bundle
-        if bundle.url(forResource: "index", withExtension: "html", subdirectory: "CanvasA2UI") != nil {
-            return true
-        }
-        return bundle.url(forResource: "index", withExtension: "html") != nil
-    }
+    // no bundled A2UI shell; scaffold fallback is purely visual
 }

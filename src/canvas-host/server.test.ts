@@ -94,4 +94,36 @@ describe("canvas host", () => {
       await fs.rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("serves the gateway-hosted A2UI scaffold", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-canvas-"));
+
+    const server = await startCanvasHost({
+      runtime: defaultRuntime,
+      rootDir: dir,
+      port: 0,
+      listenHost: "127.0.0.1",
+      allowInTests: true,
+    });
+
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:${server.port}/__clawdis__/a2ui/`,
+      );
+      const html = await res.text();
+      expect(res.status).toBe(200);
+      expect(html).toContain("clawdis-a2ui-host");
+      expect(html).toContain("clawdisCanvasA2UIAction");
+
+      const bundleRes = await fetch(
+        `http://127.0.0.1:${server.port}/__clawdis__/a2ui/a2ui.bundle.js`,
+      );
+      const js = await bundleRes.text();
+      expect(bundleRes.status).toBe(200);
+      expect(js).toContain("clawdisA2UI");
+    } finally {
+      await server.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
 });

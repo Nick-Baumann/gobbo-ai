@@ -25,6 +25,11 @@ actor BridgeSession {
     private var serverEventSubscribers: [UUID: AsyncStream<BridgeEventFrame>.Continuation] = [:]
 
     private(set) var state: State = .idle
+    private var canvasHostUrl: String?
+
+    func currentCanvasHostUrl() -> String? {
+        self.canvasHostUrl
+    }
 
     func currentRemoteAddress() -> String? {
         guard let endpoint = self.connection?.currentPath?.remoteEndpoint else { return nil }
@@ -101,6 +106,7 @@ actor BridgeSession {
         if base.type == "hello-ok" {
             let ok = try self.decoder.decode(BridgeHelloOk.self, from: data)
             self.state = .connected(serverName: ok.serverName)
+            self.canvasHostUrl = ok.canvasHostUrl?.trimmingCharacters(in: .whitespacesAndNewlines)
             await onConnected?(ok.serverName)
         } else if base.type == "error" {
             let err = try self.decoder.decode(BridgeErrorFrame.self, from: data)
@@ -210,6 +216,7 @@ actor BridgeSession {
         self.connection = nil
         self.queue = nil
         self.buffer = Data()
+        self.canvasHostUrl = nil
 
         let pending = self.pendingRPC.values
         self.pendingRPC.removeAll()

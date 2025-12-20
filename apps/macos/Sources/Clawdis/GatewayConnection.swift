@@ -172,6 +172,12 @@ actor GatewayConnection {
         self.lastSnapshot = nil
     }
 
+    func canvasHostUrl() async -> String? {
+        guard let snapshot = self.lastSnapshot else { return nil }
+        let trimmed = snapshot.canvashosturl?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     func subscribe(bufferingNewest: Int = 100) -> AsyncStream<GatewayPush> {
         let id = UUID()
         let snapshot = self.lastSnapshot

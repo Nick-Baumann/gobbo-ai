@@ -605,9 +605,17 @@ class NodeRuntime(context: Context) {
         BridgeSession.InvokeResult.ok("""{"format":"${snapshotParams.format.rawValue}","base64":"$base64"}""")
       }
       ClawdisCanvasA2UICommand.Reset.rawValue -> {
-        val ready = ensureA2uiReady()
+        val a2uiUrl = resolveA2uiHostUrl()
+          ?: return BridgeSession.InvokeResult.error(
+            code = "A2UI_HOST_NOT_CONFIGURED",
+            message = "A2UI_HOST_NOT_CONFIGURED: gateway did not advertise canvas host",
+          )
+        val ready = ensureA2uiReady(a2uiUrl)
         if (!ready) {
-          return BridgeSession.InvokeResult.error(code = "A2UI_NOT_READY", message = "A2UI not ready")
+          return BridgeSession.InvokeResult.error(
+            code = "A2UI_HOST_UNAVAILABLE",
+            message = "A2UI host not reachable",
+          )
         }
         val res = canvas.eval(a2uiResetJS)
         BridgeSession.InvokeResult.ok(res)
@@ -619,9 +627,17 @@ class NodeRuntime(context: Context) {
           } catch (err: Throwable) {
             return BridgeSession.InvokeResult.error(code = "INVALID_REQUEST", message = err.message ?: "invalid A2UI payload")
           }
-        val ready = ensureA2uiReady()
+        val a2uiUrl = resolveA2uiHostUrl()
+          ?: return BridgeSession.InvokeResult.error(
+            code = "A2UI_HOST_NOT_CONFIGURED",
+            message = "A2UI_HOST_NOT_CONFIGURED: gateway did not advertise canvas host",
+          )
+        val ready = ensureA2uiReady(a2uiUrl)
         if (!ready) {
-          return BridgeSession.InvokeResult.error(code = "A2UI_NOT_READY", message = "A2UI not ready")
+          return BridgeSession.InvokeResult.error(
+            code = "A2UI_HOST_UNAVAILABLE",
+            message = "A2UI host not reachable",
+          )
         }
         val js = a2uiApplyMessagesJS(messages)
         val res = canvas.eval(js)
@@ -707,7 +723,14 @@ class NodeRuntime(context: Context) {
     return code to "$code: $message"
   }
 
-  private suspend fun ensureA2uiReady(): Boolean {
+  private fun resolveA2uiHostUrl(): String? {
+    val raw = session.currentCanvasHostUrl()?.trim().orEmpty()
+    if (raw.isBlank()) return null
+    val base = raw.trimEnd('/')
+    return "${base}/__clawdis__/a2ui/"
+  }
+
+  private suspend fun ensureA2uiReady(a2uiUrl: String): Boolean {
     try {
       val already = canvas.eval(a2uiReadyCheckJS)
       if (already == "true") return true
@@ -715,8 +738,7 @@ class NodeRuntime(context: Context) {
       // ignore
     }
 
-    // Ensure the default canvas scaffold is loaded; A2UI is now hosted there.
-    canvas.navigate("")
+    canvas.navigate(a2uiUrl)
     repeat(50) {
       try {
         val ready = canvas.eval(a2uiReadyCheckJS)

@@ -5,6 +5,11 @@
 		"indentWidth": 2,
 		"indentStyle": "space"
 	},
+	"files": {
+		"includes": [
+			"src/**/*.ts"
+		]
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
