@@ -56,8 +56,8 @@ enum ShellExecutor {
             let err = stderrPipe.fileHandleForReading.readToEndSafely()
             let status = Int(process.terminationStatus)
             return ShellResult(
-                stdout: String(decoding: out, as: UTF8.self),
-                stderr: String(decoding: err, as: UTF8.self),
+                stdout: String(bytes: out, encoding: .utf8) ?? "",
+                stderr: String(bytes: err, encoding: .utf8) ?? "",
                 exitCode: status,
                 timedOut: false,
                 success: status == 0,

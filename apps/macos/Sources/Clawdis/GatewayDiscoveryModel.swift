@@ -327,10 +327,8 @@ final class GatewayDiscoveryModel {
             return true
         }
         if let service = normalizeServiceToken(serviceName) {
-            for token in local.hostTokens {
-                if service.contains(token) {
-                    return true
-                }
+            for token in local.hostTokens where service.contains(token) {
+                return true
             }
         }
         return false
@@ -456,8 +454,9 @@ final class GatewayTXTResolver: NSObject, NetServiceDelegate {
     func netServiceDidResolveAddress(_ sender: NetService) {
         let txt = Self.decodeTXT(sender.txtRecordData())
         if !txt.isEmpty {
+            let payload = self.formatTXT(txt)
             self.logger.debug(
-                "discovery: resolved TXT for \(sender.name, privacy: .public): \(self.formatTXT(txt), privacy: .public)")
+                "discovery: resolved TXT for \(sender.name, privacy: .public): \(payload, privacy: .public)")
         }
         self.finish(result: .success(txt))
     }

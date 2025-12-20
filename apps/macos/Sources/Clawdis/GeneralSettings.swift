@@ -585,7 +585,8 @@ extension GeneralSettings {
            trimmed.localizedCaseInsensitiveContains("host key verification failed")
         {
             let host = CommandResolver.parseSSHTarget(target)?.host ?? target
-            return "SSH check failed: Host key verification failed. Remove the old key with `ssh-keygen -R \(host)` and try again."
+            return "SSH check failed: Host key verification failed. Remove the old key with " +
+                "`ssh-keygen -R \(host)` and try again."
         }
         if let trimmed, !trimmed.isEmpty {
             if let message = response.message, message.hasPrefix("exit ") {
