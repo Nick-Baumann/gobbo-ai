@@ -86,6 +86,8 @@ describe("gateway SIGTERM", () => {
         "gateway",
         "--port",
         String(port),
+        "--bind",
+        "loopback",
         "--allow-unconfigured",
       ],
       {
@@ -93,6 +95,8 @@ describe("gateway SIGTERM", () => {
         env: {
           ...process.env,
           CLAWDIS_SKIP_PROVIDERS: "1",
+          CLAWDIS_SKIP_BROWSER_CONTROL_SERVER: "1",
+          CLAWDIS_SKIP_CANVAS_HOST: "1",
           // Avoid port collisions with other test processes that may also start a bridge server.
           CLAWDIS_BRIDGE_HOST: "127.0.0.1",
           CLAWDIS_BRIDGE_PORT: "0",
