@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import chalk from "chalk";
 import { promptYesNo } from "../cli/prompt.js";
 import { danger, info, isVerbose, logVerbose, warn } from "../globals.js";
@@ -7,20 +8,37 @@ import { ensureBinary } from "./binaries.js";
 
 export async function getTailnetHostname(exec: typeof runExec = runExec) {
   // Derive tailnet hostname (or IP fallback) from tailscale status JSON.
-  const { stdout } = await exec("tailscale", ["status", "--json"]);
-  const parsed = stdout ? (JSON.parse(stdout) as Record<string, unknown>) : {};
-  const self =
-    typeof parsed.Self === "object" && parsed.Self !== null
-      ? (parsed.Self as Record<string, unknown>)
-      : undefined;
-  const dns =
-    typeof self?.DNSName === "string" ? (self.DNSName as string) : undefined;
-  const ips = Array.isArray(self?.TailscaleIPs)
-    ? (self.TailscaleIPs as string[])
-    : [];
-  if (dns && dns.length > 0) return dns.replace(/\.$/, "");
-  if (ips.length > 0) return ips[0];
-  throw new Error("Could not determine Tailscale DNS or IP");
+  const candidates = [
+    "tailscale",
+    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+  ];
+  let lastError: unknown;
+
+  for (const candidate of candidates) {
+    if (candidate.startsWith("/") && !existsSync(candidate)) continue;
+    try {
+      const { stdout } = await exec(candidate, ["status", "--json"]);
+      const parsed = stdout
+        ? (JSON.parse(stdout) as Record<string, unknown>)
+        : {};
+      const self =
+        typeof parsed.Self === "object" && parsed.Self !== null
+          ? (parsed.Self as Record<string, unknown>)
+          : undefined;
+      const dns =
+        typeof self?.DNSName === "string" ? (self.DNSName as string) : undefined;
+      const ips = Array.isArray(self?.TailscaleIPs)
+        ? (self.TailscaleIPs as string[])
+        : [];
+      if (dns && dns.length > 0) return dns.replace(/\.$/, "");
+      if (ips.length > 0) return ips[0];
+      throw new Error("Could not determine Tailscale DNS or IP");
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError ?? new Error("Could not determine Tailscale DNS or IP");
 }
 
 export async function ensureGoInstalled(

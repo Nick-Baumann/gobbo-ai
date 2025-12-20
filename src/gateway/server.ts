@@ -77,6 +77,7 @@ import {
   pickPrimaryTailnetIPv4,
   pickPrimaryTailnetIPv6,
 } from "../infra/tailnet.js";
+import { getTailnetHostname } from "../infra/tailscale.js";
 import {
   defaultVoiceWakeTriggers,
   loadVoiceWakeConfig,
@@ -89,6 +90,7 @@ import {
 import { logError, logInfo, logWarn } from "../logger.js";
 import { getChildLogger, getResolvedLoggerSettings } from "../logging.js";
 import { setCommandLaneConcurrency } from "../process/command-queue.js";
+import { runExec } from "../process/exec.js";
 import { monitorWebProvider, webAuthExists } from "../providers/web/index.js";
 import { defaultRuntime } from "../runtime.js";
 import { monitorTelegramProvider } from "../telegram/monitor.js";
@@ -172,6 +174,20 @@ function formatBonjourInstanceName(displayName: string) {
   if (!trimmed) return "Clawdis";
   if (/clawdis/i.test(trimmed)) return trimmed;
   return `${trimmed} (Clawdis)`;
+}
+
+async function resolveTailnetDnsHint(): Promise<string | undefined> {
+  const envRaw = process.env.CLAWDIS_TAILNET_DNS?.trim();
+  const env = envRaw && envRaw.length > 0 ? envRaw.replace(/\.$/, "") : "";
+  if (env) return env;
+
+  const exec: typeof runExec = (command, args) =>
+    runExec(command, args, { timeoutMs: 1500, maxBuffer: 200_000 });
+  try {
+    return await getTailnetHostname(exec);
+  } catch {
+    return undefined;
+  }
 }
 
 type GatewaySessionsDefaults = {
@@ -2048,12 +2064,7 @@ export async function startGatewayServer(
         ? sshPortParsed
         : undefined;
 
-    const tailnetDnsEnv = process.env.CLAWDIS_TAILNET_DNS?.trim();
-    const tailnetDns = wideAreaDiscoveryEnabled
-      ? WIDE_AREA_DISCOVERY_DOMAIN
-      : tailnetDnsEnv && tailnetDnsEnv.length > 0
-        ? tailnetDnsEnv
-        : undefined;
+    const tailnetDns = await resolveTailnetDnsHint();
 
     const bonjour = await startGatewayBonjourAdvertiser({
       instanceName: formatBonjourInstanceName(machineDisplayName),
