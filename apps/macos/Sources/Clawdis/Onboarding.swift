@@ -1335,8 +1335,12 @@ struct OnboardingView: View {
         let shouldMonitor = isConnectionPage
         if shouldMonitor, !self.monitoringDiscovery {
             self.monitoringDiscovery = true
-            self.gatewayDiscovery.start()
-            Task { await self.refreshLocalGatewayProbe() }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard self.monitoringDiscovery else { return }
+                self.gatewayDiscovery.start()
+                await self.refreshLocalGatewayProbe()
+            }
         } else if !shouldMonitor, self.monitoringDiscovery {
             self.monitoringDiscovery = false
             self.gatewayDiscovery.stop()

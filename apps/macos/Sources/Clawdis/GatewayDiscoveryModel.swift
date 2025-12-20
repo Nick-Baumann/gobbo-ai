@@ -85,6 +85,7 @@ final class GatewayDiscoveryModel {
                             lanHost: lanHost,
                             tailnetDns: tailnetDns,
                             displayName: prettyName,
+                            serviceName: decodedName,
                             local: self.localIdentity)
                         return DiscoveredGateway(
                             displayName: prettyName,
@@ -180,6 +181,7 @@ final class GatewayDiscoveryModel {
         lanHost: String?,
         tailnetDns: String?,
         displayName: String?,
+        serviceName: String?,
         local: LocalIdentity) -> Bool
     {
         if let host = normalizeHostToken(lanHost),
@@ -196,6 +198,13 @@ final class GatewayDiscoveryModel {
            local.displayTokens.contains(name)
         {
             return true
+        }
+        if let service = normalizeServiceToken(serviceName) {
+            for token in local.hostTokens {
+                if service.contains(token) {
+                    return true
+                }
+            }
         }
         return false
     }
@@ -247,6 +256,13 @@ final class GatewayDiscoveryModel {
         guard let raw else { return nil }
         let prettified = Self.prettifyInstanceName(raw)
         let trimmed = prettified.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+        return trimmed.lowercased()
+    }
+
+    private static func normalizeServiceToken(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return nil }
         return trimmed.lowercased()
     }

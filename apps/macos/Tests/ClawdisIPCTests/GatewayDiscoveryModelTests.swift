@@ -10,6 +10,7 @@ import Testing
             lanHost: "studio.local",
             tailnetDns: nil,
             displayName: nil,
+            serviceName: nil,
             local: local))
     }
 
@@ -21,6 +22,7 @@ import Testing
             lanHost: nil,
             tailnetDns: "studio.tailnet.example",
             displayName: nil,
+            serviceName: nil,
             local: local))
     }
 
@@ -32,6 +34,7 @@ import Testing
             lanHost: nil,
             tailnetDns: nil,
             displayName: "Peter's Mac Studio (Clawdis)",
+            serviceName: nil,
             local: local))
     }
 
@@ -43,6 +46,19 @@ import Testing
             lanHost: "other.local",
             tailnetDns: "other.tailnet.example",
             displayName: "Other Mac",
+            serviceName: "other-bridge",
+            local: local))
+    }
+
+    @Test func localGatewayMatchesServiceName() {
+        let local = GatewayDiscoveryModel.LocalIdentity(
+            hostTokens: ["studio"],
+            displayTokens: [])
+        #expect(GatewayDiscoveryModel.isLocalGateway(
+            lanHost: nil,
+            tailnetDns: nil,
+            displayName: nil,
+            serviceName: "studio-bridge",
             local: local))
     }
 }
