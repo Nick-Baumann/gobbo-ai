@@ -5,11 +5,14 @@ import SwiftUI
 struct SkillsSettings: View {
     @State private var model = SkillsSettingsModel()
     @State private var envEditor: EnvEditorState?
+    @State private var searchQuery = ""
+    @State private var filter: SkillsFilter = .all
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 self.header
+                self.filterBar
                 self.statusBanner
                 self.skillsList
                 Spacer(minLength: 0)
@@ -62,7 +65,7 @@ struct SkillsSettings: View {
 
     private var skillsList: some View {
         VStack(spacing: 10) {
-            ForEach(self.model.skills) { skill in
+            ForEach(self.filteredSkills) { skill in
                 SkillRow(
                     skill: skill,
                     isBusy: self.model.isBusy(skill: skill),
@@ -80,6 +83,73 @@ struct SkillsSettings: View {
                             isPrimary: isPrimary)
                     })
             }
+            if !self.model.skills.isEmpty && self.filteredSkills.isEmpty {
+                Text("No skills match this filter.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    private var filterBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TextField("Search skills", text: self.$searchQuery)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 320)
+            Picker("Filter", selection: self.$filter) {
+                ForEach(SkillsFilter.allCases) { filter in
+                    Text(filter.title)
+                        .tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 420)
+        }
+    }
+
+    private var filteredSkills: [SkillStatus] {
+        let trimmed = self.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = trimmed.lowercased()
+        return self.model.skills.filter { skill in
+            if !query.isEmpty {
+                let matchesName = skill.name.lowercased().contains(query)
+                let matchesDescription = skill.description.lowercased().contains(query)
+                if !(matchesName || matchesDescription) { return false }
+            }
+            switch self.filter {
+            case .all:
+                return true
+            case .ready:
+                return !skill.disabled && skill.eligible
+            case .needsSetup:
+                return !skill.disabled && !skill.eligible
+            case .disabled:
+                return skill.disabled
+            }
+        }
+    }
+}
+
+private enum SkillsFilter: String, CaseIterable, Identifiable {
+    case all
+    case ready
+    case needsSetup
+    case disabled
+
+    var id: String { self.rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return "All"
+        case .ready:
+            return "Ready"
+        case .needsSetup:
+            return "Needs Setup"
+        case .disabled:
+            return "Disabled"
         }
     }
 }
@@ -171,6 +241,13 @@ private struct SkillRow: View {
     private var metaRow: some View {
         HStack(spacing: 10) {
             SkillTag(text: self.sourceLabel)
+            if let url = self.homepageUrl {
+                Link(destination: url) {
+                    Label("Website", systemImage: "link")
+                        .font(.caption2.weight(.semibold))
+                }
+                .buttonStyle(.link)
+            }
             HStack(spacing: 6) {
                 Text(self.enabledLabel)
                     .font(.caption)
@@ -186,6 +263,14 @@ private struct SkillRow: View {
 
     private var enabledLabel: String {
         self.skill.disabled ? "Disabled" : "Enabled"
+    }
+
+    private var homepageUrl: URL? {
+        guard let raw = self.skill.homepage?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return nil
+        }
+        guard !raw.isEmpty else { return nil }
+        return URL(string: raw)
     }
 
     private var enabledBinding: Binding<Bool> {

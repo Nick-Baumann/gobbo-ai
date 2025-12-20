@@ -29,6 +29,7 @@ export type ClawdisSkillMetadata = {
   skillKey?: string;
   primaryEnv?: string;
   emoji?: string;
+  homepage?: string;
   requires?: {
     bins?: string[];
     env?: string[];
@@ -39,7 +40,7 @@ export type ClawdisSkillMetadata = {
 
 export type SkillsInstallPreferences = {
   preferBrew: boolean;
-  nodeManager: "npm" | "pnpm" | "bun";
+  nodeManager: "npm" | "pnpm" | "yarn";
 };
 
 type ParsedSkillFrontmatter = Record<string, string>;
@@ -189,7 +190,7 @@ export function resolveSkillsInstallPreferences(
     typeof raw?.nodeManager === "string" ? raw.nodeManager.trim() : "";
   const manager = managerRaw.toLowerCase();
   const nodeManager =
-    manager === "pnpm" || manager === "bun" || manager === "npm"
+    manager === "pnpm" || manager === "yarn" || manager === "npm"
       ? (manager as SkillsInstallPreferences["nodeManager"])
       : "npm";
   return { preferBrew, nodeManager };
@@ -271,6 +272,10 @@ function resolveClawdisMetadata(
         typeof clawdisObj.always === "boolean" ? clawdisObj.always : undefined,
       emoji:
         typeof clawdisObj.emoji === "string" ? clawdisObj.emoji : undefined,
+      homepage:
+        typeof clawdisObj.homepage === "string"
+          ? clawdisObj.homepage
+          : undefined,
       skillKey:
         typeof clawdisObj.skillKey === "string"
           ? clawdisObj.skillKey

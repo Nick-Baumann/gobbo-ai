@@ -97,6 +97,8 @@ export type CanvasHostConfig = {
   enabled?: boolean;
   /** Directory to serve (default: ~/clawd/canvas). */
   root?: string;
+  /** HTTP port to listen on (default: 18793). */
+  port?: number;
 };
 
 export type GatewayControlUiConfig = {
@@ -135,7 +137,7 @@ export type SkillsLoadConfig = {
 
 export type SkillsInstallConfig = {
   preferBrew?: boolean;
-  nodeManager?: "npm" | "pnpm" | "bun";
+  nodeManager?: "npm" | "pnpm" | "yarn";
 };
 
 export type ClawdisConfig = {
@@ -147,6 +149,7 @@ export type ClawdisConfig = {
   logging?: LoggingConfig;
   browser?: BrowserConfig;
   skillsLoad?: SkillsLoadConfig;
+  skillsInstall?: SkillsInstallConfig;
   inbound?: {
     allowFrom?: string[]; // E.164 numbers allowed to trigger auto-reply (without whatsapp:)
     /** Agent working directory (preferred). Used as the default cwd for agent runs. */
@@ -188,7 +191,6 @@ export type ClawdisConfig = {
   canvasHost?: CanvasHostConfig;
   gateway?: GatewayConfig;
   skills?: Record<string, SkillConfig>;
-  skillsInstall?: SkillsInstallConfig;
 };
 
 // New branding path (preferred)
@@ -349,6 +351,7 @@ const ClawdisSchema = z.object({
     .object({
       enabled: z.boolean().optional(),
       root: z.string().optional(),
+      port: z.number().int().positive().optional(),
     })
     .optional(),
   gateway: z
@@ -378,7 +381,7 @@ const ClawdisSchema = z.object({
     .object({
       preferBrew: z.boolean().optional(),
       nodeManager: z
-        .union([z.literal("npm"), z.literal("pnpm"), z.literal("bun")])
+        .union([z.literal("npm"), z.literal("pnpm"), z.literal("yarn")])
         .optional(),
     })
     .optional(),

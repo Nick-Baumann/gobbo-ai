@@ -160,14 +160,14 @@ Example:
 ### `skillsInstall` (installer preference)
 
 Controls which installer is surfaced by the macOS Skills UI when a skill offers
-multiple install options (brew vs node). Defaults to **brew when available** and
-**npm** for node installs.
+multiple install options. Defaults to **brew when available** and **npm** for
+node installs.
 
 ```json5
 {
   skillsInstall: {
     preferBrew: true,
-    nodeManager: "npm" // npm | pnpm | bun
+    nodeManager: "npm" // npm | pnpm | yarn
   }
 }
 ```
@@ -231,31 +231,28 @@ Defaults:
 Notes:
 - `clawdis gateway` refuses to start unless `gateway.mode` is set to `local` (or you pass the override flag).
 
-### `canvasHost` (Gateway Canvas file server + live reload)
+### `canvasHost` (LAN/tailnet Canvas file server + live reload)
 
-The Gateway serves a directory of HTML/CSS/JS over HTTP so iOS/Android nodes can `canvas.navigate` to it.
+The Gateway serves a directory of HTML/CSS/JS over HTTP so iOS/Android nodes can simply `canvas.navigate` to it.
 
 Default root: `~/clawd/canvas`  
-Port: **same as the Gateway WebSocket/HTTP port** (default `18789`)  
-Path: `/__clawdis__/canvas/`  
-Live-reload WebSocket: `/__clawdis/ws`
+Default port: `18793` (chosen to avoid the clawd browser CDP port `18792`)  
+The server listens on `0.0.0.0` so it works on LAN **and** Tailnet (Tailscale is optional).
 
 The server:
 - serves files under `canvasHost.root`
 - injects a tiny live-reload client into served HTML
-- watches the directory and broadcasts reloads over `/__clawdis/ws`
+- watches the directory and broadcasts reloads over a WebSocket endpoint at `/__clawdis/ws`
 - auto-creates a starter `index.html` when the directory is empty (so you see something immediately)
 
 ```json5
 {
   canvasHost: {
-    root: "~/clawd/canvas"
+    root: "~/clawd/canvas",
+    port: 18793
   }
 }
 ```
-
-Notes:
-- The bind host follows `gateway.bind` (loopback/lan/tailnet).
 
 Disable with:
 - config: `canvasHost: { enabled: false }`

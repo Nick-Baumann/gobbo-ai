@@ -36,6 +36,7 @@ export type SkillStatusEntry = {
   skillKey: string;
   primaryEnv?: string;
   emoji?: string;
+  homepage?: string;
   always: boolean;
   disabled: boolean;
   eligible: boolean;
@@ -135,6 +136,12 @@ function buildSkillStatus(
   const disabled = skillConfig?.enabled === false;
   const always = entry.clawdis?.always === true;
   const emoji = entry.clawdis?.emoji ?? entry.frontmatter.emoji;
+  const homepageRaw =
+    entry.clawdis?.homepage ??
+    entry.frontmatter.homepage ??
+    entry.frontmatter.website ??
+    entry.frontmatter.url;
+  const homepage = homepageRaw?.trim() ? homepageRaw.trim() : undefined;
 
   const requiredBins = entry.clawdis?.requires?.bins ?? [];
   const requiredEnv = entry.clawdis?.requires?.env ?? [];
@@ -182,6 +189,7 @@ function buildSkillStatus(
     skillKey,
     primaryEnv: entry.clawdis?.primaryEnv,
     emoji,
+    homepage,
     always,
     disabled,
     eligible,

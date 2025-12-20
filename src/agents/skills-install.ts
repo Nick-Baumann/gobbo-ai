@@ -51,8 +51,8 @@ function buildNodeInstallCommand(
   switch (prefs.nodeManager) {
     case "pnpm":
       return ["pnpm", "add", "-g", packageName];
-    case "bun":
-      return ["bun", "add", "-g", packageName];
+    case "yarn":
+      return ["yarn", "global", "add", packageName];
     default:
       return ["npm", "install", "-g", packageName];
   }

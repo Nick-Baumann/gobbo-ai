@@ -39,6 +39,8 @@ Notes:
 - The parser used by the embedded agent supports **single-line** frontmatter keys only.
 - `metadata` should be a **single-line JSON object**.
 - Use `{baseDir}` in instructions to reference the skill folder path.
+- Optional frontmatter keys:
+  - `homepage` — URL surfaced as “Website” in the macOS Skills UI (also supported via `metadata.clawdis.homepage`).
 
 ## Gating (load-time filters)
 
@@ -55,6 +57,7 @@ metadata: {"clawdis":{"requires":{"bins":["uv"],"env":["GEMINI_API_KEY"],"config
 Fields under `metadata.clawdis`:
 - `always: true` — always include the skill (skip other gates).
 - `emoji` — optional emoji used by the macOS Skills UI.
+- `homepage` — optional URL shown as “Website” in the macOS Skills UI.
 - `requires.bins` — list; each must exist on `PATH`.
 - `requires.env` — list; env var must exist **or** be provided in config.
 - `requires.config` — list of `clawdis.json` paths that must be truthy.
@@ -73,7 +76,7 @@ metadata: {"clawdis":{"emoji":"♊️","requires":{"bins":["gemini"]},"install":
 
 Notes:
 - If multiple installers are listed, the gateway picks a **single** preferred option (brew when available, otherwise node).
-- Node installs honor `skillsInstall.nodeManager` in `clawdis.json` (default: npm).
+- Node installs honor `skillsInstall.nodeManager` in `clawdis.json` (default: npm; options: npm/pnpm/yarn).
 
 If no `metadata.clawdis` is present, the skill is always eligible (unless disabled in config).
 
