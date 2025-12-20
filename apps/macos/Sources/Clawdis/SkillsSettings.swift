@@ -517,7 +517,7 @@ final class SkillsSettingsModel {
         self.isLoading = false
     }
 
-    func install(skill: SkillStatus, option: SkillInstallOption, target: InstallTarget) async {
+    fileprivate func install(skill: SkillStatus, option: SkillInstallOption, target: InstallTarget) async {
         await self.withBusy(skill.skillKey) {
             do {
                 if target == .local, AppStateStore.shared.connectionMode != .local {
