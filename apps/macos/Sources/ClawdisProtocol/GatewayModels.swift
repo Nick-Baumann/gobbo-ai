@@ -621,6 +621,98 @@ public struct ConfigSetParams: Codable {
     }
 }
 
+public struct ProvidersStatusParams: Codable {
+    public let probe: Bool?
+    public let timeoutms: Int?
+
+    public init(
+        probe: Bool?,
+        timeoutms: Int?
+    ) {
+        self.probe = probe
+        self.timeoutms = timeoutms
+    }
+    private enum CodingKeys: String, CodingKey {
+        case probe
+        case timeoutms = "timeoutMs"
+    }
+}
+
+public struct WebLoginStartParams: Codable {
+    public let force: Bool?
+    public let timeoutms: Int?
+    public let verbose: Bool?
+
+    public init(
+        force: Bool?,
+        timeoutms: Int?,
+        verbose: Bool?
+    ) {
+        self.force = force
+        self.timeoutms = timeoutms
+        self.verbose = verbose
+    }
+    private enum CodingKeys: String, CodingKey {
+        case force
+        case timeoutms = "timeoutMs"
+        case verbose
+    }
+}
+
+public struct WebLoginWaitParams: Codable {
+    public let timeoutms: Int?
+
+    public init(
+        timeoutms: Int?
+    ) {
+        self.timeoutms = timeoutms
+    }
+    private enum CodingKeys: String, CodingKey {
+        case timeoutms = "timeoutMs"
+    }
+}
+
+public struct ModelChoice: Codable {
+    public let id: String
+    public let name: String
+    public let provider: String
+    public let contextwindow: Int?
+
+    public init(
+        id: String,
+        name: String,
+        provider: String,
+        contextwindow: Int?
+    ) {
+        self.id = id
+        self.name = name
+        self.provider = provider
+        self.contextwindow = contextwindow
+    }
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case provider
+        case contextwindow = "contextWindow"
+    }
+}
+
+public struct ModelsListParams: Codable {
+}
+
+public struct ModelsListResult: Codable {
+    public let models: [ModelChoice]
+
+    public init(
+        models: [ModelChoice]
+    ) {
+        self.models = models
+    }
+    private enum CodingKeys: String, CodingKey {
+        case models
+    }
+}
+
 public struct SkillsStatusParams: Codable {
 }
 

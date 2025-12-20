@@ -101,11 +101,17 @@ import { runExec } from "../process/exec.js";
 import { monitorWebProvider, webAuthExists } from "../providers/web/index.js";
 import { defaultRuntime } from "../runtime.js";
 import { monitorTelegramProvider } from "../telegram/monitor.js";
+import { probeTelegram, type TelegramProbe } from "../telegram/probe.js";
 import { sendMessageTelegram } from "../telegram/send.js";
 import { normalizeE164, resolveUserPath } from "../utils.js";
-import { setHeartbeatsEnabled } from "../web/auto-reply.js";
+import {
+  setHeartbeatsEnabled,
+  type WebProviderStatus,
+} from "../web/auto-reply.js";
+import { startWebLoginWithQr, waitForWebLogin } from "../web/login-qr.js";
 import { sendMessageWhatsApp } from "../web/outbound.js";
 import { requestReplyHeartbeatNow } from "../web/reply-heartbeat-wake.js";
+import { getWebAuthAgeMs, logoutWeb, readWebSelfId } from "../web/session.js";
 import { buildMessageWithAttachments } from "./chat-attachments.js";
 import { handleControlUiHttpRequest } from "./control-ui.js";
 
@@ -156,6 +162,65 @@ async function startBrowserControlServerIfEnabled(): Promise<void> {
   await mod.startBrowserControlServerFromConfig(defaultRuntime);
 }
 
+type GatewayModelChoice = {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow?: number;
+};
+
+let modelCatalogPromise: Promise<GatewayModelChoice[]> | null = null;
+
+// Test-only escape hatch: model catalog is cached at module scope for the
+// process lifetime, which is fine for the real gateway daemon, but makes
+// isolated unit tests harder. Keep this intentionally obscure.
+export function __resetModelCatalogCacheForTest() {
+  modelCatalogPromise = null;
+}
+
+async function loadGatewayModelCatalog(): Promise<GatewayModelChoice[]> {
+  if (modelCatalogPromise) return modelCatalogPromise;
+
+  modelCatalogPromise = (async () => {
+    const piAi = (await import("@mariozechner/pi-ai")) as unknown as {
+      getProviders: () => string[];
+      getModels: (provider: string) => Array<{
+        id: string;
+        name?: string;
+        contextWindow?: number;
+      }>;
+    };
+
+    const models: GatewayModelChoice[] = [];
+    for (const provider of piAi.getProviders()) {
+      let entries: Array<{ id: string; name?: string; contextWindow?: number }>;
+      try {
+        entries = piAi.getModels(provider);
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const id = String(entry?.id ?? "").trim();
+        if (!id) continue;
+        const name = String(entry?.name ?? id).trim() || id;
+        const contextWindow =
+          typeof entry?.contextWindow === "number" && entry.contextWindow > 0
+            ? entry.contextWindow
+            : undefined;
+        models.push({ id, name, provider, contextWindow });
+      }
+    }
+
+    return models.sort((a, b) => {
+      const p = a.provider.localeCompare(b.provider);
+      if (p !== 0) return p;
+      return a.name.localeCompare(b.name);
+    });
+  })();
+
+  return modelCatalogPromise;
+}
+
 import {
   type ConnectParams,
   ErrorCodes,
@@ -181,6 +246,7 @@ import {
   validateCronRunsParams,
   validateCronStatusParams,
   validateCronUpdateParams,
+  validateModelsListParams,
   validateNodeDescribeParams,
   validateNodeInvokeParams,
   validateNodeListParams,
@@ -189,6 +255,7 @@ import {
   validateNodePairRejectParams,
   validateNodePairRequestParams,
   validateNodePairVerifyParams,
+  validateProvidersStatusParams,
   validateRequestFrame,
   validateSendParams,
   validateSessionsListParams,
@@ -197,6 +264,8 @@ import {
   validateSkillsStatusParams,
   validateSkillsUpdateParams,
   validateWakeParams,
+  validateWebLoginStartParams,
+  validateWebLoginWaitParams,
 } from "./protocol/index.js";
 import { DEFAULT_WS_SLOW_MS, getGatewayWsLogStyle } from "./ws-logging.js";
 
@@ -267,9 +336,11 @@ type SessionsPatchResult = {
 
 const METHODS = [
   "health",
+  "providers.status",
   "status",
   "config.get",
   "config.set",
+  "models.list",
   "skills.status",
   "skills.install",
   "skills.update",
@@ -299,6 +370,10 @@ const METHODS = [
   "system-event",
   "send",
   "agent",
+  "web.login.start",
+  "web.login.wait",
+  "web.logout",
+  "telegram.logout",
   // WebChat WebSocket-native chat methods
   "chat.history",
   "chat.abort",
@@ -1113,8 +1188,33 @@ export async function startGatewayServer(
       wss.emit("connection", ws, req);
     });
   });
-  const providerAbort = new AbortController();
-  const providerTasks: Array<Promise<unknown>> = [];
+  let whatsappAbort: AbortController | null = null;
+  let telegramAbort: AbortController | null = null;
+  let whatsappTask: Promise<unknown> | null = null;
+  let telegramTask: Promise<unknown> | null = null;
+  let whatsappRuntime: WebProviderStatus = {
+    running: false,
+    connected: false,
+    reconnectAttempts: 0,
+    lastConnectedAt: null,
+    lastDisconnect: null,
+    lastMessageAt: null,
+    lastEventAt: null,
+    lastError: null,
+  };
+  let telegramRuntime: {
+    running: boolean;
+    lastStartAt?: number | null;
+    lastStopAt?: number | null;
+    lastError?: string | null;
+    mode?: "webhook" | "polling" | null;
+  } = {
+    running: false,
+    lastStartAt: null,
+    lastStopAt: null,
+    lastError: null,
+    mode: null,
+  };
   const clients = new Set<Client>();
   let seq = 0;
   // Track per-run sequence to detect out-of-order/lost agent events.
@@ -1185,49 +1285,150 @@ export async function startGatewayServer(
     },
   });
 
-  const startProviders = async () => {
-    const cfg = loadConfig();
-    const telegramToken =
-      process.env.TELEGRAM_BOT_TOKEN ?? cfg.telegram?.botToken ?? "";
+  const updateWhatsAppStatus = (next: WebProviderStatus) => {
+    whatsappRuntime = next;
+  };
 
-    if (await webAuthExists()) {
-      defaultRuntime.log("gateway: starting WhatsApp Web provider");
-      providerTasks.push(
-        monitorWebProvider(
-          isVerbose(),
-          undefined,
-          true,
-          undefined,
-          defaultRuntime,
-          providerAbort.signal,
-        ).catch((err) => logError(`web provider exited: ${formatError(err)}`)),
-      );
-    } else {
+  const startWhatsAppProvider = async () => {
+    if (whatsappTask) return;
+    if (!(await webAuthExists())) {
+      whatsappRuntime = {
+        ...whatsappRuntime,
+        running: false,
+        connected: false,
+        lastError: "not linked",
+      };
       defaultRuntime.log(
         "gateway: skipping WhatsApp Web provider (no linked session)",
       );
+      return;
     }
+    defaultRuntime.log("gateway: starting WhatsApp Web provider");
+    whatsappAbort = new AbortController();
+    whatsappRuntime = {
+      ...whatsappRuntime,
+      running: true,
+      connected: false,
+      lastError: null,
+    };
+    const task = monitorWebProvider(
+      isVerbose(),
+      undefined,
+      true,
+      undefined,
+      defaultRuntime,
+      whatsappAbort.signal,
+      { statusSink: updateWhatsAppStatus },
+    )
+      .catch((err) => {
+        whatsappRuntime = {
+          ...whatsappRuntime,
+          lastError: formatError(err),
+        };
+        logError(`web provider exited: ${formatError(err)}`);
+      })
+      .finally(() => {
+        whatsappAbort = null;
+        whatsappTask = null;
+        whatsappRuntime = {
+          ...whatsappRuntime,
+          running: false,
+          connected: false,
+        };
+      });
+    whatsappTask = task;
+  };
 
-    if (telegramToken.trim().length > 0) {
-      defaultRuntime.log("gateway: starting Telegram provider");
-      providerTasks.push(
-        monitorTelegramProvider({
-          token: telegramToken.trim(),
-          runtime: defaultRuntime,
-          abortSignal: providerAbort.signal,
-          useWebhook: Boolean(cfg.telegram?.webhookUrl),
-          webhookUrl: cfg.telegram?.webhookUrl,
-          webhookSecret: cfg.telegram?.webhookSecret,
-          webhookPath: cfg.telegram?.webhookPath,
-        }).catch((err) =>
-          logError(`telegram provider exited: ${formatError(err)}`),
-        ),
-      );
-    } else {
+  const stopWhatsAppProvider = async () => {
+    if (!whatsappAbort && !whatsappTask) return;
+    whatsappAbort?.abort();
+    try {
+      await whatsappTask;
+    } catch {
+      // ignore
+    }
+    whatsappAbort = null;
+    whatsappTask = null;
+    whatsappRuntime = {
+      ...whatsappRuntime,
+      running: false,
+      connected: false,
+    };
+  };
+
+  const startTelegramProvider = async () => {
+    if (telegramTask) return;
+    const cfg = loadConfig();
+    const telegramToken =
+      process.env.TELEGRAM_BOT_TOKEN ?? cfg.telegram?.botToken ?? "";
+    if (!telegramToken.trim()) {
+      telegramRuntime = {
+        ...telegramRuntime,
+        running: false,
+        lastError: "not configured",
+      };
       defaultRuntime.log(
         "gateway: skipping Telegram provider (no TELEGRAM_BOT_TOKEN/config)",
       );
+      return;
     }
+    defaultRuntime.log("gateway: starting Telegram provider");
+    telegramAbort = new AbortController();
+    telegramRuntime = {
+      ...telegramRuntime,
+      running: true,
+      lastStartAt: Date.now(),
+      lastError: null,
+      mode: cfg.telegram?.webhookUrl ? "webhook" : "polling",
+    };
+    const task = monitorTelegramProvider({
+      token: telegramToken.trim(),
+      runtime: defaultRuntime,
+      abortSignal: telegramAbort.signal,
+      useWebhook: Boolean(cfg.telegram?.webhookUrl),
+      webhookUrl: cfg.telegram?.webhookUrl,
+      webhookSecret: cfg.telegram?.webhookSecret,
+      webhookPath: cfg.telegram?.webhookPath,
+    })
+      .catch((err) => {
+        telegramRuntime = {
+          ...telegramRuntime,
+          lastError: formatError(err),
+        };
+        logError(`telegram provider exited: ${formatError(err)}`);
+      })
+      .finally(() => {
+        telegramAbort = null;
+        telegramTask = null;
+        telegramRuntime = {
+          ...telegramRuntime,
+          running: false,
+          lastStopAt: Date.now(),
+        };
+      });
+    telegramTask = task;
+  };
+
+  const stopTelegramProvider = async () => {
+    if (!telegramAbort && !telegramTask) return;
+    telegramAbort?.abort();
+    try {
+      await telegramTask;
+    } catch {
+      // ignore
+    }
+    telegramAbort = null;
+    telegramTask = null;
+    telegramRuntime = {
+      ...telegramRuntime,
+      running: false,
+      lastStopAt: Date.now(),
+    };
+  };
+
+  const startProviders = async () => {
+    await startWhatsAppProvider();
+    await startTelegramProvider();
   };
 
   const broadcast = (
@@ -1538,6 +1739,20 @@ export async function startGatewayServer(
               config: validated.config,
             }),
           };
+        }
+        case "models.list": {
+          const params = parseParams();
+          if (!validateModelsListParams(params)) {
+            return {
+              ok: false,
+              error: {
+                code: ErrorCodes.INVALID_REQUEST,
+                message: `invalid models.list params: ${formatValidationErrors(validateModelsListParams.errors)}`,
+              },
+            };
+          }
+          const models = await loadGatewayModelCatalog();
+          return { ok: true, payloadJSON: JSON.stringify({ models }) };
         }
         case "sessions.list": {
           const params = parseParams();
@@ -2771,6 +2986,84 @@ export async function startGatewayServer(
               }
               break;
             }
+            case "providers.status": {
+              const params = (req.params ?? {}) as Record<string, unknown>;
+              if (!validateProvidersStatusParams(params)) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.INVALID_REQUEST,
+                    `invalid providers.status params: ${formatValidationErrors(validateProvidersStatusParams.errors)}`,
+                  ),
+                );
+                break;
+              }
+              const probe = (params as { probe?: boolean }).probe === true;
+              const timeoutMsRaw = (params as { timeoutMs?: unknown })
+                .timeoutMs;
+              const timeoutMs =
+                typeof timeoutMsRaw === "number"
+                  ? Math.max(1000, timeoutMsRaw)
+                  : 10_000;
+              const cfg = loadConfig();
+              const envToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+              const configToken = cfg.telegram?.botToken?.trim();
+              const telegramToken = envToken || configToken || "";
+              const tokenSource = envToken
+                ? "env"
+                : configToken
+                  ? "config"
+                  : "none";
+              let telegramProbe: TelegramProbe | undefined;
+              let lastProbeAt: number | null = null;
+              if (probe && telegramToken) {
+                telegramProbe = await probeTelegram(
+                  telegramToken,
+                  timeoutMs,
+                  cfg.telegram?.proxy,
+                );
+                lastProbeAt = Date.now();
+              }
+
+              const linked = await webAuthExists();
+              const authAgeMs = getWebAuthAgeMs();
+              const self = readWebSelfId();
+
+              respond(
+                true,
+                {
+                  ts: Date.now(),
+                  whatsapp: {
+                    configured: linked,
+                    linked,
+                    authAgeMs,
+                    self,
+                    running: whatsappRuntime.running,
+                    connected: whatsappRuntime.connected,
+                    lastConnectedAt: whatsappRuntime.lastConnectedAt ?? null,
+                    lastDisconnect: whatsappRuntime.lastDisconnect ?? null,
+                    reconnectAttempts: whatsappRuntime.reconnectAttempts,
+                    lastMessageAt: whatsappRuntime.lastMessageAt ?? null,
+                    lastEventAt: whatsappRuntime.lastEventAt ?? null,
+                    lastError: whatsappRuntime.lastError ?? null,
+                  },
+                  telegram: {
+                    configured: Boolean(telegramToken),
+                    tokenSource,
+                    running: telegramRuntime.running,
+                    mode: telegramRuntime.mode ?? null,
+                    lastStartAt: telegramRuntime.lastStartAt ?? null,
+                    lastStopAt: telegramRuntime.lastStopAt ?? null,
+                    lastError: telegramRuntime.lastError ?? null,
+                    probe: telegramProbe,
+                    lastProbeAt,
+                  },
+                },
+                undefined,
+              );
+              break;
+            }
             case "chat.history": {
               const params = (req.params ?? {}) as Record<string, unknown>;
               if (!validateChatHistoryParams(params)) {
@@ -3193,6 +3486,164 @@ export async function startGatewayServer(
             case "status": {
               const status = await getStatusSummary();
               respond(true, status, undefined);
+              break;
+            }
+            case "web.login.start": {
+              const params = (req.params ?? {}) as Record<string, unknown>;
+              if (!validateWebLoginStartParams(params)) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.INVALID_REQUEST,
+                    `invalid web.login.start params: ${formatValidationErrors(validateWebLoginStartParams.errors)}`,
+                  ),
+                );
+                break;
+              }
+              try {
+                await stopWhatsAppProvider();
+                const result = await startWebLoginWithQr({
+                  force: Boolean((params as { force?: boolean }).force),
+                  timeoutMs:
+                    typeof (params as { timeoutMs?: unknown }).timeoutMs ===
+                    "number"
+                      ? (params as { timeoutMs?: number }).timeoutMs
+                      : undefined,
+                  verbose: Boolean((params as { verbose?: boolean }).verbose),
+                });
+                respond(true, result, undefined);
+              } catch (err) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)),
+                );
+              }
+              break;
+            }
+            case "web.login.wait": {
+              const params = (req.params ?? {}) as Record<string, unknown>;
+              if (!validateWebLoginWaitParams(params)) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.INVALID_REQUEST,
+                    `invalid web.login.wait params: ${formatValidationErrors(validateWebLoginWaitParams.errors)}`,
+                  ),
+                );
+                break;
+              }
+              try {
+                const result = await waitForWebLogin({
+                  timeoutMs:
+                    typeof (params as { timeoutMs?: unknown }).timeoutMs ===
+                    "number"
+                      ? (params as { timeoutMs?: number }).timeoutMs
+                      : undefined,
+                });
+                if (result.connected) {
+                  await startWhatsAppProvider();
+                }
+                respond(true, result, undefined);
+              } catch (err) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)),
+                );
+              }
+              break;
+            }
+            case "web.logout": {
+              try {
+                await stopWhatsAppProvider();
+                const cleared = await logoutWeb(defaultRuntime);
+                whatsappRuntime = {
+                  ...whatsappRuntime,
+                  running: false,
+                  connected: false,
+                  lastError: cleared ? "logged out" : whatsappRuntime.lastError,
+                };
+                respond(true, { cleared }, undefined);
+              } catch (err) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)),
+                );
+              }
+              break;
+            }
+            case "telegram.logout": {
+              try {
+                await stopTelegramProvider();
+                const snapshot = await readConfigFileSnapshot();
+                if (!snapshot.valid) {
+                  respond(
+                    false,
+                    undefined,
+                    errorShape(
+                      ErrorCodes.INVALID_REQUEST,
+                      "config invalid; fix it before logging out",
+                    ),
+                  );
+                  break;
+                }
+                const cfg = snapshot.config ?? {};
+                const envToken = process.env.TELEGRAM_BOT_TOKEN?.trim() ?? "";
+                const hadToken = Boolean(cfg.telegram?.botToken);
+                const nextTelegram = cfg.telegram
+                  ? { ...cfg.telegram }
+                  : undefined;
+                if (nextTelegram) {
+                  delete nextTelegram.botToken;
+                }
+                const nextCfg = { ...cfg } as ClawdisConfig;
+                if (nextTelegram && Object.keys(nextTelegram).length > 0) {
+                  nextCfg.telegram = nextTelegram;
+                } else {
+                  delete nextCfg.telegram;
+                }
+                await writeConfigFile(nextCfg);
+                respond(
+                  true,
+                  { cleared: hadToken, envToken: Boolean(envToken) },
+                  undefined,
+                );
+              } catch (err) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)),
+                );
+              }
+              break;
+            }
+            case "models.list": {
+              const params = (req.params ?? {}) as Record<string, unknown>;
+              if (!validateModelsListParams(params)) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.INVALID_REQUEST,
+                    `invalid models.list params: ${formatValidationErrors(validateModelsListParams.errors)}`,
+                  ),
+                );
+                break;
+              }
+              try {
+                const models = await loadGatewayModelCatalog();
+                respond(true, { models }, undefined);
+              } catch (err) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(ErrorCodes.UNAVAILABLE, String(err)),
+                );
+              }
               break;
             }
             case "config.get": {
@@ -4445,7 +4896,8 @@ export async function startGatewayServer(
           /* ignore */
         }
       }
-      providerAbort.abort();
+      await stopWhatsAppProvider();
+      await stopTelegramProvider();
       cron.stop();
       broadcast("shutdown", {
         reason: "gateway stopping",
@@ -4481,7 +4933,9 @@ export async function startGatewayServer(
       if (stopBrowserControlServerIfStarted) {
         await stopBrowserControlServerIfStarted().catch(() => {});
       }
-      await Promise.allSettled(providerTasks);
+      await Promise.allSettled(
+        [whatsappTask, telegramTask].filter(Boolean) as Array<Promise<unknown>>,
+      );
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve, reject) =>
         httpServer.close((err) => (err ? reject(err) : resolve())),

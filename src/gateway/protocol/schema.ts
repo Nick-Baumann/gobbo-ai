@@ -305,6 +305,52 @@ export const ConfigSetParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const ProvidersStatusParamsSchema = Type.Object(
+  {
+    probe: Type.Optional(Type.Boolean()),
+    timeoutMs: Type.Optional(Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);
+
+export const WebLoginStartParamsSchema = Type.Object(
+  {
+    force: Type.Optional(Type.Boolean()),
+    timeoutMs: Type.Optional(Type.Integer({ minimum: 0 })),
+    verbose: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
+
+export const WebLoginWaitParamsSchema = Type.Object(
+  {
+    timeoutMs: Type.Optional(Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);
+
+export const ModelChoiceSchema = Type.Object(
+  {
+    id: NonEmptyString,
+    name: NonEmptyString,
+    provider: NonEmptyString,
+    contextWindow: Type.Optional(Type.Integer({ minimum: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export const ModelsListParamsSchema = Type.Object(
+  {},
+  { additionalProperties: false },
+);
+
+export const ModelsListResultSchema = Type.Object(
+  {
+    models: Type.Array(ModelChoiceSchema),
+  },
+  { additionalProperties: false },
+);
+
 export const SkillsStatusParamsSchema = Type.Object(
   {},
   { additionalProperties: false },
@@ -583,6 +629,12 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   SessionsPatchParams: SessionsPatchParamsSchema,
   ConfigGetParams: ConfigGetParamsSchema,
   ConfigSetParams: ConfigSetParamsSchema,
+  ProvidersStatusParams: ProvidersStatusParamsSchema,
+  WebLoginStartParams: WebLoginStartParamsSchema,
+  WebLoginWaitParams: WebLoginWaitParamsSchema,
+  ModelChoice: ModelChoiceSchema,
+  ModelsListParams: ModelsListParamsSchema,
+  ModelsListResult: ModelsListResultSchema,
   SkillsStatusParams: SkillsStatusParamsSchema,
   SkillsInstallParams: SkillsInstallParamsSchema,
   SkillsUpdateParams: SkillsUpdateParamsSchema,
@@ -629,6 +681,12 @@ export type SessionsListParams = Static<typeof SessionsListParamsSchema>;
 export type SessionsPatchParams = Static<typeof SessionsPatchParamsSchema>;
 export type ConfigGetParams = Static<typeof ConfigGetParamsSchema>;
 export type ConfigSetParams = Static<typeof ConfigSetParamsSchema>;
+export type ProvidersStatusParams = Static<typeof ProvidersStatusParamsSchema>;
+export type WebLoginStartParams = Static<typeof WebLoginStartParamsSchema>;
+export type WebLoginWaitParams = Static<typeof WebLoginWaitParamsSchema>;
+export type ModelChoice = Static<typeof ModelChoiceSchema>;
+export type ModelsListParams = Static<typeof ModelsListParamsSchema>;
+export type ModelsListResult = Static<typeof ModelsListResultSchema>;
 export type SkillsStatusParams = Static<typeof SkillsStatusParamsSchema>;
 export type SkillsInstallParams = Static<typeof SkillsInstallParamsSchema>;
 export type SkillsUpdateParams = Static<typeof SkillsUpdateParamsSchema>;

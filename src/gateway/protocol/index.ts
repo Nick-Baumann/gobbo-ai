@@ -42,6 +42,8 @@ import {
   GatewayFrameSchema,
   type HelloOk,
   HelloOkSchema,
+  type ModelsListParams,
+  ModelsListParamsSchema,
   type NodeDescribeParams,
   NodeDescribeParamsSchema,
   type NodeInvokeParams,
@@ -62,6 +64,8 @@ import {
   type PresenceEntry,
   PresenceEntrySchema,
   ProtocolSchemas,
+  type ProvidersStatusParams,
+  ProvidersStatusParamsSchema,
   type RequestFrame,
   RequestFrameSchema,
   type ResponseFrame,
@@ -87,6 +91,10 @@ import {
   TickEventSchema,
   type WakeParams,
   WakeParamsSchema,
+  type WebLoginStartParams,
+  WebLoginStartParamsSchema,
+  type WebLoginWaitParams,
+  WebLoginWaitParamsSchema,
 } from "./schema.js";
 
 const ajv = new (
@@ -141,6 +149,12 @@ export const validateConfigGetParams = ajv.compile<ConfigGetParams>(
 export const validateConfigSetParams = ajv.compile<ConfigSetParams>(
   ConfigSetParamsSchema,
 );
+export const validateProvidersStatusParams = ajv.compile<ProvidersStatusParams>(
+  ProvidersStatusParamsSchema,
+);
+export const validateModelsListParams = ajv.compile<ModelsListParams>(
+  ModelsListParamsSchema,
+);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(
   SkillsStatusParamsSchema,
 );
@@ -173,6 +187,12 @@ export const validateChatAbortParams = ajv.compile<ChatAbortParams>(
   ChatAbortParamsSchema,
 );
 export const validateChatEvent = ajv.compile(ChatEventSchema);
+export const validateWebLoginStartParams = ajv.compile<WebLoginStartParams>(
+  WebLoginStartParamsSchema,
+);
+export const validateWebLoginWaitParams = ajv.compile<WebLoginWaitParams>(
+  WebLoginWaitParamsSchema,
+);
 
 export function formatValidationErrors(
   errors: ErrorObject[] | null | undefined,
@@ -208,6 +228,10 @@ export {
   SessionsPatchParamsSchema,
   ConfigGetParamsSchema,
   ConfigSetParamsSchema,
+  ProvidersStatusParamsSchema,
+  WebLoginStartParamsSchema,
+  WebLoginWaitParamsSchema,
+  ModelsListParamsSchema,
   SkillsStatusParamsSchema,
   SkillsInstallParamsSchema,
   SkillsUpdateParamsSchema,
@@ -250,6 +274,9 @@ export type {
   NodePairApproveParams,
   ConfigGetParams,
   ConfigSetParams,
+  ProvidersStatusParams,
+  WebLoginStartParams,
+  WebLoginWaitParams,
   SkillsStatusParams,
   SkillsInstallParams,
   SkillsUpdateParams,
