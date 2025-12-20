@@ -63,4 +63,40 @@ struct GatewayDiscoveryModelTests {
             serviceName: "studio-bridge",
             local: local))
     }
+
+    @Test func parsesGatewayTXTFields() {
+        let parsed = GatewayDiscoveryModel.parseGatewayTXT([
+            "lanHost": "  studio.local  ",
+            "tailnetDns": "  peters-mac-studio-1.ts.net  ",
+            "sshPort": " 2222 ",
+            "cliPath": " /opt/clawdis "
+        ])
+        #expect(parsed.lanHost == "studio.local")
+        #expect(parsed.tailnetDns == "peters-mac-studio-1.ts.net")
+        #expect(parsed.sshPort == 2222)
+        #expect(parsed.cliPath == "/opt/clawdis")
+    }
+
+    @Test func parsesGatewayTXTDefaults() {
+        let parsed = GatewayDiscoveryModel.parseGatewayTXT([
+            "lanHost": "  ",
+            "tailnetDns": "\n",
+            "sshPort": "nope"
+        ])
+        #expect(parsed.lanHost == nil)
+        #expect(parsed.tailnetDns == nil)
+        #expect(parsed.sshPort == 22)
+        #expect(parsed.cliPath == nil)
+    }
+
+    @Test func buildsSSHTarget() {
+        #expect(GatewayDiscoveryModel.buildSSHTarget(
+            user: "peter",
+            host: "studio.local",
+            port: 22) == "peter@studio.local")
+        #expect(GatewayDiscoveryModel.buildSSHTarget(
+            user: "peter",
+            host: "studio.local",
+            port: 2201) == "peter@studio.local:2201")
+    }
 }
