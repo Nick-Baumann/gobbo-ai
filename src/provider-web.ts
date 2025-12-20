@@ -9,6 +9,7 @@ export {
   runWebHeartbeatOnce,
   setHeartbeatsEnabled,
   type WebMonitorTuning,
+  type WebProviderStatus,
 } from "./web/auto-reply.js";
 export {
   extractMediaPlaceholder,

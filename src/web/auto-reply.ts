@@ -67,6 +67,7 @@ export type WebMonitorTuning = {
   replyHeartbeatMinutes?: number;
   replyHeartbeatNow?: boolean;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  statusSink?: (status: WebProviderStatus) => void;
 };
 
 const formatDuration = (ms: number) =>
@@ -75,6 +76,22 @@ const formatDuration = (ms: number) =>
 const DEFAULT_REPLY_HEARTBEAT_MINUTES = 30;
 export const HEARTBEAT_TOKEN = "HEARTBEAT_OK";
 export const HEARTBEAT_PROMPT = "HEARTBEAT";
+
+export type WebProviderStatus = {
+  running: boolean;
+  connected: boolean;
+  reconnectAttempts: number;
+  lastConnectedAt?: number | null;
+  lastDisconnect?: {
+    at: number;
+    status?: number;
+    error?: string;
+    loggedOut?: boolean;
+  } | null;
+  lastMessageAt?: number | null;
+  lastEventAt?: number | null;
+  lastError?: string | null;
+};
 
 function elide(text?: string, limit = 400) {
   if (!text) return text;
@@ -702,6 +719,25 @@ export async function monitorWebProvider(
   const replyLogger = getChildLogger({ module: "web-auto-reply", runId });
   const heartbeatLogger = getChildLogger({ module: "web-heartbeat", runId });
   const reconnectLogger = getChildLogger({ module: "web-reconnect", runId });
+  const status: WebProviderStatus = {
+    running: true,
+    connected: false,
+    reconnectAttempts: 0,
+    lastConnectedAt: null,
+    lastDisconnect: null,
+    lastMessageAt: null,
+    lastEventAt: null,
+    lastError: null,
+  };
+  const emitStatus = () => {
+    tuning.statusSink?.({
+      ...status,
+      lastDisconnect: status.lastDisconnect
+        ? { ...status.lastDisconnect }
+        : null,
+    });
+  };
+  emitStatus();
   const cfg = loadConfig();
   const configuredMaxMb = cfg.inbound?.agent?.mediaMaxMb;
   const maxMediaBytes =
@@ -802,6 +838,9 @@ export async function monitorWebProvider(
     };
 
     const processMessage = async (msg: WebInboundMsg) => {
+      status.lastMessageAt = Date.now();
+      status.lastEventAt = status.lastMessageAt;
+      emitStatus();
       const conversationId = msg.conversationId ?? msg.from;
       let combinedBody = buildLine(msg);
 
@@ -1038,6 +1077,9 @@ export async function monitorWebProvider(
       onMessage: async (msg) => {
         handledMessages += 1;
         lastMessageAt = Date.now();
+        status.lastMessageAt = lastMessageAt;
+        status.lastEventAt = lastMessageAt;
+        emitStatus();
         lastInboundMsg = msg;
         const conversationId = msg.conversationId ?? msg.from;
 
@@ -1089,6 +1131,12 @@ export async function monitorWebProvider(
         return processMessage(msg);
       },
     });
+
+    status.connected = true;
+    status.lastConnectedAt = Date.now();
+    status.lastEventAt = status.lastConnectedAt;
+    status.lastError = null;
+    emitStatus();
 
     // Surface a concise connection event for the next main-session turn/heartbeat.
     const { e164: selfE164 } = readWebSelfId();
@@ -1420,13 +1468,15 @@ export async function monitorWebProvider(
     if (uptimeMs > heartbeatSeconds * 1000) {
       reconnectAttempts = 0; // Healthy stretch; reset the backoff.
     }
+    status.reconnectAttempts = reconnectAttempts;
+    emitStatus();
 
     if (stopRequested() || sigintStop || reason === "aborted") {
       await closeListener();
       break;
     }
 
-    const status =
+    const statusCode =
       (typeof reason === "object" && reason && "status" in reason
         ? (reason as { status?: number }).status
         : undefined) ?? "unknown";
@@ -1437,11 +1487,22 @@ export async function monitorWebProvider(
       (reason as { isLoggedOut?: boolean }).isLoggedOut;
 
     const errorStr = formatError(reason);
+    status.connected = false;
+    status.lastEventAt = Date.now();
+    status.lastDisconnect = {
+      at: status.lastEventAt,
+      status: typeof statusCode === "number" ? statusCode : undefined,
+      error: errorStr,
+      loggedOut: Boolean(loggedOut),
+    };
+    status.lastError = errorStr;
+    status.reconnectAttempts = reconnectAttempts;
+    emitStatus();
 
     reconnectLogger.info(
       {
         connectionId,
-        status,
+        status: statusCode,
         loggedOut,
         reconnectAttempts,
         error: errorStr,
@@ -1450,7 +1511,7 @@ export async function monitorWebProvider(
     );
 
     enqueueSystemEvent(
-      `WhatsApp gateway disconnected (status ${status ?? "unknown"})`,
+      `WhatsApp gateway disconnected (status ${statusCode ?? "unknown"})`,
     );
 
     if (loggedOut) {
@@ -1464,6 +1525,8 @@ export async function monitorWebProvider(
     }
 
     reconnectAttempts += 1;
+    status.reconnectAttempts = reconnectAttempts;
+    emitStatus();
     if (
       reconnectPolicy.maxAttempts > 0 &&
       reconnectAttempts >= reconnectPolicy.maxAttempts
@@ -1471,7 +1534,7 @@ export async function monitorWebProvider(
       reconnectLogger.warn(
         {
           connectionId,
-          status,
+          status: statusCode,
           reconnectAttempts,
           maxAttempts: reconnectPolicy.maxAttempts,
         },
@@ -1490,7 +1553,7 @@ export async function monitorWebProvider(
     reconnectLogger.info(
       {
         connectionId,
-        status,
+        status: statusCode,
         reconnectAttempts,
         maxAttempts: reconnectPolicy.maxAttempts || "unlimited",
         delayMs: delay,
@@ -1499,7 +1562,7 @@ export async function monitorWebProvider(
     );
     runtime.error(
       danger(
-        `WhatsApp Web connection closed (status ${status}). Retry ${reconnectAttempts}/${reconnectPolicy.maxAttempts || "∞"} in ${formatDuration(delay)}… (${errorStr})`,
+        `WhatsApp Web connection closed (status ${statusCode}). Retry ${reconnectAttempts}/${reconnectPolicy.maxAttempts || "∞"} in ${formatDuration(delay)}… (${errorStr})`,
       ),
     );
     await closeListener();
@@ -1509,6 +1572,11 @@ export async function monitorWebProvider(
       break;
     }
   }
+
+  status.running = false;
+  status.connected = false;
+  status.lastEventAt = Date.now();
+  emitStatus();
 
   process.removeListener("SIGINT", handleSigint);
 }
