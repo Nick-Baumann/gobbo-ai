@@ -24,6 +24,19 @@ Model notes
 - Stable: `eleven_multilingual_v2`
 - Fast: `eleven_flash_v2_5`
 
+Pronunciation + delivery rules
+- First fix: respell (e.g. "key-note"), add hyphens, adjust casing.
+- Numbers/units/URLs: `--normalize auto` (or `off` if it harms names).
+- Language bias: `--lang en|de|fr|...` to guide normalization.
+- v3: SSML `<break>` not supported; use `[pause]`, `[short pause]`, `[long pause]`.
+- v2/v2.5: SSML `<break time="1.5s" />` supported; `<phoneme>` not exposed in `sag`.
+
+v3 audio tags (put at the entrance of a line)
+- `[whispers]`, `[shouts]`, `[sings]`
+- `[laughs]`, `[starts laughing]`, `[sighs]`, `[exhales]`
+- `[sarcastic]`, `[curious]`, `[excited]`, `[crying]`, `[mischievously]`
+- Example: `sag "[whispers] keep this quiet. [short pause] ok?"`
+
 Voice defaults
 - `ELEVENLABS_VOICE_ID` or `SAG_VOICE_ID`
 
