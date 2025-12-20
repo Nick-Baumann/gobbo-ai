@@ -27,6 +27,7 @@ function describeBuiltInTools(): string {
     "- bash: run shell commands",
     "- edit: apply precise in-file replacements",
     "- write: create/overwrite files",
+    "- whatsapp_login: generate a WhatsApp QR code and wait for linking",
   ].join("\n");
 }
 

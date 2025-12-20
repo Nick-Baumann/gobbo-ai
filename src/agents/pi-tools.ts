@@ -1,9 +1,10 @@
 import type { AgentTool, AgentToolResult } from "@mariozechner/pi-ai";
 import { bashTool, codingTools, readTool } from "@mariozechner/pi-coding-agent";
-import type { TSchema } from "@sinclair/typebox";
+import { Type, type TSchema } from "@sinclair/typebox";
 
 import { getImageMetadata, resizeToJpeg } from "../media/image-ops.js";
 import { detectMime } from "../media/mime.js";
+import { startWebLoginWithQr, waitForWebLogin } from "../web/login-qr.js";
 
 // TODO(steipete): Remove this wrapper once pi-mono ships file-magic MIME detection
 // for `read` image payloads in `@mariozechner/pi-coding-agent` (then switch back to `codingTools` directly).
@@ -102,6 +103,70 @@ function normalizeReadImageResult(
 }
 
 type AnyAgentTool = AgentTool<TSchema, unknown>;
+
+function createWhatsAppLoginTool(): AnyAgentTool {
+  return {
+    label: "WhatsApp Login",
+    name: "whatsapp_login",
+    description:
+      "Generate a WhatsApp QR code for linking, or wait for the scan to complete.",
+    parameters: Type.Object({
+      action: Type.Union([Type.Literal("start"), Type.Literal("wait")]),
+      timeoutMs: Type.Optional(Type.Number()),
+      force: Type.Optional(Type.Boolean()),
+    }),
+    execute: async (_toolCallId, args) => {
+      const action = (args as { action?: string })?.action ?? "start";
+      if (action === "wait") {
+        const result = await waitForWebLogin({
+          timeoutMs:
+            typeof (args as { timeoutMs?: unknown }).timeoutMs === "number"
+              ? (args as { timeoutMs?: number }).timeoutMs
+              : undefined,
+        });
+        return {
+          content: [{ type: "text", text: result.message }],
+          details: { connected: result.connected },
+        };
+      }
+
+      const result = await startWebLoginWithQr({
+        timeoutMs:
+          typeof (args as { timeoutMs?: unknown }).timeoutMs === "number"
+            ? (args as { timeoutMs?: number }).timeoutMs
+            : undefined,
+        force:
+          typeof (args as { force?: unknown }).force === "boolean"
+            ? (args as { force?: boolean }).force
+            : false,
+      });
+
+      if (!result.qrDataUrl) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: result.message,
+            },
+          ],
+          details: { qr: false },
+        };
+      }
+
+      const text = [
+        result.message,
+        "",
+        "Open WhatsApp → Linked Devices and scan:",
+        "",
+        `![whatsapp-qr](${result.qrDataUrl})`,
+      ].join("\n");
+      return {
+        content: [{ type: "text", text }],
+        details: { qr: true },
+      };
+    },
+  };
+}
 
 function isImageBlock(block: unknown): block is ImageContentBlock {
   if (!block || typeof block !== "object") return false;
@@ -266,11 +331,12 @@ function createClawdisBashTool(base: AnyAgentTool): AnyAgentTool {
 }
 
 export function createClawdisCodingTools(): AnyAgentTool[] {
-  return (codingTools as unknown as AnyAgentTool[]).map((tool) =>
+  const base = (codingTools as unknown as AnyAgentTool[]).map((tool) =>
     tool.name === readTool.name
       ? createClawdisReadTool(tool)
       : tool.name === bashTool.name
         ? createClawdisBashTool(tool)
         : (tool as AnyAgentTool),
   );
+  return [...base, createWhatsAppLoginTool()];
 }

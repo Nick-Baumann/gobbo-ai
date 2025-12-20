@@ -83,7 +83,11 @@ async function safeSaveCreds(
  * Create a Baileys socket backed by the multi-file auth store we keep on disk.
  * Consumers can opt into QR printing for interactive login flows.
  */
-export async function createWaSocket(printQr: boolean, verbose: boolean) {
+export async function createWaSocket(
+  printQr: boolean,
+  verbose: boolean,
+  opts: { onQr?: (qr: string) => void } = {},
+) {
   const baseLogger = getChildLogger(
     { module: "baileys" },
     {
@@ -115,9 +119,12 @@ export async function createWaSocket(printQr: boolean, verbose: boolean) {
     (update: Partial<import("@whiskeysockets/baileys").ConnectionState>) => {
       try {
         const { connection, lastDisconnect, qr } = update;
-        if (qr && printQr) {
-          console.log("Scan this QR in WhatsApp (Linked Devices):");
-          qrcode.generate(qr, { small: true });
+        if (qr) {
+          opts.onQr?.(qr);
+          if (printQr) {
+            console.log("Scan this QR in WhatsApp (Linked Devices):");
+            qrcode.generate(qr, { small: true });
+          }
         }
         if (connection === "close") {
           const status = getStatusCode(lastDisconnect?.error);
