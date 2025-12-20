@@ -138,12 +138,7 @@ function parseInstallSpec(input: unknown): SkillInstallSpec | undefined {
         ? raw.type
         : "";
   const kind = kindRaw.trim().toLowerCase();
-  if (
-    kind !== "brew" &&
-    kind !== "node" &&
-    kind !== "go" &&
-    kind !== "uv"
-  ) {
+  if (kind !== "brew" && kind !== "node" && kind !== "go" && kind !== "uv") {
     return undefined;
   }
 

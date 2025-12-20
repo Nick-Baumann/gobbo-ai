@@ -64,25 +64,21 @@ function buildInstallCommand(
 } {
   switch (spec.kind) {
     case "brew": {
-      if (!spec.formula)
-        return { argv: null, error: "missing brew formula" };
+      if (!spec.formula) return { argv: null, error: "missing brew formula" };
       return { argv: ["brew", "install", spec.formula] };
     }
     case "node": {
-      if (!spec.package)
-        return { argv: null, error: "missing node package" };
+      if (!spec.package) return { argv: null, error: "missing node package" };
       return {
         argv: buildNodeInstallCommand(spec.package, prefs),
       };
     }
     case "go": {
-      if (!spec.module)
-        return { argv: null, error: "missing go module" };
+      if (!spec.module) return { argv: null, error: "missing go module" };
       return { argv: ["go", "install", spec.module] };
     }
     case "uv": {
-      if (!spec.package)
-        return { argv: null, error: "missing uv package" };
+      if (!spec.package) return { argv: null, error: "missing uv package" };
       return { argv: ["uv", "tool", "install", spec.package] };
     }
     default:
