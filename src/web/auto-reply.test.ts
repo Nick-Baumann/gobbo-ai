@@ -1712,4 +1712,53 @@ describe("web auto-reply", () => {
     expect(reply).toHaveBeenCalledWith("🦞 already prefixed");
     resetLoadConfigMock();
   });
+
+  it("sends tool summaries immediately with responsePrefix", async () => {
+    setLoadConfigMock(() => ({
+      inbound: {
+        allowFrom: ["*"],
+        messagePrefix: undefined,
+        responsePrefix: "🦞",
+        timestampPrefix: false,
+      },
+    }));
+
+    let capturedOnMessage:
+      | ((msg: import("./inbound.js").WebInboundMessage) => Promise<void>)
+      | undefined;
+    const reply = vi.fn();
+    const listenerFactory = async (opts: {
+      onMessage: (
+        msg: import("./inbound.js").WebInboundMessage,
+      ) => Promise<void>;
+    }) => {
+      capturedOnMessage = opts.onMessage;
+      return { close: vi.fn() };
+    };
+
+    const resolver = vi
+      .fn()
+      .mockImplementation(async (_ctx, opts?: { onToolResult?: Function }) => {
+        await opts?.onToolResult?.({ text: "[🛠️ tool1]" });
+        await opts?.onToolResult?.({ text: "[🛠️ tool2]" });
+        return { text: "final" };
+      });
+
+    await monitorWebProvider(false, listenerFactory, false, resolver);
+    expect(capturedOnMessage).toBeDefined();
+
+    await capturedOnMessage?.({
+      body: "hi",
+      from: "+1555",
+      to: "+2666",
+      id: "msg1",
+      sendComposing: vi.fn(),
+      reply,
+      sendMedia: vi.fn(),
+    });
+
+    const replies = reply.mock.calls.map((call) => call[0]);
+    expect(replies).toEqual(["🦞 [🛠️ tool1]", "🦞 [🛠️ tool2]", "🦞 final"]);
+    resetLoadConfigMock();
+  });
 });
