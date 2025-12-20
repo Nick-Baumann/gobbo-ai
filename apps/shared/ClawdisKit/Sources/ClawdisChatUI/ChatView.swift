@@ -2,19 +2,25 @@ import SwiftUI
 
 @MainActor
 public struct ClawdisChatView: View {
+    public enum Style {
+        case standard
+        case onboarding
+    }
+
     @State private var viewModel: ClawdisChatViewModel
     @State private var scrollerBottomID = UUID()
     @State private var showSessions = false
     private let showsSessionSwitcher: Bool
+    private let style: Style
 
     private enum Layout {
         #if os(macOS)
-        static let outerPadding: CGFloat = 2
-        static let stackSpacing: CGFloat = 3
-        static let messageSpacing: CGFloat = 8
-        static let messageListPaddingTop: CGFloat = 0
-        static let messageListPaddingBottom: CGFloat = 2
-        static let messageListPaddingHorizontal: CGFloat = 4
+        static let outerPadding: CGFloat = 6
+        static let stackSpacing: CGFloat = 6
+        static let messageSpacing: CGFloat = 6
+        static let messageListPaddingTop: CGFloat = 2
+        static let messageListPaddingBottom: CGFloat = 4
+        static let messageListPaddingHorizontal: CGFloat = 6
         #else
         static let outerPadding: CGFloat = 6
         static let stackSpacing: CGFloat = 6
@@ -25,9 +31,14 @@ public struct ClawdisChatView: View {
         #endif
     }
 
-    public init(viewModel: ClawdisChatViewModel, showsSessionSwitcher: Bool = false) {
+    public init(
+        viewModel: ClawdisChatViewModel,
+        showsSessionSwitcher: Bool = false,
+        style: Style = .standard)
+    {
         self._viewModel = State(initialValue: viewModel)
         self.showsSessionSwitcher = showsSessionSwitcher
+        self.style = style
     }
 
     public var body: some View {
@@ -37,7 +48,7 @@ public struct ClawdisChatView: View {
 
             VStack(spacing: Layout.stackSpacing) {
                 self.messageList
-                ClawdisChatComposer(viewModel: self.viewModel)
+                ClawdisChatComposer(viewModel: self.viewModel, style: self.style)
             }
             .padding(.horizontal, Layout.outerPadding)
             .padding(.vertical, Layout.outerPadding)
@@ -88,10 +99,6 @@ public struct ClawdisChatView: View {
                 .padding(.bottom, Layout.messageListPaddingBottom)
                 .padding(.horizontal, Layout.messageListPaddingHorizontal)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(ClawdisChatTheme.card)
-                    .shadow(color: .black.opacity(0.05), radius: 12, y: 6))
             .onChange(of: self.viewModel.messages.count) { _, _ in
                 withAnimation(.snappy(duration: 0.22)) {
                     proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)

@@ -31,6 +31,52 @@ enum ClawdisChatTheme {
         #endif
     }
 
+    static var userBubble: Color {
+        #if os(macOS)
+        Color(nsColor: .systemBlue)
+        #else
+        Color(uiColor: .systemBlue)
+        #endif
+    }
+
+    static var assistantBubble: Color {
+        #if os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        Color(uiColor: .secondarySystemBackground)
+        #endif
+    }
+
+    static var userText: Color { .white }
+
+    static var assistantText: Color {
+        #if os(macOS)
+        Color(nsColor: .labelColor)
+        #else
+        Color(uiColor: .label)
+        #endif
+    }
+
+    static var composerBackground: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+
+    static var composerField: Color {
+        #if os(macOS)
+        Color(nsColor: .textBackgroundColor)
+        #else
+        Color(uiColor: .secondarySystemBackground)
+        #endif
+    }
+
+    static var composerBorder: Color {
+        Color.secondary.opacity(0.2)
+    }
+
     static var divider: Color {
         Color.secondary.opacity(0.2)
     }

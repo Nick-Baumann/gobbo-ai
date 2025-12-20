@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 @MainActor
 struct ClawdisChatComposer: View {
     @Bindable var viewModel: ClawdisChatViewModel
+    let style: ClawdisChatView.Style
 
     #if !os(macOS)
     @State private var pickerItems: [PhotosPickerItem] = []
@@ -18,14 +19,16 @@ struct ClawdisChatComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                self.thinkingPicker
-                Spacer()
-                self.refreshButton
-                self.attachmentPicker
+            if self.showsToolbar {
+                HStack(spacing: 8) {
+                    self.thinkingPicker
+                    Spacer()
+                    self.refreshButton
+                    self.attachmentPicker
+                }
             }
 
-            if !self.viewModel.attachments.isEmpty {
+            if self.showsAttachments && !self.viewModel.attachments.isEmpty {
                 self.attachmentsStrip
             }
 
@@ -40,9 +43,9 @@ struct ClawdisChatComposer: View {
         }
         .padding(8)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(ClawdisChatTheme.card)
-                .shadow(color: .black.opacity(0.06), radius: 12, y: 6))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(ClawdisChatTheme.composerBackground)
+                .shadow(color: .black.opacity(0.08), radius: 10, y: 4))
         #if os(macOS)
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 self.handleDrop(providers)
@@ -126,15 +129,17 @@ struct ClawdisChatComposer: View {
 
     private var editor: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(ClawdisChatTheme.divider)
+            .strokeBorder(ClawdisChatTheme.composerBorder)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(ClawdisChatTheme.card))
+                    .fill(ClawdisChatTheme.composerField))
             .overlay {
                 VStack(alignment: .leading, spacing: 6) {
                     self.editorOverlay
                     HStack(alignment: .bottom, spacing: 8) {
-                        self.connectionPill
+                        if self.showsConnectionPill {
+                            self.connectionPill
+                        }
                         Spacer(minLength: 0)
                         self.sendButton
                     }
@@ -195,29 +200,32 @@ struct ClawdisChatComposer: View {
                     self.viewModel.abort()
                 } label: {
                     if self.viewModel.isAborting {
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.mini)
                     } else {
                         Image(systemName: "stop.fill")
                             .font(.system(size: 13, weight: .semibold))
                     }
                 }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Circle().fill(Color.red))
                 .disabled(self.viewModel.isAborting)
             } else {
                 Button {
                     self.viewModel.send()
                 } label: {
                     if self.viewModel.isSending {
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.mini)
                     } else {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 13, weight: .semibold))
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Circle().fill(Color.accentColor))
                 .disabled(!self.viewModel.canSend)
             }
         }
@@ -232,6 +240,18 @@ struct ClawdisChatComposer: View {
         .buttonStyle(.bordered)
         .controlSize(.small)
         .help("Refresh")
+    }
+
+    private var showsToolbar: Bool {
+        self.style == .standard
+    }
+
+    private var showsAttachments: Bool {
+        self.style == .standard
+    }
+
+    private var showsConnectionPill: Bool {
+        self.style == .standard
     }
 
     #if os(macOS)

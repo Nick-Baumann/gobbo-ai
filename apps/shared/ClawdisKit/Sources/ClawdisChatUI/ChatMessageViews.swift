@@ -2,8 +2,8 @@ import Foundation
 import SwiftUI
 
 private enum ChatUIConstants {
-    static let bubbleMaxWidth: CGFloat = 760
-    static let bubbleCorner: CGFloat = 16
+    static let bubbleMaxWidth: CGFloat = 560
+    static let bubbleCorner: CGFloat = 18
 }
 
 @MainActor
@@ -11,27 +11,10 @@ struct ChatMessageBubble: View {
     let message: ClawdisChatMessage
 
     var body: some View {
-        VStack(alignment: self.isUser ? .trailing : .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                if !self.isUser {
-                    Label("Assistant", systemImage: "sparkles")
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                if self.isUser {
-                    Label("You", systemImage: "person.fill")
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            ChatMessageBody(message: self.message, isUser: self.isUser)
-                .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
-        }
-        .padding(.horizontal, 2)
+        ChatMessageBody(message: self.message, isUser: self.isUser)
+            .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
+            .frame(maxWidth: .infinity, alignment: self.isUser ? .trailing : .leading)
+            .padding(.horizontal, 2)
     }
 
     private var isUser: Bool { self.message.role.lowercased() == "user" }
@@ -45,14 +28,15 @@ private struct ChatMessageBody: View {
     var body: some View {
         let text = self.primaryText
         let split = ChatMarkdownSplitter.split(markdown: text)
+        let textColor = self.isUser ? ClawdisChatTheme.userText : ClawdisChatTheme.assistantText
 
         VStack(alignment: .leading, spacing: 10) {
             ForEach(split.blocks) { block in
                 switch block.kind {
                 case .text:
-                    MarkdownTextView(text: block.text)
+                    MarkdownTextView(text: block.text, textColor: textColor)
                 case let .code(language):
-                    CodeBlockView(code: block.text, language: language)
+                    CodeBlockView(code: block.text, language: language, isUser: self.isUser)
                 }
             }
 
@@ -80,12 +64,14 @@ private struct ChatMessageBody: View {
 
             if !self.inlineAttachments.isEmpty {
                 ForEach(self.inlineAttachments.indices, id: \.self) { idx in
-                    AttachmentRow(att: self.inlineAttachments[idx])
+                    AttachmentRow(att: self.inlineAttachments[idx], isUser: self.isUser)
                 }
             }
         }
         .textSelection(.enabled)
-        .padding(12)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .foregroundStyle(textColor)
         .background(self.bubbleBackground)
         .overlay(self.bubbleBorder)
         .clipShape(RoundedRectangle(cornerRadius: ChatUIConstants.bubbleCorner, style: .continuous))
@@ -101,27 +87,21 @@ private struct ChatMessageBody: View {
     }
 
     private var bubbleBackground: AnyShapeStyle {
-        if self.isUser {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [
-                        Color.orange.opacity(0.22),
-                        Color.accentColor.opacity(0.18),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing))
-        }
-        return AnyShapeStyle(ClawdisChatTheme.subtleCard)
+        let fill = self.isUser ? ClawdisChatTheme.userBubble : ClawdisChatTheme.assistantBubble
+        return AnyShapeStyle(fill)
     }
 
     private var bubbleBorder: some View {
         RoundedRectangle(cornerRadius: ChatUIConstants.bubbleCorner, style: .continuous)
-            .strokeBorder(self.isUser ? Color.orange.opacity(0.35) : Color.white.opacity(0.10), lineWidth: 1)
+            .strokeBorder(
+                self.isUser ? Color.white.opacity(0.12) : Color.black.opacity(0.08),
+                lineWidth: self.isUser ? 0.5 : 1)
     }
 }
 
 private struct AttachmentRow: View {
     let att: ClawdisChatMessageContent
+    let isUser: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -129,10 +109,11 @@ private struct AttachmentRow: View {
             Text(self.att.fileName ?? "Attachment")
                 .font(.footnote)
                 .lineLimit(1)
+                .foregroundStyle(self.isUser ? ClawdisChatTheme.userText : ClawdisChatTheme.assistantText)
             Spacer()
         }
         .padding(10)
-        .background(Color.white.opacity(0.06))
+        .background(self.isUser ? Color.white.opacity(0.2) : Color.black.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
@@ -150,10 +131,10 @@ struct ChatTypingIndicatorBubble: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(ClawdisChatTheme.subtleCard))
+                .fill(ClawdisChatTheme.assistantBubble))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1))
         .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: .leading)
     }
 }
@@ -164,19 +145,15 @@ struct ChatStreamingAssistantBubble: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Assistant (streaming)", systemImage: "sparkles")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            ChatMarkdownBody(text: self.text)
+            ChatMarkdownBody(text: self.text, textColor: ClawdisChatTheme.assistantText)
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(ClawdisChatTheme.subtleCard))
+                .fill(ClawdisChatTheme.assistantBubble))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1))
         .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: .leading)
     }
 }
@@ -207,10 +184,10 @@ struct ChatPendingToolsBubble: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(ClawdisChatTheme.subtleCard))
+                .fill(ClawdisChatTheme.assistantBubble))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1))
         .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: .leading)
     }
 }
@@ -245,16 +222,17 @@ private struct TypingDots: View {
 @MainActor
 private struct MarkdownTextView: View {
     let text: String
+    let textColor: Color
 
     var body: some View {
         if let attributed = try? AttributedString(markdown: self.text) {
             Text(attributed)
                 .font(.system(size: 14))
-                .foregroundStyle(.primary)
+                .foregroundStyle(self.textColor)
         } else {
             Text(self.text)
                 .font(.system(size: 14))
-                .foregroundStyle(.primary)
+                .foregroundStyle(self.textColor)
         }
     }
 }
@@ -262,6 +240,7 @@ private struct MarkdownTextView: View {
 @MainActor
 private struct ChatMarkdownBody: View {
     let text: String
+    let textColor: Color
 
     var body: some View {
         let split = ChatMarkdownSplitter.split(markdown: self.text)
@@ -269,9 +248,9 @@ private struct ChatMarkdownBody: View {
             ForEach(split.blocks) { block in
                 switch block.kind {
                 case .text:
-                    MarkdownTextView(text: block.text)
+                    MarkdownTextView(text: block.text, textColor: self.textColor)
                 case let .code(language):
-                    CodeBlockView(code: block.text, language: language)
+                    CodeBlockView(code: block.text, language: language, isUser: false)
                 }
             }
 
@@ -305,6 +284,7 @@ private struct ChatMarkdownBody: View {
 private struct CodeBlockView: View {
     let code: String
     let language: String?
+    let isUser: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -315,15 +295,15 @@ private struct CodeBlockView: View {
             }
             Text(self.code)
                 .font(.system(size: 13, weight: .regular, design: .monospaced))
-                .foregroundStyle(.primary)
+                .foregroundStyle(self.isUser ? .white : .primary)
                 .textSelection(.enabled)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.06))
+        .background(self.isUser ? Color.white.opacity(0.16) : Color.black.opacity(0.06))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
