@@ -11,7 +11,6 @@ struct SkillsSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             self.header
-            self.filterBar
             self.statusBanner
             self.skillsList
             Spacer(minLength: 0)
@@ -51,6 +50,7 @@ struct SkillsSettings: View {
                 .buttonStyle(.bordered)
                 .help("Refresh")
             }
+            self.headerFilter
         }
     }
 
@@ -103,22 +103,16 @@ struct SkillsSettings: View {
         }
     }
 
-    private var filterBar: some View {
-        HStack(spacing: 10) {
-            Text("Filter")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Picker("", selection: self.$filter) {
-                ForEach(SkillsFilter.allCases) { filter in
-                    Text(filter.title)
-                        .tag(filter)
-                }
+    private var headerFilter: some View {
+        Picker("Filter", selection: self.$filter) {
+            ForEach(SkillsFilter.allCases) { filter in
+                Text(filter.title)
+                    .tag(filter)
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(width: 160, alignment: .leading)
-            Spacer(minLength: 0)
         }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(width: 160, alignment: .trailing)
     }
 
     private var filteredSkills: [SkillStatus] {
