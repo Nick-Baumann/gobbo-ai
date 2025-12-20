@@ -1,6 +1,7 @@
 ---
 name: brave-search
 description: Web search and content extraction via Brave Search API.
+homepage: https://brave.com/search/api
 metadata: {"clawdis":{"emoji":"🦁","requires":{"bins":["node"],"env":["BRAVE_API_KEY"]},"primaryEnv":"BRAVE_API_KEY"}}
 ---
 

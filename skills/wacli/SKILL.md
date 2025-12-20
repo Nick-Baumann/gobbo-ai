@@ -1,6 +1,7 @@
 ---
 name: wacli
 description: WhatsApp CLI for sync, search, and sending messages.
+homepage: https://wacli.sh
 metadata: {"clawdis":{"emoji":"📱","requires":{"bins":["wacli"]},"install":[{"id":"go","kind":"go","module":"github.com/steipete/wacli/cmd/wacli@latest","bins":["wacli"],"label":"Install wacli (go)"}]}}
 ---
 

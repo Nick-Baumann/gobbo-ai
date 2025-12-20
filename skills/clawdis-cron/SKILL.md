@@ -1,6 +1,7 @@
 ---
 name: clawdis-cron
 description: Schedule jobs and wakeups via Clawdis Gateway cron.* RPC.
+homepage: https://clawdis.ai
 metadata: {"clawdis":{"emoji":"⏰","always":true}}
 ---
 

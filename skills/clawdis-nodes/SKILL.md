@@ -1,6 +1,7 @@
 ---
 name: clawdis-nodes
 description: Discover, interpret, and target Clawdis nodes (paired devices) via the Gateway/CLI. Use when an agent must find available nodes, choose the best target machine, or reason about presence vs node availability (Tailnet/Tailscale optional).
+homepage: https://clawdis.ai
 metadata: {"clawdis":{"emoji":"🛰️"}}
 ---
 

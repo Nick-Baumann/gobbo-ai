@@ -1,6 +1,7 @@
 ---
 name: clawdis-canvas
 description: Drive the Clawdis Canvas panel (present, eval, snapshot, A2UI) via the clawdis CLI, including gateway-hosted A2UI surfaces and action bridging.
+homepage: https://clawdis.ai
 metadata: {"clawdis":{"emoji":"🎨","always":true}}
 ---
 

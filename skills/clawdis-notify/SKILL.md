@@ -1,6 +1,7 @@
 ---
 name: clawdis-notify
 description: Send system notifications to specific Clawdis nodes (macOS computers) via the Gateway and CLI. Use when you need to alert a person or confirm a remote action on a particular machine, or when an agent must push a notification to another computer.
+homepage: https://clawdis.ai
 metadata: {"clawdis":{"emoji":"🔔"}}
 ---
 
