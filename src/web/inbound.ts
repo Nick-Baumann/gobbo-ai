@@ -227,12 +227,13 @@ export async function monitorWebInbox(options: {
         "inbound message",
       );
       try {
-        await options.onMessage({
-          id,
-          from,
-          conversationId: from,
-          to: selfE164 ?? "me",
-          body,
+        const task = Promise.resolve(
+          options.onMessage({
+            id,
+            from,
+            conversationId: from,
+            to: selfE164 ?? "me",
+            body,
           pushName: senderName,
           timestamp,
           chatType: group ? "group" : "direct",
@@ -248,8 +249,12 @@ export async function monitorWebInbox(options: {
           sendComposing,
           reply,
           sendMedia,
-          mediaPath,
-          mediaType,
+            mediaPath,
+            mediaType,
+          }),
+        );
+        void task.catch((err) => {
+          console.error("Failed handling inbound web message:", String(err));
         });
       } catch (err) {
         console.error("Failed handling inbound web message:", String(err));
