@@ -10,7 +10,7 @@ struct OnboardingViewSmokeTests {
         let view = OnboardingView(
             state: state,
             permissionMonitor: PermissionMonitor.shared,
-            discoveryModel: MasterDiscoveryModel())
+            discoveryModel: GatewayDiscoveryModel())
         _ = view.body
     }
 }

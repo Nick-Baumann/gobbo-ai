@@ -133,18 +133,38 @@ func age(from date: Date, now: Date = .init()) -> String {
 
 @MainActor
 enum CLIInstaller {
-    static func installedLocation() -> String? {
-        let fm = FileManager.default
+    private static func embeddedHelperURL() -> URL {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/Relay/clawdis")
+    }
 
-        for basePath in cliHelperSearchPaths {
+    static func installedLocation() -> String? {
+        self.installedLocation(
+            searchPaths: cliHelperSearchPaths,
+            embeddedHelper: self.embeddedHelperURL(),
+            fileManager: .default)
+    }
+
+    static func installedLocation(
+        searchPaths: [String],
+        embeddedHelper: URL,
+        fileManager: FileManager) -> String?
+    {
+        let embedded = embeddedHelper.resolvingSymlinksInPath()
+
+        for basePath in searchPaths {
             let candidate = URL(fileURLWithPath: basePath).appendingPathComponent("clawdis").path
             var isDirectory: ObjCBool = false
 
-            guard fm.fileExists(atPath: candidate, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            guard fileManager.fileExists(atPath: candidate, isDirectory: &isDirectory),
+                  !isDirectory.boolValue
+            else {
                 continue
             }
 
-            if fm.isExecutableFile(atPath: candidate) {
+            guard fileManager.isExecutableFile(atPath: candidate) else { continue }
+
+            let resolved = URL(fileURLWithPath: candidate).resolvingSymlinksInPath()
+            if resolved == embedded {
                 return candidate
             }
         }
@@ -157,9 +177,11 @@ enum CLIInstaller {
     }
 
     static func install(statusHandler: @escaping @Sendable (String) async -> Void) async {
-        let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/Relay/clawdis")
+        let helper = self.embeddedHelperURL()
         guard FileManager.default.isExecutableFile(atPath: helper.path) else {
-            await statusHandler("Helper missing in bundle; rebuild via scripts/package-mac-app.sh")
+            await statusHandler(
+                "Embedded CLI missing in bundle; repackage via scripts/package-mac-app.sh " +
+                    "(or restart-mac.sh without SKIP_GATEWAY_PACKAGE=1).")
             return
         }
 
