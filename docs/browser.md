@@ -1,5 +1,5 @@
 ---
-summary: "Spec: integrated browser control server + MCP tool dispatch"
+summary: "Spec: integrated browser control server + action commands"
 read_when:
   - Adding agent-controlled browser automation
   - Debugging why clawd is interfering with your own Chrome
@@ -98,45 +98,45 @@ Fallback behavior:
   the user set the profile color/name once via Chrome UI; it must persist because
   the `userDataDir` is persistent.
 
-## Control server contract (proposed)
+## Control server contract (current)
 
 Expose a small local HTTP API (and/or gateway RPC surface) so the agent can manage
 state without touching the user's Chrome.
 
-Minimum endpoints/methods (names illustrative):
+Basics:
+- `GET /` status payload (enabled/running/pid/cdpPort/etc)
+- `POST /start` start browser
+- `POST /stop` stop browser
+- `GET /tabs` list tabs
+- `POST /tabs/open` open a new tab
+- `POST /tabs/focus` focus a tab by id/prefix
+- `DELETE /tabs/:targetId` close a tab by id/prefix
+- `POST /close` close the current tab (optional targetId in body)
 
-- `browser.status`
-  - returns: `{ enabled, url, running, pid?, version?, chosenBrowser?, userDataDir?, ports: { control, cdp } }`
-- `browser.start`
-  - starts the browser-control server + browser (no-op if already running)
-- `browser.stop`
-  - stops the server and closes the clawd browser (best-effort; graceful first, then force if needed)
-- `browser.tabs.list`
-  - returns: array of `{ targetId, title, url, isActive, lastFocusedAt? }`
-- `browser.tabs.open`
-  - params: `{ url, newTab?: true }` → returns `{ targetId }`
-- `browser.tabs.focus`
-  - params: `{ targetId }`
-- `browser.tabs.close`
-  - params: `{ targetId }`
-- `browser.screenshot`
-  - params: `{ targetId?, fullPage?: false }` → returns a `MEDIA:` attachment URL (via the existing Clawdis media host)
+Inspection:
+- `GET /screenshot` (CDP screenshot)
+- `POST /screenshot` (Playwright screenshot with ref/element)
+- `POST /eval` (CDP evaluate)
+- `GET /query`
+- `GET /dom`
+- `GET /snapshot` (`aria` | `domSnapshot` | `ai`)
 
-DOM + inspection (v1):
-- `browser.eval`
-  - params: `{ js, targetId?, await?: false }` → returns the CDP `Runtime.evaluate` result (best-effort `returnByValue`)
-- `browser.query`
-  - params: `{ selector, targetId?, limit? }` → returns basic element summaries (tag/id/class/text/value/href/outerHTML)
-- `browser.dom`
-  - params: `{ format: "html"|"text", targetId?, selector?, maxChars? }` → returns a truncated dump (`text` field)
-- `browser.snapshot`
-  - params: `{ format: "aria"|"domSnapshot", targetId?, limit? }`
-  - `aria`: simplified Accessibility tree with `backendDOMNodeId` when available (future click/type hooks)
-  - `domSnapshot`: lightweight DOM walk snapshot (tree-ish, bounded by `limit`)
-
-Nice-to-have (later):
-- `browser.click` / `browser.type` / `browser.waitFor` helpers built atop snapshot refs / backend node ids
-- `browser.tool` dispatch that mirrors Playwright MCP tool names for quick feature parity
+Actions:
+- `POST /navigate`, `POST /back`
+- `POST /resize`
+- `POST /click`, `POST /type`, `POST /press`, `POST /hover`, `POST /drag`, `POST /select`
+- `POST /upload` (file chooser modal must be open)
+- `POST /fill` (JSON field descriptors)
+- `POST /dialog` (alert/confirm/prompt)
+- `POST /wait` (time/text/textGone)
+- `POST /evaluate` (function + optional ref)
+- `POST /run` (function(page) → result)
+- `GET /console`, `GET /network`
+- `POST /trace/start`, `POST /trace/stop`
+- `POST /pdf`
+- `POST /verify/element`, `POST /verify/text`, `POST /verify/list`, `POST /verify/value`
+- `POST /mouse/move`, `POST /mouse/click`, `POST /mouse/drag`
+- `POST /locator` (generate Playwright locator)
 
 ### "Is it open or closed?"
 
@@ -163,54 +163,60 @@ The agent should not assume tabs are ephemeral. It should:
 - reuse an existing tab when appropriate (e.g. a persistent "main" tab)
 - avoid opening duplicate tabs unless asked
 
-## Tool dispatch (Playwright MCP parity)
+## CLI quick reference (one example each)
 
-Clawdis exposes a generic tool dispatcher for Playwright MCP-style tools:
+Basics:
+- `clawdis browser status`
+- `clawdis browser start`
+- `clawdis browser stop`
+- `clawdis browser tabs`
+- `clawdis browser open https://example.com`
+- `clawdis browser focus abcd1234`
+- `clawdis browser close abcd1234`
 
-`POST /tool` with JSON `{ name: "browser_*", args: { ... }, targetId?: "..." }`
+Inspection:
+- `clawdis browser screenshot`
+- `clawdis browser screenshot --full-page`
+- `clawdis browser screenshot --ref 12`
+- `clawdis browser eval "document.title"`
+- `clawdis browser query "a" --limit 5`
+- `clawdis browser dom --format text --max-chars 5000`
+- `clawdis browser snapshot --format aria --limit 200`
+- `clawdis browser snapshot --format ai`
 
-CLI helper:
-`clawdis browser tool browser_* --args '{...}'`
-
-Supported tool names:
-- `browser_close`
-- `browser_resize`
-- `browser_console_messages`
-- `browser_network_requests`
-- `browser_handle_dialog`
-- `browser_evaluate`
-- `browser_file_upload`
-- `browser_fill_form`
-- `browser_install` (no-op; uses system Chrome/Chromium)
-- `browser_press_key`
-- `browser_type`
-- `browser_navigate`
-- `browser_navigate_back`
-- `browser_run_code`
-- `browser_take_screenshot`
-- `browser_snapshot`
-- `browser_click`
-- `browser_drag`
-- `browser_hover`
-- `browser_select_option`
-- `browser_tabs`
-- `browser_wait_for`
-- `browser_pdf_save`
-- `browser_start_tracing`
-- `browser_stop_tracing`
-- `browser_verify_element_visible`
-- `browser_verify_text_visible`
-- `browser_verify_list_visible`
-- `browser_verify_value`
-- `browser_mouse_move_xy`
-- `browser_mouse_click_xy`
-- `browser_mouse_drag_xy`
-- `browser_generate_locator`
+Actions:
+- `clawdis browser navigate https://example.com`
+- `clawdis browser back`
+- `clawdis browser resize 1280 720`
+- `clawdis browser click 12 --double`
+- `clawdis browser type 23 "hello" --submit`
+- `clawdis browser press Enter`
+- `clawdis browser hover 44`
+- `clawdis browser drag 10 11`
+- `clawdis browser select 9 OptionA OptionB`
+- `clawdis browser upload /tmp/file.pdf`
+- `clawdis browser fill --fields '[{\"ref\":\"1\",\"value\":\"Ada\"}]'`
+- `clawdis browser dialog --accept`
+- `clawdis browser wait --text "Done"`
+- `clawdis browser evaluate --fn '(el) => el.textContent' --ref 7`
+- `clawdis browser run --code '(page) => page.title()'`
+- `clawdis browser console --level error`
+- `clawdis browser network --include-static`
+- `clawdis browser trace-start`
+- `clawdis browser trace-stop`
+- `clawdis browser pdf`
+- `clawdis browser verify-element --role button --name "Submit"`
+- `clawdis browser verify-text "Welcome"`
+- `clawdis browser verify-list 3 ItemA ItemB`
+- `clawdis browser verify-value --ref 4 --type textbox --value hello`
+- `clawdis browser mouse-move --x 120 --y 240`
+- `clawdis browser mouse-click --x 120 --y 240`
+- `clawdis browser mouse-drag --start-x 10 --start-y 20 --end-x 200 --end-y 300`
+- `clawdis browser locator 77`
 
 Notes:
-- `browser_file_upload` and `browser_handle_dialog` are modal-only; they only
-  work when a file chooser/dialog modal state is present.
-- `browser_snapshot` returns a Playwright-for-AI snapshot (use for follow-up actions).
+- `upload` and `dialog` only work when a file chooser or dialog is present.
+- `snapshot --format ai` returns Playwright-for-AI markup used for ref-based actions.
 
 ## Security & privacy notes
 

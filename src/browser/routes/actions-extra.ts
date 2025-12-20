@@ -27,8 +27,23 @@ import {
   toStringOrEmpty,
 } from "./utils.js";
 
-type ToolExtraParams = {
-  name: string;
+export type BrowserActionExtra =
+  | "console"
+  | "locator"
+  | "mouseClick"
+  | "mouseDrag"
+  | "mouseMove"
+  | "network"
+  | "pdf"
+  | "traceStart"
+  | "traceStop"
+  | "verifyElement"
+  | "verifyList"
+  | "verifyText"
+  | "verifyValue";
+
+type ActionExtraParams = {
+  action: BrowserActionExtra;
   args: Record<string, unknown>;
   targetId: string;
   cdpPort: number;
@@ -36,14 +51,14 @@ type ToolExtraParams = {
   res: express.Response;
 };
 
-export async function handleBrowserToolExtra(
-  params: ToolExtraParams,
+export async function handleBrowserActionExtra(
+  params: ActionExtraParams,
 ): Promise<boolean> {
-  const { name, args, targetId, cdpPort, ctx, res } = params;
+  const { action, args, targetId, cdpPort, ctx, res } = params;
   const target = targetId || undefined;
 
-  switch (name) {
-    case "browser_console_messages": {
+  switch (action) {
+    case "console": {
       const level = toStringOrEmpty(args.level) || undefined;
       const tab = await ctx.ensureTabAvailable(target);
       const messages = await getConsoleMessagesViaPlaywright({
@@ -54,7 +69,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true, messages, targetId: tab.targetId });
       return true;
     }
-    case "browser_network_requests": {
+    case "network": {
       const includeStatic = toBoolean(args.includeStatic) ?? false;
       const tab = await ctx.ensureTabAvailable(target);
       const requests = await getNetworkRequestsViaPlaywright({
@@ -65,7 +80,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true, requests, targetId: tab.targetId });
       return true;
     }
-    case "browser_pdf_save": {
+    case "pdf": {
       const tab = await ctx.ensureTabAvailable(target);
       const pdf = await pdfViaPlaywright({
         cdpPort,
@@ -86,7 +101,7 @@ export async function handleBrowserToolExtra(
       });
       return true;
     }
-    case "browser_start_tracing": {
+    case "traceStart": {
       const tab = await ctx.ensureTabAvailable(target);
       await startTracingViaPlaywright({
         cdpPort,
@@ -95,7 +110,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_stop_tracing": {
+    case "traceStop": {
       const tab = await ctx.ensureTabAvailable(target);
       const trace = await stopTracingViaPlaywright({
         cdpPort,
@@ -116,7 +131,7 @@ export async function handleBrowserToolExtra(
       });
       return true;
     }
-    case "browser_verify_element_visible": {
+    case "verifyElement": {
       const role = toStringOrEmpty(args.role);
       const accessibleName = toStringOrEmpty(args.accessibleName);
       if (!role || !accessibleName) {
@@ -133,7 +148,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_verify_text_visible": {
+    case "verifyText": {
       const text = toStringOrEmpty(args.text);
       if (!text) {
         jsonError(res, 400, "text is required");
@@ -148,7 +163,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_verify_list_visible": {
+    case "verifyList": {
       const ref = toStringOrEmpty(args.ref);
       const items = toStringArray(args.items);
       if (!ref || !items?.length) {
@@ -165,7 +180,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_verify_value": {
+    case "verifyValue": {
       const ref = toStringOrEmpty(args.ref);
       const type = toStringOrEmpty(args.type);
       const value = toStringOrEmpty(args.value);
@@ -184,7 +199,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_mouse_move_xy": {
+    case "mouseMove": {
       const x = toNumber(args.x);
       const y = toNumber(args.y);
       if (x === undefined || y === undefined) {
@@ -201,7 +216,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_mouse_click_xy": {
+    case "mouseClick": {
       const x = toNumber(args.x);
       const y = toNumber(args.y);
       if (x === undefined || y === undefined) {
@@ -220,7 +235,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_mouse_drag_xy": {
+    case "mouseDrag": {
       const startX = toNumber(args.startX);
       const startY = toNumber(args.startY);
       const endX = toNumber(args.endX);
@@ -246,7 +261,7 @@ export async function handleBrowserToolExtra(
       res.json({ ok: true });
       return true;
     }
-    case "browser_generate_locator": {
+    case "locator": {
       const ref = toStringOrEmpty(args.ref);
       if (!ref) {
         jsonError(res, 400, "ref is required");

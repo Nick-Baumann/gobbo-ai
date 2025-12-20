@@ -281,27 +281,4 @@ export function registerBrowserInspectRoutes(
       jsonError(res, 500, String(err));
     }
   });
-
-  app.post("/click", async (req, res) => {
-    const ref = toStringOrEmpty((req.body as { ref?: unknown })?.ref);
-    const targetId = toStringOrEmpty(
-      (req.body as { targetId?: unknown })?.targetId,
-    );
-
-    if (!ref) return jsonError(res, 400, "ref is required");
-
-    try {
-      const tab = await ctx.ensureTabAvailable(targetId || undefined);
-      await clickViaPlaywright({
-        cdpPort: ctx.state().cdpPort,
-        targetId: tab.targetId,
-        ref,
-      });
-      res.json({ ok: true, targetId: tab.targetId, url: tab.url });
-    } catch (err) {
-      const mapped = ctx.mapTabError(err);
-      if (mapped) return jsonError(res, mapped.status, mapped.message);
-      jsonError(res, 500, String(err));
-    }
-  });
 }

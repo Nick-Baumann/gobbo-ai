@@ -1,0 +1,492 @@
+import type { Command } from "commander";
+import { resolveBrowserControlUrl } from "../browser/client.js";
+import {
+  browserBack,
+  browserClick,
+  browserDrag,
+  browserEvaluate,
+  browserFillForm,
+  browserHandleDialog,
+  browserHover,
+  browserNavigate,
+  browserPressKey,
+  browserResize,
+  browserRunCode,
+  browserSelectOption,
+  browserType,
+  browserUpload,
+  browserWaitFor,
+} from "../browser/client-actions.js";
+import { danger } from "../globals.js";
+import { defaultRuntime } from "../runtime.js";
+import type { BrowserParentOpts } from "./browser-cli-shared.js";
+
+async function readStdin(): Promise<string> {
+  const chunks: string[] = [];
+  return await new Promise((resolve, reject) => {
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => chunks.push(chunk));
+    process.stdin.on("end", () => resolve(chunks.join("")));
+    process.stdin.on("error", reject);
+  });
+}
+
+async function readFile(path: string): Promise<string> {
+  const fs = await import("node:fs/promises");
+  return await fs.readFile(path, "utf8");
+}
+
+async function readCode(opts: {
+  code?: string;
+  codeFile?: string;
+  codeStdin?: boolean;
+}): Promise<string> {
+  if (opts.codeFile) return await readFile(opts.codeFile);
+  if (opts.codeStdin) return await readStdin();
+  return opts.code ?? "";
+}
+
+async function readFields(opts: {
+  fields?: string;
+  fieldsFile?: string;
+}): Promise<Array<Record<string, unknown>>> {
+  const payload = opts.fieldsFile
+    ? await readFile(opts.fieldsFile)
+    : (opts.fields ?? "");
+  if (!payload.trim()) throw new Error("fields are required");
+  const parsed = JSON.parse(payload) as unknown;
+  if (!Array.isArray(parsed)) throw new Error("fields must be an array");
+  return parsed as Array<Record<string, unknown>>;
+}
+
+export function registerBrowserActionInputCommands(
+  browser: Command,
+  parentOpts: (cmd: Command) => BrowserParentOpts,
+) {
+  browser
+    .command("navigate")
+    .description("Navigate the current tab to a URL")
+    .argument("<url>", "URL to navigate to")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (url: string, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserNavigate(baseUrl, {
+          url,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`navigated to ${result.url ?? url}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("back")
+    .description("Navigate back in history")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserBack(baseUrl, {
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(
+          `navigated back to ${result.url ?? "previous page"}`,
+        );
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("resize")
+    .description("Resize the viewport")
+    .argument("<width>", "Viewport width", (v: string) => Number(v))
+    .argument("<height>", "Viewport height", (v: string) => Number(v))
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (width: number, height: number, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      if (!Number.isFinite(width) || !Number.isFinite(height)) {
+        defaultRuntime.error(danger("width and height must be numbers"));
+        defaultRuntime.exit(1);
+        return;
+      }
+      try {
+        const result = await browserResize(baseUrl, {
+          width,
+          height,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`resized to ${width}x${height}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("click")
+    .description("Click an element by ref from an ai snapshot (e.g. 76)")
+    .argument("<ref>", "Ref id from ai snapshot")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .option("--double", "Double click", false)
+    .option("--button <left|right|middle>", "Mouse button to use")
+    .option("--modifiers <list>", "Comma-separated modifiers (Shift,Alt,Meta)")
+    .action(async (ref: string, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      const modifiers = opts.modifiers
+        ? String(opts.modifiers)
+            .split(",")
+            .map((v: string) => v.trim())
+            .filter(Boolean)
+        : undefined;
+      try {
+        const result = await browserClick(baseUrl, {
+          ref,
+          targetId: opts.targetId?.trim() || undefined,
+          doubleClick: Boolean(opts.double),
+          button: opts.button?.trim() || undefined,
+          modifiers,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        const suffix = result.url ? ` on ${result.url}` : "";
+        defaultRuntime.log(`clicked ref ${ref}${suffix}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("type")
+    .description("Type into an element by ai ref")
+    .argument("<ref>", "Ref id from ai snapshot")
+    .argument("<text>", "Text to type")
+    .option("--submit", "Press Enter after typing", false)
+    .option("--slowly", "Type slowly (human-like)", false)
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (ref: string, text: string, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserType(baseUrl, {
+          ref,
+          text,
+          submit: Boolean(opts.submit),
+          slowly: Boolean(opts.slowly),
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`typed into ref ${ref}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("press")
+    .description("Press a key")
+    .argument("<key>", "Key to press (e.g. Enter)")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (key: string, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserPressKey(baseUrl, {
+          key,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`pressed ${key}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("hover")
+    .description("Hover an element by ai ref")
+    .argument("<ref>", "Ref id from ai snapshot")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (ref: string, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserHover(baseUrl, {
+          ref,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`hovered ref ${ref}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("drag")
+    .description("Drag from one ref to another")
+    .argument("<startRef>", "Start ref id")
+    .argument("<endRef>", "End ref id")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (startRef: string, endRef: string, opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserDrag(baseUrl, {
+          startRef,
+          endRef,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`dragged ${startRef} → ${endRef}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("select")
+    .description("Select option(s) in a select element")
+    .argument("<ref>", "Ref id from ai snapshot")
+    .argument("<values...>", "Option values to select")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (ref: string, values: string[], opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserSelectOption(baseUrl, {
+          ref,
+          values,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`selected ${values.join(", ")}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("upload")
+    .description("Upload file(s) when a file chooser is open")
+    .argument("<paths...>", "File paths to upload")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (paths: string[], opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserUpload(baseUrl, {
+          paths,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`uploaded ${paths.length} file(s)`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("fill")
+    .description("Fill a form with JSON field descriptors")
+    .option("--fields <json>", "JSON array of field objects")
+    .option("--fields-file <path>", "Read JSON array from a file")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const fields = await readFields({
+          fields: opts.fields,
+          fieldsFile: opts.fieldsFile,
+        });
+        const result = await browserFillForm(baseUrl, {
+          fields,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`filled ${fields.length} field(s)`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("dialog")
+    .description("Handle a modal dialog (alert/confirm/prompt)")
+    .option("--accept", "Accept the dialog", false)
+    .option("--dismiss", "Dismiss the dialog", false)
+    .option("--prompt <text>", "Prompt response text")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      const accept = opts.accept ? true : opts.dismiss ? false : undefined;
+      if (accept === undefined) {
+        defaultRuntime.error(danger("Specify --accept or --dismiss"));
+        defaultRuntime.exit(1);
+        return;
+      }
+      try {
+        const result = await browserHandleDialog(baseUrl, {
+          accept,
+          promptText: opts.prompt?.trim() || undefined,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(`dialog handled: ${result.type}`);
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("wait")
+    .description("Wait for time or text conditions")
+    .option("--time <ms>", "Wait for N milliseconds", (v: string) => Number(v))
+    .option("--text <value>", "Wait for text to appear")
+    .option("--text-gone <value>", "Wait for text to disappear")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const result = await browserWaitFor(baseUrl, {
+          time: Number.isFinite(opts.time) ? opts.time : undefined,
+          text: opts.text?.trim() || undefined,
+          textGone: opts.textGone?.trim() || undefined,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log("wait complete");
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("evaluate")
+    .description("Evaluate a function against the page or a ref")
+    .option("--fn <code>", "Function source, e.g. (el) => el.textContent")
+    .option("--ref <id>", "ARIA ref from ai snapshot")
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      if (!opts.fn) {
+        defaultRuntime.error(danger("Missing --fn"));
+        defaultRuntime.exit(1);
+        return;
+      }
+      try {
+        const result = await browserEvaluate(baseUrl, {
+          fn: opts.fn,
+          ref: opts.ref?.trim() || undefined,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(JSON.stringify(result.result, null, 2));
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+
+  browser
+    .command("run")
+    .description("Run a Playwright code function (page => ...) ")
+    .option("--code <code>", "Function source, e.g. (page) => page.title()")
+    .option("--code-file <path>", "Read function source from a file")
+    .option("--code-stdin", "Read function source from stdin", false)
+    .option("--target-id <id>", "CDP target id (or unique prefix)")
+    .action(async (opts, cmd) => {
+      const parent = parentOpts(cmd);
+      const baseUrl = resolveBrowserControlUrl(parent?.url);
+      try {
+        const code = await readCode({
+          code: opts.code,
+          codeFile: opts.codeFile,
+          codeStdin: Boolean(opts.codeStdin),
+        });
+        if (!code.trim()) {
+          defaultRuntime.error(danger("Missing --code (or file/stdin)"));
+          defaultRuntime.exit(1);
+          return;
+        }
+        const result = await browserRunCode(baseUrl, {
+          code,
+          targetId: opts.targetId?.trim() || undefined,
+        });
+        if (parent?.json) {
+          defaultRuntime.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        defaultRuntime.log(JSON.stringify(result.result, null, 2));
+      } catch (err) {
+        defaultRuntime.error(danger(String(err)));
+        defaultRuntime.exit(1);
+      }
+    });
+}

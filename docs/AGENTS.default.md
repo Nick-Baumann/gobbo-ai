@@ -97,4 +97,4 @@ git commit -m "Add Clawd workspace"
 - Keep heartbeats enabled so the assistant can schedule reminders, monitor inboxes, and trigger camera captures.
 - For browser-driven verification, use `clawdis browser` (tabs/status/screenshot) with the clawd-managed Chrome profile.
 - For DOM inspection, use `clawdis browser eval|query|dom|snapshot` (and `--json`/`--out` when you need machine output).
-- For advanced actions, use `clawdis browser tool browser_* --args '{...}'` (Playwright MCP parity).
+- For interactions, use `clawdis browser click|type|hover|drag|select|upload|press|wait|navigate|back|evaluate|run`.

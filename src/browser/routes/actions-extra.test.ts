@@ -30,7 +30,7 @@ const media = vi.hoisted(() => ({
 vi.mock("../pw-ai.js", () => pw);
 vi.mock("../../media/store.js", () => media);
 
-import { handleBrowserToolExtra } from "./tool-extra.js";
+import { handleBrowserActionExtra } from "./actions-extra.js";
 
 const baseTab = {
   targetId: "tab1",
@@ -78,11 +78,14 @@ function createCtx(
   };
 }
 
-async function callTool(name: string, args: Record<string, unknown> = {}) {
+async function callAction(
+  action: Parameters<typeof handleBrowserActionExtra>[0]["action"],
+  args: Record<string, unknown> = {},
+) {
   const res = createRes();
   const ctx = createCtx();
-  const handled = await handleBrowserToolExtra({
-    name,
+  const handled = await handleBrowserActionExtra({
+    action,
     args,
     targetId: "",
     cdpPort: 18792,
@@ -96,11 +99,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("handleBrowserToolExtra", () => {
-  it("dispatches extra Playwright tools", async () => {
+describe("handleBrowserActionExtra", () => {
+  it("dispatches extra browser actions", async () => {
     const cases = [
       {
-        name: "browser_console_messages",
+        action: "console" as const,
         args: { level: "error" },
         fn: pw.getConsoleMessagesViaPlaywright,
         expectArgs: {
@@ -111,7 +114,7 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true, messages: [], targetId: "tab1" },
       },
       {
-        name: "browser_network_requests",
+        action: "network" as const,
         args: { includeStatic: true },
         fn: pw.getNetworkRequestsViaPlaywright,
         expectArgs: {
@@ -122,14 +125,14 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true, requests: [], targetId: "tab1" },
       },
       {
-        name: "browser_start_tracing",
+        action: "traceStart" as const,
         args: {},
         fn: pw.startTracingViaPlaywright,
         expectArgs: { cdpPort: 18792, targetId: "tab1" },
         expectBody: { ok: true },
       },
       {
-        name: "browser_verify_element_visible",
+        action: "verifyElement" as const,
         args: { role: "button", accessibleName: "Submit" },
         fn: pw.verifyElementVisibleViaPlaywright,
         expectArgs: {
@@ -141,14 +144,14 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true },
       },
       {
-        name: "browser_verify_text_visible",
+        action: "verifyText" as const,
         args: { text: "Hello" },
         fn: pw.verifyTextVisibleViaPlaywright,
         expectArgs: { cdpPort: 18792, targetId: "tab1", text: "Hello" },
         expectBody: { ok: true },
       },
       {
-        name: "browser_verify_list_visible",
+        action: "verifyList" as const,
         args: { ref: "1", items: ["a", "b"] },
         fn: pw.verifyListVisibleViaPlaywright,
         expectArgs: {
@@ -160,7 +163,7 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true },
       },
       {
-        name: "browser_verify_value",
+        action: "verifyValue" as const,
         args: { ref: "2", type: "textbox", value: "x" },
         fn: pw.verifyValueViaPlaywright,
         expectArgs: {
@@ -173,14 +176,14 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true },
       },
       {
-        name: "browser_mouse_move_xy",
+        action: "mouseMove" as const,
         args: { x: 10, y: 20 },
         fn: pw.mouseMoveViaPlaywright,
         expectArgs: { cdpPort: 18792, targetId: "tab1", x: 10, y: 20 },
         expectBody: { ok: true },
       },
       {
-        name: "browser_mouse_click_xy",
+        action: "mouseClick" as const,
         args: { x: 1, y: 2, button: "right" },
         fn: pw.mouseClickViaPlaywright,
         expectArgs: {
@@ -193,7 +196,7 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true },
       },
       {
-        name: "browser_mouse_drag_xy",
+        action: "mouseDrag" as const,
         args: { startX: 1, startY: 2, endX: 3, endY: 4 },
         fn: pw.mouseDragViaPlaywright,
         expectArgs: {
@@ -207,7 +210,7 @@ describe("handleBrowserToolExtra", () => {
         expectBody: { ok: true },
       },
       {
-        name: "browser_generate_locator",
+        action: "locator" as const,
         args: { ref: "99" },
         fn: pw.generateLocatorForRef,
         expectArgs: "99",
@@ -216,7 +219,7 @@ describe("handleBrowserToolExtra", () => {
     ];
 
     for (const item of cases) {
-      const { res, handled } = await callTool(item.name, item.args);
+      const { res, handled } = await callAction(item.action, item.args);
       expect(handled).toBe(true);
       expect(item.fn).toHaveBeenCalledWith(item.expectArgs);
       expect(res.body).toEqual(item.expectBody);
@@ -224,7 +227,7 @@ describe("handleBrowserToolExtra", () => {
   });
 
   it("stores PDF and trace outputs", async () => {
-    const { res: pdfRes } = await callTool("browser_pdf_save");
+    const { res: pdfRes } = await callAction("pdf");
     expect(pw.pdfViaPlaywright).toHaveBeenCalledWith({
       cdpPort: 18792,
       targetId: "tab1",
@@ -239,7 +242,7 @@ describe("handleBrowserToolExtra", () => {
     });
 
     media.saveMediaBuffer.mockResolvedValueOnce({ path: "/tmp/fake.zip" });
-    const { res: traceRes } = await callTool("browser_stop_tracing");
+    const { res: traceRes } = await callAction("traceStop");
     expect(pw.stopTracingViaPlaywright).toHaveBeenCalledWith({
       cdpPort: 18792,
       targetId: "tab1",
