@@ -114,6 +114,43 @@ describe("web monitor inbox", () => {
     await listener.close();
   });
 
+  it("does not block follow-up messages when handler is pending", async () => {
+    let resolveFirst: (() => void) | null = null;
+    const onMessage = vi.fn(async () => {
+      if (!resolveFirst) {
+        await new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+    });
+
+    const listener = await monitorWebInbox({ verbose: false, onMessage });
+    const sock = await createWaSocket();
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: { id: "abc1", fromMe: false, remoteJid: "999@s.whatsapp.net" },
+          message: { conversation: "ping" },
+          messageTimestamp: 1_700_000_000,
+        },
+        {
+          key: { id: "abc2", fromMe: false, remoteJid: "999@s.whatsapp.net" },
+          message: { conversation: "pong" },
+          messageTimestamp: 1_700_000_001,
+        },
+      ],
+    };
+
+    sock.ev.emit("messages.upsert", upsert);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onMessage).toHaveBeenCalledTimes(2);
+
+    resolveFirst?.();
+    await listener.close();
+  });
+
   it("captures media path for image messages", async () => {
     const onMessage = vi.fn();
     const listener = await monitorWebInbox({ verbose: false, onMessage });
