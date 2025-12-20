@@ -193,8 +193,10 @@ vi.mock("../config/config.js", () => {
       gateway: testGatewayBind ? { bind: testGatewayBind } : undefined,
       cron: (() => {
         const cron: Record<string, unknown> = {};
-        if (typeof testCronEnabled === "boolean") cron.enabled = testCronEnabled;
-        if (typeof testCronStorePath === "string") cron.store = testCronStorePath;
+        if (typeof testCronEnabled === "boolean")
+          cron.enabled = testCronEnabled;
+        if (typeof testCronStorePath === "string")
+          cron.store = testCronStorePath;
         return Object.keys(cron).length > 0 ? cron : undefined;
       })(),
     }),
