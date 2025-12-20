@@ -6,6 +6,73 @@ private enum ChatUIConstants {
     static let bubbleCorner: CGFloat = 18
 }
 
+private enum ChatBubbleTailSide {
+    case left
+    case right
+    case none
+}
+
+private struct ChatBubbleShape: Shape {
+    let cornerRadius: CGFloat
+    let tailSide: ChatBubbleTailSide
+
+    private let tailWidth: CGFloat = 10
+    private let tailHeight: CGFloat = 16
+
+    func path(in rect: CGRect) -> Path {
+        let hasTail = self.tailSide != .none
+        let bubbleRect: CGRect = {
+            guard hasTail else { return rect }
+            switch self.tailSide {
+            case .left:
+                return CGRect(
+                    x: rect.minX + tailWidth,
+                    y: rect.minY,
+                    width: rect.width - tailWidth,
+                    height: rect.height)
+            case .right:
+                return CGRect(
+                    x: rect.minX,
+                    y: rect.minY,
+                    width: rect.width - tailWidth,
+                    height: rect.height)
+            case .none:
+                return rect
+            }
+        }()
+
+        var path = Path(roundedRect: bubbleRect, cornerRadius: cornerRadius)
+
+        guard hasTail else { return path }
+
+        let tailBaseY = bubbleRect.maxY - tailHeight - 4
+        let tailTipY = bubbleRect.maxY - 6
+
+        switch self.tailSide {
+        case .left:
+            let start = CGPoint(x: bubbleRect.minX, y: tailBaseY)
+            let tip = CGPoint(x: rect.minX + 2, y: tailTipY)
+            let end = CGPoint(x: bubbleRect.minX + 2, y: tailTipY + 6)
+            path.move(to: start)
+            path.addQuadCurve(to: tip, control: CGPoint(x: bubbleRect.minX - 4, y: tailBaseY + 6))
+            path.addQuadCurve(to: end, control: CGPoint(x: bubbleRect.minX - 2, y: tailTipY + 8))
+            path.closeSubpath()
+        case .right:
+            let start = CGPoint(x: bubbleRect.maxX, y: tailBaseY)
+            let tip = CGPoint(x: rect.maxX - 2, y: tailTipY)
+            let end = CGPoint(x: bubbleRect.maxX - 2, y: tailTipY + 6)
+            path.move(to: start)
+            path.addQuadCurve(to: tip, control: CGPoint(x: bubbleRect.maxX + 4, y: tailBaseY + 6))
+            path.addQuadCurve(to: end, control: CGPoint(x: bubbleRect.maxX + 2, y: tailTipY + 8))
+            path.closeSubpath()
+        case .none:
+            break
+        }
+
+        return path
+    }
+}
+
 @MainActor
 struct ChatMessageBubble: View {
     let message: ClawdisChatMessage
@@ -76,7 +143,7 @@ private struct ChatMessageBody: View {
         .foregroundStyle(textColor)
         .background(self.bubbleBackground)
         .overlay(self.bubbleBorder)
-        .clipShape(RoundedRectangle(cornerRadius: ChatUIConstants.bubbleCorner, style: .continuous))
+        .clipShape(self.bubbleShape)
         .shadow(color: self.bubbleShadowColor, radius: self.bubbleShadowRadius, y: self.bubbleShadowYOffset)
     }
 
@@ -117,6 +184,17 @@ private struct ChatMessageBody: View {
 
         return RoundedRectangle(cornerRadius: ChatUIConstants.bubbleCorner, style: .continuous)
             .strokeBorder(borderColor, lineWidth: lineWidth)
+            .clipShape(self.bubbleShape)
+    }
+
+    private var bubbleShape: ChatBubbleShape {
+        let tailSide: ChatBubbleTailSide
+        if self.style == .onboarding {
+            tailSide = self.isUser ? .right : .left
+        } else {
+            tailSide = .none
+        }
+        return ChatBubbleShape(cornerRadius: ChatUIConstants.bubbleCorner, tailSide: tailSide)
     }
 
     private var bubbleShadowColor: Color {
