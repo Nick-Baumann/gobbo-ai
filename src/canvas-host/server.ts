@@ -7,6 +7,7 @@ import http, {
 import type { Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
+import type { Duplex } from "node:stream";
 
 import chokidar from "chokidar";
 import { type WebSocket, WebSocketServer } from "ws";
@@ -50,7 +51,7 @@ export type CanvasHostHandler = {
   ) => Promise<boolean>;
   handleUpgrade: (
     req: IncomingMessage,
-    socket: Socket,
+    socket: Duplex,
     head: Buffer,
   ) => boolean;
   close: () => Promise<void>;
@@ -266,12 +267,12 @@ export async function createCanvasHostHandler(
 
   const handleUpgrade = (
     req: IncomingMessage,
-    socket: Socket,
+    socket: Duplex,
     head: Buffer,
   ) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== CANVAS_WS_PATH) return false;
-    wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.handleUpgrade(req, socket as Socket, head, (ws) => {
       wss.emit("connection", ws, req);
     });
     return true;
