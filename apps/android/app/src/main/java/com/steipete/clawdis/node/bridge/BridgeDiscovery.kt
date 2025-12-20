@@ -43,6 +43,7 @@ import org.xbill.DNS.Type
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+@Suppress("DEPRECATION")
 class BridgeDiscovery(
   context: Context,
   private val scope: CoroutineScope,
