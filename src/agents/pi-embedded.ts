@@ -317,6 +317,7 @@ export async function runEmbeddedPiAgent(params: {
       const sessionManager = new SessionManager(false, params.sessionFile);
       const settingsManager = new SettingsManager();
 
+      // TODO(steipete): Drop the steerable transport after pi-mono PR #259 lands and deps are bumped.
       const agent = new Agent({
         initialState: {
           systemPrompt: systemPromptWithSkills,
