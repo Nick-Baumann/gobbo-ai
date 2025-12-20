@@ -294,13 +294,14 @@ extension Double {
 // MARK: - Navigation Delegate
 
 /// Handles navigation policy to intercept clawdis:// deep links from canvas
+@MainActor
 private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
     weak var controller: ScreenController?
 
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void)
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void)
     {
         guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
@@ -310,9 +311,7 @@ private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
         // Intercept clawdis:// deep links
         if url.scheme == "clawdis" {
             decisionHandler(.cancel)
-            Task { @MainActor in
-                self.controller?.onDeepLink?(url)
-            }
+            self.controller?.onDeepLink?(url)
             return
         }
 
@@ -324,15 +323,11 @@ private final class ScreenNavigationDelegate: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation _: WKNavigation?,
         withError error: any Error)
     {
-        Task { @MainActor in
-            self.controller?.errorText = error.localizedDescription
-        }
+        self.controller?.errorText = error.localizedDescription
     }
 
     func webView(_: WKWebView, didFail _: WKNavigation?, withError error: any Error) {
-        Task { @MainActor in
-            self.controller?.errorText = error.localizedDescription
-        }
+        self.controller?.errorText = error.localizedDescription
     }
 }
 

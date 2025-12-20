@@ -3,6 +3,10 @@ import ReplayKit
 
 @MainActor
 final class ScreenRecordService {
+    private struct UncheckedSendableBox<T>: @unchecked Sendable {
+        let value: T
+    }
+
     enum ScreenRecordError: LocalizedError {
         case invalidScreenIndex(Int)
         case captureFailed(String)
@@ -20,6 +24,7 @@ final class ScreenRecordService {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     func record(
         screenIndex: Int?,
         durationMs: Int?,
@@ -165,8 +170,10 @@ final class ScreenRecordService {
         videoInput.markAsFinished()
         audioInput?.markAsFinished()
 
+        let writerBox = UncheckedSendableBox(value: writer)
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            writer.finishWriting {
+            writerBox.value.finishWriting {
+                let writer = writerBox.value
                 if let err = writer.error {
                     cont.resume(throwing: ScreenRecordError.writeFailed(err.localizedDescription))
                 } else if writer.status != .completed {

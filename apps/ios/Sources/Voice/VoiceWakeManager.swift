@@ -94,7 +94,7 @@ final class VoiceWakeManager: NSObject {
 
     private var lastDispatched: String?
     private var onCommand: (@Sendable (String) async -> Void)?
-    private nonisolated(unsafe) var userDefaultsObserver: NSObjectProtocol?
+    private var userDefaultsObserver: NSObjectProtocol?
 
     override init() {
         super.init()
@@ -110,7 +110,7 @@ final class VoiceWakeManager: NSObject {
             })
     }
 
-    deinit {
+    @MainActor deinit {
         if let userDefaultsObserver = self.userDefaultsObserver {
             NotificationCenter.default.removeObserver(userDefaultsObserver)
         }
