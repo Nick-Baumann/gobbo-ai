@@ -1,7 +1,9 @@
 import Testing
 @testable import Clawdis
 
-@Suite struct GatewayDiscoveryModelTests {
+@Suite
+@MainActor
+struct GatewayDiscoveryModelTests {
     @Test func localGatewayMatchesLanHost() {
         let local = GatewayDiscoveryModel.LocalIdentity(
             hostTokens: ["studio"],

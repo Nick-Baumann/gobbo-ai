@@ -105,8 +105,10 @@ struct OnboardingView: View {
     }
 
     private var buttonTitle: String { self.currentPage == self.pageCount - 1 ? "Finish" : "Next" }
-    private let devLinkCommand =
-        "ln -sf /Applications/Clawdis.app/Contents/Resources/Relay/clawdis /usr/local/bin/clawdis"
+    private var devLinkCommand: String {
+        let bundlePath = Bundle.main.bundlePath
+        return "ln -sf '\(bundlePath)/Contents/Resources/Relay/clawdis' /usr/local/bin/clawdis"
+    }
 
     private struct LocalGatewayProbe: Equatable {
         let port: Int

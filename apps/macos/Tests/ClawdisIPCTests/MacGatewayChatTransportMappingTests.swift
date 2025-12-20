@@ -16,6 +16,7 @@ import Testing
             server: [:],
             features: [:],
             snapshot: snapshot,
+            canvashosturl: nil,
             policy: [:])
 
         let mapped = MacGatewayChatTransport.mapPushToTransportEvent(.snapshot(hello))

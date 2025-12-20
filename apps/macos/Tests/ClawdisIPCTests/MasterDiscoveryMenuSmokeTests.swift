@@ -6,41 +6,56 @@ import Testing
 @MainActor
 struct MasterDiscoveryMenuSmokeTests {
     @Test func inlineListBuildsBodyWhenEmpty() {
-        let discovery = MasterDiscoveryModel()
+        let discovery = GatewayDiscoveryModel()
         discovery.statusText = "Searching…"
-        discovery.masters = []
+        discovery.gateways = []
 
-        let view = MasterDiscoveryInlineList(discovery: discovery, currentTarget: nil, onSelect: { _ in })
+        let view = GatewayDiscoveryInlineList(discovery: discovery, currentTarget: nil, onSelect: { _ in })
         _ = view.body
     }
 
     @Test func inlineListBuildsBodyWithMasterAndSelection() {
-        let discovery = MasterDiscoveryModel()
+        let discovery = GatewayDiscoveryModel()
         discovery.statusText = "Found 1"
-        discovery.masters = [
-            .init(
+        discovery.gateways = [
+            GatewayDiscoveryModel.DiscoveredGateway(
                 displayName: "Office Mac",
                 lanHost: "office.local",
                 tailnetDns: "office.tailnet-123.ts.net",
                 sshPort: 2222,
-                debugID: "office"),
+                stableID: "office",
+                debugID: "office",
+                isLocal: false),
         ]
 
         let currentTarget = "\(NSUserName())@office.tailnet-123.ts.net:2222"
-        let view = MasterDiscoveryInlineList(discovery: discovery, currentTarget: currentTarget, onSelect: { _ in })
+        let view = GatewayDiscoveryInlineList(discovery: discovery, currentTarget: currentTarget, onSelect: { _ in })
         _ = view.body
     }
 
     @Test func menuBuildsBodyWithMasters() {
-        let discovery = MasterDiscoveryModel()
+        let discovery = GatewayDiscoveryModel()
         discovery.statusText = "Found 2"
-        discovery.masters = [
-            .init(displayName: "A", lanHost: "a.local", tailnetDns: nil, sshPort: 22, debugID: "a"),
-            .init(displayName: "B", lanHost: nil, tailnetDns: "b.ts.net", sshPort: 22, debugID: "b"),
+        discovery.gateways = [
+            GatewayDiscoveryModel.DiscoveredGateway(
+                displayName: "A",
+                lanHost: "a.local",
+                tailnetDns: nil,
+                sshPort: 22,
+                stableID: "a",
+                debugID: "a",
+                isLocal: false),
+            GatewayDiscoveryModel.DiscoveredGateway(
+                displayName: "B",
+                lanHost: nil,
+                tailnetDns: "b.ts.net",
+                sshPort: 22,
+                stableID: "b",
+                debugID: "b",
+                isLocal: false),
         ]
 
-        let view = MasterDiscoveryMenu(discovery: discovery, onSelect: { _ in })
+        let view = GatewayDiscoveryMenu(discovery: discovery, onSelect: { _ in })
         _ = view.body
     }
 }
-
