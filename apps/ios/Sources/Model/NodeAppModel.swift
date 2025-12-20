@@ -143,6 +143,13 @@ final class NodeAppModel {
         }
     }
 
+    private func resolveA2UIHostURL() async -> String? {
+        guard let raw = await self.bridge.currentCanvasHostUrl() else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let base = URL(string: trimmed) else { return nil }
+        return base.appendingPathComponent("__clawdis__/a2ui/").absoluteString
+    }
+
     func setScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .background:
@@ -436,12 +443,22 @@ final class NodeAppModel {
                 return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
 
             case ClawdisCanvasA2UICommand.reset.rawValue:
-                self.screen.showDefaultCanvas()
+                guard let a2uiUrl = await self.resolveA2UIHostURL() else {
+                    return BridgeInvokeResponse(
+                        id: req.id,
+                        ok: false,
+                        error: ClawdisNodeError(
+                            code: .unavailable,
+                            message: "A2UI_HOST_NOT_CONFIGURED: gateway did not advertise canvas host"))
+                }
+                self.screen.navigate(to: a2uiUrl)
                 if await !self.screen.waitForA2UIReady(timeoutMs: 5000) {
                     return BridgeInvokeResponse(
                         id: req.id,
                         ok: false,
-                        error: ClawdisNodeError(code: .unavailable, message: "A2UI not ready"))
+                        error: ClawdisNodeError(
+                            code: .unavailable,
+                            message: "A2UI_HOST_UNAVAILABLE: A2UI host not reachable"))
                 }
 
                 let json = try await self.screen.eval(javaScript: """
@@ -468,12 +485,22 @@ final class NodeAppModel {
                     }
                 }
 
-                self.screen.showDefaultCanvas()
+                guard let a2uiUrl = await self.resolveA2UIHostURL() else {
+                    return BridgeInvokeResponse(
+                        id: req.id,
+                        ok: false,
+                        error: ClawdisNodeError(
+                            code: .unavailable,
+                            message: "A2UI_HOST_NOT_CONFIGURED: gateway did not advertise canvas host"))
+                }
+                self.screen.navigate(to: a2uiUrl)
                 if await !self.screen.waitForA2UIReady(timeoutMs: 5000) {
                     return BridgeInvokeResponse(
                         id: req.id,
                         ok: false,
-                        error: ClawdisNodeError(code: .unavailable, message: "A2UI not ready"))
+                        error: ClawdisNodeError(
+                            code: .unavailable,
+                            message: "A2UI_HOST_UNAVAILABLE: A2UI host not reachable"))
                 }
 
                 let messagesJSON = try ClawdisCanvasA2UIJSONL.encodeMessagesJSONArray(messages)

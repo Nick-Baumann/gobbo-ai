@@ -66,9 +66,7 @@ public enum CanvasShowStatus: String, Codable, Sendable {
     case ok
     /// Local canvas target did not resolve to a file (404 page).
     case notFound
-    /// Local canvas root ("/") has no index, so the built-in A2UI shell is shown.
-    case a2uiShell
-    /// Legacy fallback when the built-in shell isn't available (dev misconfiguration).
+    /// Local scaffold fallback (e.g., no index.html present).
     case welcome
 }
 

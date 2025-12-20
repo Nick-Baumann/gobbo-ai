@@ -156,6 +156,10 @@ if [[ "${SKIP_GATEWAY_PACKAGE:-0}" != "1" ]]; then
     --define "__CLAWDIS_VERSION__=\\\"$PKG_VERSION\\\""
   chmod +x "$CLI_OUT"
 
+  echo "🎨 Copying gateway A2UI host assets"
+  rm -rf "$RELAY_DIR/a2ui"
+  cp -R "$ROOT_DIR/src/canvas-host/a2ui" "$RELAY_DIR/a2ui"
+
   echo "📄 Writing embedded runtime package.json (Pi compatibility)"
   cat > "$RELAY_DIR/package.json" <<JSON
 {

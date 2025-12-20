@@ -6,7 +6,6 @@ import Foundation
 actor MacNodeRuntime {
     private let cameraCapture = CameraCaptureService()
     @MainActor private let screenRecorder = ScreenRecordService()
-    private static let a2uiShellPath = "/__clawdis__/a2ui/"
 
     // swiftlint:disable:next function_body_length
     func handleInvoke(_ req: BridgeInvokeRequest) async -> BridgeInvokeResponse {
@@ -248,13 +247,25 @@ actor MacNodeRuntime {
 
     private func ensureA2UIHost() async throws {
         if await self.isA2UIReady() { return }
+        guard let a2uiUrl = await self.resolveA2UIHostUrl() else {
+            throw NSError(domain: "Canvas", code: 30, userInfo: [
+                NSLocalizedDescriptionKey: "A2UI_HOST_NOT_CONFIGURED: gateway did not advertise canvas host",
+            ])
+        }
         _ = try await MainActor.run {
-            try CanvasManager.shared.show(sessionKey: "main", path: Self.a2uiShellPath)
+            try CanvasManager.shared.show(sessionKey: "main", path: a2uiUrl)
         }
         if await self.isA2UIReady(poll: true) { return }
         throw NSError(domain: "Canvas", code: 31, userInfo: [
-            NSLocalizedDescriptionKey: "A2UI not ready",
+            NSLocalizedDescriptionKey: "A2UI_HOST_UNAVAILABLE: A2UI host not reachable",
         ])
+    }
+
+    private func resolveA2UIHostUrl() async -> String? {
+        guard let raw = await GatewayConnection.shared.canvasHostUrl() else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let baseUrl = URL(string: trimmed) else { return nil }
+        return baseUrl.appendingPathComponent("__clawdis__/a2ui/").absoluteString
     }
 
     private func isA2UIReady(poll: Bool = false) async -> Bool {

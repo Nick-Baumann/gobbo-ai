@@ -108,6 +108,7 @@ export const HelloOkSchema = Type.Object(
       { additionalProperties: false },
     ),
     snapshot: SnapshotSchema,
+    canvasHostUrl: Type.Optional(NonEmptyString),
     policy: Type.Object(
       {
         maxPayload: Type.Integer({ minimum: 1 }),

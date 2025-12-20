@@ -52,7 +52,7 @@ log "==> Killing existing Clawdis instances"
 kill_all_clawdis
 stop_launch_agent
 
-# Bundle built-in Canvas A2UI shell (single-file JS, shipped in the app bundle).
+# Bundle Gateway-hosted Canvas A2UI assets.
 run_step "bundle canvas a2ui" bash -lc "cd '${ROOT_DIR}' && pnpm canvas:a2ui:bundle"
 
 # 2) Rebuild into the same path the packager consumes (.build).

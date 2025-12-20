@@ -28,40 +28,4 @@ import Testing
         #expect(msg.contains("instance=ipad16_6 ctx={\"city\":\"Vienna\"}"))
         #expect(msg.hasSuffix(" default=update_canvas"))
     }
-
-    @Test func a2uiBundleSupportsAndroidBridgeFallback() throws {
-        guard let url = ClawdisKitResources.bundle.url(forResource: "a2ui.bundle", withExtension: "js")
-        else {
-            throw NSError(domain: "Tests", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Missing resource a2ui.bundle.js",
-            ])
-        }
-        let js = try String(contentsOf: url, encoding: .utf8)
-        #expect(js.contains("clawdisCanvasA2UIAction"))
-        #expect(js.contains("globalThis.clawdisCanvasA2UIAction"))
-    }
-
-    @Test func a2uiBundleWrapsDynamicCssValues() throws {
-        guard let url = ClawdisKitResources.bundle.url(forResource: "a2ui.bundle", withExtension: "js")
-        else {
-            throw NSError(domain: "Tests", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Missing resource a2ui.bundle.js",
-            ])
-        }
-        let js = try String(contentsOf: url, encoding: .utf8)
-        #expect(js.contains("blur(${r(statusBlur)})"))
-        #expect(js.contains("box-shadow: ${r(statusShadow)}"))
-    }
-
-    @Test func a2uiBundleStylesModalBackdrop() throws {
-        guard let url = ClawdisKitResources.bundle.url(forResource: "a2ui.bundle", withExtension: "js")
-        else {
-            throw NSError(domain: "Tests", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Missing resource a2ui.bundle.js",
-            ])
-        }
-        let js = try String(contentsOf: url, encoding: .utf8)
-        #expect(js.contains("::backdrop"))
-        #expect(js.contains("backdrop-filter: blur(6px)"))
-    }
 }

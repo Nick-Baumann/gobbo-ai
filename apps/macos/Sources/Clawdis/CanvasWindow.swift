@@ -162,10 +162,7 @@ final class CanvasWindowController: NSWindowController, WKNavigationDelegate, NS
                 // Only auto-reload when we are showing local canvas content.
                 guard webView.url?.scheme == CanvasScheme.scheme else { return }
 
-                // Avoid reloading the built-in A2UI shell due to filesystem noise (it does not depend on session
-                // files).
                 let path = webView.url?.path ?? ""
-                if path.hasPrefix("/__clawdis__/a2ui") { return }
                 if path == "/" || path.isEmpty {
                     let indexA = sessionDir.appendingPathComponent("index.html", isDirectory: false)
                     let indexB = sessionDir.appendingPathComponent("index.htm", isDirectory: false)
@@ -608,9 +605,14 @@ private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHan
         guard message.name == Self.messageName else { return }
 
         // Only accept actions from local Canvas content (not arbitrary web pages).
-        guard let webView = message.webView,
-              webView.url?.scheme == CanvasScheme.scheme
-        else { return }
+        guard let webView = message.webView, let url = webView.url else { return }
+        if url.scheme == CanvasScheme.scheme {
+            // ok
+        } else if Self.isLocalNetworkCanvasURL(url) {
+            // ok
+        } else {
+            return
+        }
 
         let body: [String: Any] = {
             if let dict = message.body as? [String: Any] { return dict }
@@ -691,6 +693,43 @@ private final class CanvasA2UIActionMessageHandler: NSObject, WKScriptMessageHan
                     """)
             }
         }
+    }
+
+    private static func isLocalNetworkCanvasURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return false
+        }
+        guard let host = url.host?.trimmingCharacters(in: .whitespacesAndNewlines), !host.isEmpty else {
+            return false
+        }
+        if host == "localhost" { return true }
+        if host.hasSuffix(".local") { return true }
+        if host.hasSuffix(".ts.net") { return true }
+        if host.hasSuffix(".tailscale.net") { return true }
+        if !host.contains("."), !host.contains(":") { return true }
+        if let ipv4 = Self.parseIPv4(host) {
+            return Self.isLocalNetworkIPv4(ipv4)
+        }
+        return false
+    }
+
+    private static func parseIPv4(_ host: String) -> (UInt8, UInt8, UInt8, UInt8)? {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+        let bytes: [UInt8] = parts.compactMap { UInt8($0) }
+        guard bytes.count == 4 else { return nil }
+        return (bytes[0], bytes[1], bytes[2], bytes[3])
+    }
+
+    private static func isLocalNetworkIPv4(_ ip: (UInt8, UInt8, UInt8, UInt8)) -> Bool {
+        let (a, b, _, _) = ip
+        if a == 10 { return true }
+        if a == 172, (16...31).contains(Int(b)) { return true }
+        if a == 192, b == 168 { return true }
+        if a == 127 { return true }
+        if a == 169, b == 254 { return true }
+        if a == 100, (64...127).contains(Int(b)) { return true }
+        return false
     }
 
     // Formatting helpers live in ClawdisKit (`ClawdisCanvasA2UIAction`).

@@ -79,7 +79,11 @@ type BridgeInvokeResponseFrame = {
   error?: { code: string; message: string } | null;
 };
 
-type BridgeHelloOkFrame = { type: "hello-ok"; serverName: string };
+type BridgeHelloOkFrame = {
+  type: "hello-ok";
+  serverName: string;
+  canvasHostUrl?: string;
+};
 type BridgePairOkFrame = { type: "pair-ok"; token: string };
 type BridgeErrorFrame = { type: "error"; code: string; message: string };
 
@@ -132,6 +136,7 @@ export type NodeBridgeServerOpts = {
   host: string;
   port: number; // 0 = ephemeral
   pairingBaseDir?: string;
+  canvasHostPort?: number;
   onEvent?: (nodeId: string, evt: BridgeEventFrame) => Promise<void> | void;
   onRequest?: (
     nodeId: string,
@@ -179,6 +184,15 @@ export async function startNodeBridgeServer(
     typeof opts.serverName === "string" && opts.serverName.trim()
       ? opts.serverName.trim()
       : os.hostname();
+
+  const buildCanvasHostUrl = (socket: net.Socket) => {
+    const port = opts.canvasHostPort;
+    if (!port) return undefined;
+    const host = socket.localAddress?.trim();
+    if (!host) return undefined;
+    const formatted = host.includes(":") ? `[${host}]` : host;
+    return `http://${formatted}:${port}`;
+  };
 
   type ConnectionState = {
     socket: net.Socket;
@@ -356,7 +370,11 @@ export async function startNodeBridgeServer(
         opts.pairingBaseDir,
       );
       connections.set(nodeId, { socket, nodeInfo, invokeWaiters });
-      send({ type: "hello-ok", serverName } satisfies BridgeHelloOkFrame);
+      send({
+        type: "hello-ok",
+        serverName,
+        canvasHostUrl: buildCanvasHostUrl(socket),
+      } satisfies BridgeHelloOkFrame);
       await opts.onAuthenticated?.(nodeInfo);
     };
 
@@ -466,7 +484,11 @@ export async function startNodeBridgeServer(
       };
       connections.set(nodeId, { socket, nodeInfo, invokeWaiters });
       send({ type: "pair-ok", token: wait.token } satisfies BridgePairOkFrame);
-      send({ type: "hello-ok", serverName } satisfies BridgeHelloOkFrame);
+      send({
+        type: "hello-ok",
+        serverName,
+        canvasHostUrl: buildCanvasHostUrl(socket),
+      } satisfies BridgeHelloOkFrame);
       await opts.onAuthenticated?.(nodeInfo);
     };
 

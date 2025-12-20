@@ -53,6 +53,7 @@ public struct HelloOk: Codable {
     public let server: [String: AnyCodable]
     public let features: [String: AnyCodable]
     public let snapshot: Snapshot
+    public let canvashosturl: String?
     public let policy: [String: AnyCodable]
 
     public init(
@@ -61,6 +62,7 @@ public struct HelloOk: Codable {
         server: [String: AnyCodable],
         features: [String: AnyCodable],
         snapshot: Snapshot,
+        canvashosturl: String?,
         policy: [String: AnyCodable]
     ) {
         self.type = type
@@ -68,6 +70,7 @@ public struct HelloOk: Codable {
         self.server = server
         self.features = features
         self.snapshot = snapshot
+        self.canvashosturl = canvashosturl
         self.policy = policy
     }
     private enum CodingKeys: String, CodingKey {
@@ -76,6 +79,7 @@ public struct HelloOk: Codable {
         case server
         case features
         case snapshot
+        case canvashosturl = "canvasHostUrl"
         case policy
     }
 }

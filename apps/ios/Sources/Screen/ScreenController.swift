@@ -199,20 +199,10 @@ final class ScreenController {
         name: "scaffold",
         ext: "html",
         subdirectory: "CanvasScaffold")
-    private static let a2uiIndexURL: URL? = ScreenController.bundledResourceURL(
-        name: "index",
-        ext: "html",
-        subdirectory: "CanvasA2UI")
-
     func isTrustedCanvasUIURL(_ url: URL) -> Bool {
         guard url.isFileURL else { return false }
         let std = url.standardizedFileURL
         if let expected = Self.canvasScaffoldURL,
-           std == expected.standardizedFileURL
-        {
-            return true
-        }
-        if let expected = Self.a2uiIndexURL,
            std == expected.standardizedFileURL
         {
             return true

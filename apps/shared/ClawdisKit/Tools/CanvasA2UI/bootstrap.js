@@ -8,14 +8,17 @@ import { themeContext } from "@clawdis/a2ui-theme-context";
 
 const modalStyles = css`
   dialog {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
     padding: 24px;
     border: none;
-    background: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 32px);
+    background: rgba(5, 8, 16, 0.65);
+    backdrop-filter: blur(6px);
+    display: grid;
+    place-items: center;
   }
 
   dialog::backdrop {

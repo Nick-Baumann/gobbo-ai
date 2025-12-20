@@ -61,6 +61,7 @@ class BridgeSession(
   private val json = Json { ignoreUnknownKeys = true }
   private val writeLock = Mutex()
   private val pending = ConcurrentHashMap<String, CompletableDeferred<RpcResponse>>()
+  @Volatile private var canvasHostUrl: String? = null
 
   private var desired: Pair<BridgeEndpoint, Hello>? = null
   private var job: Job? = null
@@ -77,9 +78,12 @@ class BridgeSession(
     scope.launch(Dispatchers.IO) {
       job?.cancelAndJoin()
       job = null
+      canvasHostUrl = null
       onDisconnected("Offline")
     }
   }
+
+  fun currentCanvasHostUrl(): String? = canvasHostUrl
 
   suspend fun sendEvent(event: String, payloadJson: String?) {
     val conn = currentConnection ?: return
@@ -209,6 +213,7 @@ class BridgeSession(
         when (first["type"].asStringOrNull()) {
           "hello-ok" -> {
             val name = first["serverName"].asStringOrNull() ?: "Bridge"
+            canvasHostUrl = first["canvasHostUrl"].asStringOrNull()?.trim()?.ifEmpty { null }
             onConnected(name, conn.remoteAddress)
           }
           "error" -> {
