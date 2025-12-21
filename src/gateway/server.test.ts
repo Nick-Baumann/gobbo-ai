@@ -114,6 +114,7 @@ let testAllowFrom: string[] | undefined;
 let testCronStorePath: string | undefined;
 let testCronEnabled: boolean | undefined = false;
 let testGatewayBind: "auto" | "lan" | "tailnet" | "loopback" | undefined;
+let testGatewayAuth: Record<string, unknown> | undefined;
 const sessionStoreSaveDelayMs = vi.hoisted(() => ({ value: 0 }));
 vi.mock("../config/sessions.js", async () => {
   const actual = await vi.importActual<typeof import("../config/sessions.js")>(
@@ -190,7 +191,12 @@ vi.mock("../config/config.js", () => {
         agent: { provider: "anthropic", model: "claude-opus-4-5" },
         session: { mainKey: "main", store: testSessionStorePath },
       },
-      gateway: testGatewayBind ? { bind: testGatewayBind } : undefined,
+      gateway: (() => {
+        const gateway: Record<string, unknown> = {};
+        if (testGatewayBind) gateway.bind = testGatewayBind;
+        if (testGatewayAuth) gateway.auth = testGatewayAuth;
+        return Object.keys(gateway).length > 0 ? gateway : undefined;
+      })(),
       cron: (() => {
         const cron: Record<string, unknown> = {};
         if (typeof testCronEnabled === "boolean")
@@ -244,6 +250,7 @@ beforeEach(async () => {
   sessionStoreSaveDelayMs.value = 0;
   testTailnetIPv4.value = undefined;
   testGatewayBind = undefined;
+  testGatewayAuth = undefined;
   __resetModelCatalogCacheForTest();
   piAiMock.enabled = false;
   piAiMock.getModelsCalls.length = 0;
@@ -335,6 +342,8 @@ async function connectReq(
   ws: WebSocket,
   opts?: {
     token?: string;
+    username?: string;
+    password?: string;
     minProtocol?: number;
     maxProtocol?: number;
     client?: {
@@ -362,7 +371,14 @@ async function connectReq(
           mode: "test",
         },
         caps: [],
-        auth: opts?.token ? { token: opts.token } : undefined,
+        auth:
+          opts?.token || opts?.password || opts?.username
+            ? {
+                token: opts?.token,
+                username: opts?.username,
+                password: opts?.password,
+              }
+            : undefined,
       },
     }),
   );
@@ -1849,6 +1865,35 @@ describe("gateway server", () => {
     ws.close();
     await server.close();
     process.env.CLAWDIS_GATEWAY_TOKEN = prevToken;
+  });
+
+  test("accepts password auth when configured", async () => {
+    testGatewayAuth = { mode: "password", password: "secret" };
+    const port = await getFreePort();
+    const server = await startGatewayServer(port);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    await new Promise<void>((resolve) => ws.once("open", resolve));
+
+    const res = await connectReq(ws, { password: "secret" });
+    expect(res.ok).toBe(true);
+
+    ws.close();
+    await server.close();
+  });
+
+  test("rejects invalid password", async () => {
+    testGatewayAuth = { mode: "password", password: "secret" };
+    const port = await getFreePort();
+    const server = await startGatewayServer(port);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    await new Promise<void>((resolve) => ws.once("open", resolve));
+
+    const res = await connectReq(ws, { password: "wrong" });
+    expect(res.ok).toBe(false);
+    expect(res.error?.message ?? "").toContain("unauthorized");
+
+    ws.close();
+    await server.close();
   });
 
   test(

@@ -68,6 +68,9 @@
     "ws": "^8.18.3",
     "zod": "^4.2.1"
   },
+  "optionalDependencies": {
+    "authenticate-pam": "^1.0.5"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.3.10",
     "@lit-labs/signals": "^0.1.3",

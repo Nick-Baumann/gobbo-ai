@@ -30,6 +30,8 @@ type Pending = {
 export type GatewayBrowserClientOptions = {
   url: string;
   token?: string;
+  username?: string;
+  password?: string;
   clientName?: string;
   clientVersion?: string;
   platform?: string;
@@ -96,6 +98,14 @@ export class GatewayBrowserClient {
   }
 
   private sendConnect() {
+    const auth =
+      this.opts.token || this.opts.password || this.opts.username
+        ? {
+            token: this.opts.token,
+            username: this.opts.username,
+            password: this.opts.password,
+          }
+        : undefined;
     const params = {
       minProtocol: 2,
       maxProtocol: 2,
@@ -107,7 +117,7 @@ export class GatewayBrowserClient {
         instanceId: this.opts.instanceId,
       },
       caps: [],
-      auth: this.opts.token ? { token: this.opts.token } : undefined,
+      auth,
       userAgent: navigator.userAgent,
       locale: navigator.language,
     };
