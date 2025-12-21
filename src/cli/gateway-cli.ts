@@ -17,6 +17,8 @@ import { forceFreePortAndWait } from "./ports.js";
 type GatewayRpcOpts = {
   url?: string;
   token?: string;
+  username?: string;
+  password?: string;
   timeout?: string;
   expectFinal?: boolean;
 };
@@ -25,6 +27,8 @@ const gatewayCallOpts = (cmd: Command) =>
   cmd
     .option("--url <url>", "Gateway WebSocket URL", "ws://127.0.0.1:18789")
     .option("--token <token>", "Gateway token (if required)")
+    .option("--username <username>", "Gateway username (system auth)")
+    .option("--password <password>", "Gateway password (password/system auth)")
     .option("--timeout <ms>", "Timeout in ms", "10000")
     .option("--expect-final", "Wait for final response (agent)", false);
 
@@ -36,6 +40,8 @@ const callGatewayCli = async (
   callGateway({
     url: opts.url,
     token: opts.token,
+    username: opts.username,
+    password: opts.password,
     method,
     params,
     expectFinal: Boolean(opts.expectFinal),
@@ -56,6 +62,18 @@ export function registerGatewayCli(program: Command) {
     .option(
       "--token <token>",
       "Shared token required in connect.params.auth.token (default: CLAWDIS_GATEWAY_TOKEN env if set)",
+    )
+    .option("--auth <mode>", 'Gateway auth mode ("token"|"password"|"system")')
+    .option("--password <password>", "Password for auth mode=password")
+    .option("--username <username>", "Default username for system auth")
+    .option(
+      "--tailscale <mode>",
+      'Tailscale exposure mode ("off"|"serve"|"funnel")',
+    )
+    .option(
+      "--tailscale-reset-on-exit",
+      "Reset Tailscale serve/funnel configuration on shutdown",
+      false,
     )
     .option("--verbose", "Verbose logging to stdout/stderr", false)
     .option(
@@ -96,6 +114,34 @@ export function registerGatewayCli(program: Command) {
       }
       if (opts.token) {
         process.env.CLAWDIS_GATEWAY_TOKEN = String(opts.token);
+      }
+      const authModeRaw = opts.auth ? String(opts.auth) : undefined;
+      const authMode =
+        authModeRaw === "token" ||
+        authModeRaw === "password" ||
+        authModeRaw === "system"
+          ? authModeRaw
+          : null;
+      if (authModeRaw && !authMode) {
+        defaultRuntime.error(
+          'Invalid --auth (use "token", "password", or "system")',
+        );
+        defaultRuntime.exit(1);
+        return;
+      }
+      const tailscaleRaw = opts.tailscale ? String(opts.tailscale) : undefined;
+      const tailscaleMode =
+        tailscaleRaw === "off" ||
+        tailscaleRaw === "serve" ||
+        tailscaleRaw === "funnel"
+          ? tailscaleRaw
+          : null;
+      if (tailscaleRaw && !tailscaleMode) {
+        defaultRuntime.error(
+          'Invalid --tailscale (use "off", "serve", or "funnel")',
+        );
+        defaultRuntime.exit(1);
+        return;
       }
       const cfg = loadConfig();
       const bindRaw = String(opts.bind ?? cfg.gateway?.bind ?? "loopback");
@@ -157,7 +203,24 @@ export function registerGatewayCli(program: Command) {
       process.once("SIGINT", onSigint);
 
       try {
-        server = await startGatewayServer(port, { bind });
+        server = await startGatewayServer(port, {
+          bind,
+          auth:
+            authMode || opts.password || opts.username || authModeRaw
+              ? {
+                  mode: authMode ?? undefined,
+                  password: opts.password ? String(opts.password) : undefined,
+                  username: opts.username ? String(opts.username) : undefined,
+                }
+              : undefined,
+          tailscale:
+            tailscaleMode || opts.tailscaleResetOnExit
+              ? {
+                  mode: tailscaleMode ?? undefined,
+                  resetOnExit: Boolean(opts.tailscaleResetOnExit),
+                }
+              : undefined,
+        });
       } catch (err) {
         if (err instanceof GatewayLockError) {
           defaultRuntime.error(`Gateway failed to start: ${err.message}`);
@@ -182,6 +245,18 @@ export function registerGatewayCli(program: Command) {
     .option(
       "--token <token>",
       "Shared token required in connect.params.auth.token (default: CLAWDIS_GATEWAY_TOKEN env if set)",
+    )
+    .option("--auth <mode>", 'Gateway auth mode ("token"|"password"|"system")')
+    .option("--password <password>", "Password for auth mode=password")
+    .option("--username <username>", "Default username for system auth")
+    .option(
+      "--tailscale <mode>",
+      'Tailscale exposure mode ("off"|"serve"|"funnel")',
+    )
+    .option(
+      "--tailscale-reset-on-exit",
+      "Reset Tailscale serve/funnel configuration on shutdown",
+      false,
     )
     .option(
       "--allow-unconfigured",
@@ -267,6 +342,34 @@ export function registerGatewayCli(program: Command) {
       if (opts.token) {
         process.env.CLAWDIS_GATEWAY_TOKEN = String(opts.token);
       }
+      const authModeRaw = opts.auth ? String(opts.auth) : undefined;
+      const authMode =
+        authModeRaw === "token" ||
+        authModeRaw === "password" ||
+        authModeRaw === "system"
+          ? authModeRaw
+          : null;
+      if (authModeRaw && !authMode) {
+        defaultRuntime.error(
+          'Invalid --auth (use "token", "password", or "system")',
+        );
+        defaultRuntime.exit(1);
+        return;
+      }
+      const tailscaleRaw = opts.tailscale ? String(opts.tailscale) : undefined;
+      const tailscaleMode =
+        tailscaleRaw === "off" ||
+        tailscaleRaw === "serve" ||
+        tailscaleRaw === "funnel"
+          ? tailscaleRaw
+          : null;
+      if (tailscaleRaw && !tailscaleMode) {
+        defaultRuntime.error(
+          'Invalid --tailscale (use "off", "serve", or "funnel")',
+        );
+        defaultRuntime.exit(1);
+        return;
+      }
       const cfg = loadConfig();
       const configExists = fs.existsSync(CONFIG_PATH_CLAWDIS);
       const mode = cfg.gateway?.mode;
@@ -344,7 +447,24 @@ export function registerGatewayCli(program: Command) {
       process.once("SIGINT", onSigint);
 
       try {
-        server = await startGatewayServer(port, { bind });
+        server = await startGatewayServer(port, {
+          bind,
+          auth:
+            authMode || opts.password || opts.username || authModeRaw
+              ? {
+                  mode: authMode ?? undefined,
+                  password: opts.password ? String(opts.password) : undefined,
+                  username: opts.username ? String(opts.username) : undefined,
+                }
+              : undefined,
+          tailscale:
+            tailscaleMode || opts.tailscaleResetOnExit
+              ? {
+                  mode: tailscaleMode ?? undefined,
+                  resetOnExit: Boolean(opts.tailscaleResetOnExit),
+                }
+              : undefined,
+        });
       } catch (err) {
         if (err instanceof GatewayLockError) {
           defaultRuntime.error(`Gateway failed to start: ${err.message}`);

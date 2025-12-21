@@ -19,6 +19,8 @@ type Pending = {
 export type GatewayClientOptions = {
   url?: string; // ws://127.0.0.1:18789
   token?: string;
+  username?: string;
+  password?: string;
   instanceId?: string;
   clientName?: string;
   clientVersion?: string;
@@ -81,6 +83,14 @@ export class GatewayClient {
   }
 
   private sendConnect() {
+    const auth =
+      this.opts.token || this.opts.password || this.opts.username
+        ? {
+            token: this.opts.token,
+            username: this.opts.username,
+            password: this.opts.password,
+          }
+        : undefined;
     const params: ConnectParams = {
       minProtocol: this.opts.minProtocol ?? PROTOCOL_VERSION,
       maxProtocol: this.opts.maxProtocol ?? PROTOCOL_VERSION,
@@ -92,7 +102,7 @@ export class GatewayClient {
         instanceId: this.opts.instanceId,
       },
       caps: [],
-      auth: this.opts.token ? { token: this.opts.token } : undefined,
+      auth,
     };
 
     void this.request<HelloOk>("connect", params)

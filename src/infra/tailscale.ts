@@ -181,3 +181,37 @@ export async function ensureFunnel(
     runtime.exit(1);
   }
 }
+
+export async function enableTailscaleServe(
+  port: number,
+  exec: typeof runExec = runExec,
+) {
+  await exec("tailscale", ["serve", "--bg", "--yes", `${port}`], {
+    maxBuffer: 200_000,
+    timeoutMs: 15_000,
+  });
+}
+
+export async function disableTailscaleServe(exec: typeof runExec = runExec) {
+  await exec("tailscale", ["serve", "reset"], {
+    maxBuffer: 200_000,
+    timeoutMs: 15_000,
+  });
+}
+
+export async function enableTailscaleFunnel(
+  port: number,
+  exec: typeof runExec = runExec,
+) {
+  await exec("tailscale", ["funnel", "--bg", "--yes", `${port}`], {
+    maxBuffer: 200_000,
+    timeoutMs: 15_000,
+  });
+}
+
+export async function disableTailscaleFunnel(exec: typeof runExec = runExec) {
+  await exec("tailscale", ["funnel", "reset"], {
+    maxBuffer: 200_000,
+    timeoutMs: 15_000,
+  });
+}

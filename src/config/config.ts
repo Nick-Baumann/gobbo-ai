@@ -106,6 +106,28 @@ export type GatewayControlUiConfig = {
   enabled?: boolean;
 };
 
+export type GatewayAuthMode = "token" | "password" | "system";
+
+export type GatewayAuthConfig = {
+  /** Authentication mode for Gateway connections. Defaults to token when set. */
+  mode?: GatewayAuthMode;
+  /** Username for system auth (PAM). Defaults to current user. */
+  username?: string;
+  /** Shared password for password mode (consider env instead). */
+  password?: string;
+  /** Allow Tailscale identity headers when serve mode is enabled. */
+  allowTailscale?: boolean;
+};
+
+export type GatewayTailscaleMode = "off" | "serve" | "funnel";
+
+export type GatewayTailscaleConfig = {
+  /** Tailscale exposure mode for the Gateway control UI. */
+  mode?: GatewayTailscaleMode;
+  /** Reset serve/funnel configuration on shutdown. */
+  resetOnExit?: boolean;
+};
+
 export type GatewayConfig = {
   /**
    * Explicit gateway mode. When set to "remote", local gateway start is disabled.
@@ -118,6 +140,8 @@ export type GatewayConfig = {
    */
   bind?: BridgeBindMode;
   controlUi?: GatewayControlUiConfig;
+  auth?: GatewayAuthConfig;
+  tailscale?: GatewayTailscaleConfig;
 };
 
 export type SkillConfig = {
@@ -368,6 +392,28 @@ const ClawdisSchema = z.object({
       controlUi: z
         .object({
           enabled: z.boolean().optional(),
+        })
+        .optional(),
+      auth: z
+        .object({
+          mode: z
+            .union([
+              z.literal("token"),
+              z.literal("password"),
+              z.literal("system"),
+            ])
+            .optional(),
+          username: z.string().optional(),
+          password: z.string().optional(),
+          allowTailscale: z.boolean().optional(),
+        })
+        .optional(),
+      tailscale: z
+        .object({
+          mode: z
+            .union([z.literal("off"), z.literal("serve"), z.literal("funnel")])
+            .optional(),
+          resetOnExit: z.boolean().optional(),
         })
         .optional(),
     })
