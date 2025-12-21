@@ -12,8 +12,14 @@ The Gateway serves a small **browser Control UI** (Vite + Lit) from the same por
 
 The UI talks directly to the Gateway WS and supports:
 - Chat (`chat.history`, `chat.send`, `chat.abort`)
+- Connections (provider status, WhatsApp QR, Telegram config)
+- Instances (`system-presence`)
+- Sessions (`sessions.list`, `sessions.patch`)
+- Cron (`cron.*`)
+- Skills (`skills.status`, `skills.update`, `skills.install`)
 - Nodes (`node.list`, `node.describe`, `node.invoke`)
 - Config (`config.get`, `config.set`) for `~/.clawdis/clawdis.json`
+- Debug (status/health/models snapshots + manual calls)
 
 ## Config (default-on)
 
@@ -28,11 +34,31 @@ You can control it via config:
 }
 ```
 
-## Tailnet access
+## Tailscale access
 
-To access the UI across Tailscale, bind the Gateway to the Tailnet interface and require a token.
+### Integrated Serve (recommended)
 
-### Via config (recommended)
+Keep the Gateway on loopback and let Tailscale Serve proxy it:
+
+```json5
+{
+  gateway: {
+    bind: "loopback",
+    tailscale: { mode: "serve" }
+  }
+}
+```
+
+Then start the gateway:
+
+```bash
+clawdis gateway
+```
+
+Open:
+- `https://<magicdns>/ui/`
+
+### Tailnet bind + token (legacy)
 
 ```json5
 {
@@ -53,16 +79,24 @@ clawdis gateway
 Open:
 - `http://<tailscale-ip>:18789/ui/`
 
-### Via CLI (one-off)
+### Public internet (Funnel)
 
-```bash
-clawdis gateway --bind tailnet --token "…your token…"
+```json5
+{
+  gateway: {
+    bind: "loopback",
+    tailscale: { mode: "funnel" },
+    auth: { mode: "system" } // or "password" with CLAWDIS_GATEWAY_PASSWORD
+  }
+}
 ```
 
 ## Security notes
 
-- Binding the Gateway to a non-loopback address **requires** `CLAWDIS_GATEWAY_TOKEN`.
-- The token is sent as `connect.params.auth.token` by the UI and other clients.
+- Binding the Gateway to a non-loopback address **requires** auth (`CLAWDIS_GATEWAY_TOKEN` or `gateway.auth`).
+- `gateway.auth.mode: "system"` uses PAM to verify your OS password.
+- The UI sends `connect.params.auth.token` or `connect.params.auth.password`.
+- Use `gateway.auth.allowTailscale: false` to require explicit credentials even in Serve mode.
 
 ## Building the UI
 
@@ -72,4 +106,3 @@ The Gateway serves static files from `dist/control-ui`. Build them with:
 pnpm ui:install
 pnpm ui:build
 ```
-

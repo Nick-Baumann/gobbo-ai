@@ -1,0 +1,89 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+:root {
+  --bg: #0a0e14;
+  --bg-accent: #101826;
+  --panel: rgba(18, 24, 36, 0.92);
+  --panel-strong: rgba(24, 32, 46, 0.95);
+  --text: rgba(246, 248, 252, 0.95);
+  --muted: rgba(210, 218, 230, 0.62);
+  --border: rgba(255, 255, 255, 0.08);
+  --accent: #ff7a3d;
+  --accent-2: #36cfc9;
+  --ok: #1bd98a;
+  --warn: #f2c94c;
+  --danger: #ff5c5c;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --font-body: "Space Grotesk", system-ui, sans-serif;
+  --font-display: "Fraunces", "Times New Roman", serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font: 15px/1.4 var(--font-body);
+  background: radial-gradient(1200px 900px at 20% 0%, #1a2740 0%, var(--bg) 55%)
+      fixed,
+    radial-gradient(900px 700px at 90% 10%, #241626 0%, transparent 55%) fixed,
+    var(--bg);
+  color: var(--text);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0) 35%
+    ),
+    radial-gradient(
+      600px 400px at 80% 80%,
+      rgba(54, 207, 201, 0.08),
+      transparent 60%
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+clawdis-app {
+  display: block;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
