@@ -23,6 +23,18 @@ export const WA_WEB_AUTH_DIR = path.join(CONFIG_DIR, "credentials");
 const WA_CREDS_PATH = path.join(WA_WEB_AUTH_DIR, "creds.json");
 const WA_CREDS_BACKUP_PATH = path.join(WA_WEB_AUTH_DIR, "creds.json.bak");
 
+let credsSaveQueue: Promise<void> = Promise.resolve();
+function enqueueSaveCreds(
+  saveCreds: () => Promise<void> | void,
+  logger: ReturnType<typeof getChildLogger>,
+): void {
+  credsSaveQueue = credsSaveQueue
+    .then(() => safeSaveCreds(saveCreds, logger))
+    .catch((err) => {
+      logger.warn({ error: String(err) }, "WhatsApp creds save queue error");
+    });
+}
+
 function readCredsJsonRaw(filePath: string): string | null {
   try {
     if (!fsSync.existsSync(filePath)) return null;
@@ -66,8 +78,15 @@ async function safeSaveCreds(
 ): Promise<void> {
   try {
     // Best-effort backup so we can recover after abrupt restarts.
-    if (fsSync.existsSync(WA_CREDS_PATH)) {
-      fsSync.copyFileSync(WA_CREDS_PATH, WA_CREDS_BACKUP_PATH);
+    // Important: don't clobber a good backup with a corrupted/truncated creds.json.
+    const raw = readCredsJsonRaw(WA_CREDS_PATH);
+    if (raw) {
+      try {
+        JSON.parse(raw);
+        fsSync.copyFileSync(WA_CREDS_PATH, WA_CREDS_BACKUP_PATH);
+      } catch {
+        // keep existing backup
+      }
     }
   } catch {
     // ignore backup failures
@@ -113,7 +132,7 @@ export async function createWaSocket(
     markOnlineOnConnect: false,
   });
 
-  sock.ev.on("creds.update", () => safeSaveCreds(saveCreds, sessionLogger));
+  sock.ev.on("creds.update", () => enqueueSaveCreds(saveCreds, sessionLogger));
   sock.ev.on(
     "connection.update",
     (update: Partial<import("@whiskeysockets/baileys").ConnectionState>) => {
