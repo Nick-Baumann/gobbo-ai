@@ -217,33 +217,39 @@ async function loadGatewayModelCatalog(): Promise<GatewayModelChoice[]> {
   if (modelCatalogPromise) return modelCatalogPromise;
 
   modelCatalogPromise = (async () => {
-    const piAi = (await import("@mariozechner/pi-ai")) as unknown as {
-      getProviders: () => string[];
-      getModels: (provider: string) => Array<{
+    const piSdk = (await import("@mariozechner/pi-coding-agent")) as {
+      discoverModels: () => Array<{
         id: string;
         name?: string;
+        provider: string;
         contextWindow?: number;
       }>;
     };
 
+    let entries: Array<{
+      id: string;
+      name?: string;
+      provider: string;
+      contextWindow?: number;
+    }> = [];
+    try {
+      entries = piSdk.discoverModels();
+    } catch {
+      entries = [];
+    }
+
     const models: GatewayModelChoice[] = [];
-    for (const provider of piAi.getProviders()) {
-      let entries: Array<{ id: string; name?: string; contextWindow?: number }>;
-      try {
-        entries = piAi.getModels(provider);
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        const id = String(entry?.id ?? "").trim();
-        if (!id) continue;
-        const name = String(entry?.name ?? id).trim() || id;
-        const contextWindow =
-          typeof entry?.contextWindow === "number" && entry.contextWindow > 0
-            ? entry.contextWindow
-            : undefined;
-        models.push({ id, name, provider, contextWindow });
-      }
+    for (const entry of entries) {
+      const id = String(entry?.id ?? "").trim();
+      if (!id) continue;
+      const provider = String(entry?.provider ?? "").trim();
+      if (!provider) continue;
+      const name = String(entry?.name ?? id).trim() || id;
+      const contextWindow =
+        typeof entry?.contextWindow === "number" && entry.contextWindow > 0
+          ? entry.contextWindow
+          : undefined;
+      models.push({ id, name, provider, contextWindow });
     }
 
     return models.sort((a, b) => {

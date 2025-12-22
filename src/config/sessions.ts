@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import type { Skill } from "@mariozechner/pi-coding-agent";
 import JSON5 from "json5";
 import type { MsgContext } from "../auto-reply/templating.js";
 import { normalizeE164 } from "../utils.js";
@@ -31,6 +32,7 @@ export type SessionEntry = {
 export type SessionSkillSnapshot = {
   prompt: string;
   skills: Array<{ name: string; primaryEnv?: string }>;
+  resolvedSkills?: Skill[];
 };
 
 export function resolveSessionTranscriptsDir(): string {

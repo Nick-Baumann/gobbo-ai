@@ -41,6 +41,12 @@ Clawdis loads skills from three locations (workspace wins on name conflict):
 
 Skills can be gated by config/env (see `skills.*` in `docs/configuration.md`).
 
+## SDK integration
+
+The embedded agent uses the `@mariozechner/pi-coding-agent` SDK for sessions and discovery.
+- Hooks, custom tools, and slash commands are discovered via the SDK (from `~/.pi/agent` and `<workspace>/.pi` settings).
+- Bootstrap files are injected as SDK project context (see “Project Context” in the system prompt).
+
 ## Peter @ steipete (only)
 
 Apply these notes **only** when the user is Peter Steinberger at steipete.

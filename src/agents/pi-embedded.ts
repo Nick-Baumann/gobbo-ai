@@ -1,28 +1,26 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
-import {
-  Agent,
-  type AgentEvent,
-  type AppMessage,
-  ProviderTransport,
-  type ThinkingLevel,
+import type {
+  AgentEvent,
+  AppMessage,
+  ThinkingLevel,
 } from "@mariozechner/pi-agent-core";
-import {
-  type AgentToolResult,
-  type Api,
-  type AssistantMessage,
-  getApiKey,
-  getModels,
-  getProviders,
-  type KnownProvider,
-  type Model,
+import type {
+  AgentToolResult,
+  Api,
+  AssistantMessage,
+  Model,
 } from "@mariozechner/pi-ai";
 import {
-  AgentSession,
-  messageTransformer,
+  buildSystemPrompt,
+  createAgentSession,
+  defaultGetApiKey,
+  findModel,
   SessionManager,
   SettingsManager,
+  type Skill,
 } from "@mariozechner/pi-coding-agent";
 import type { ThinkLevel, VerboseLevel } from "../auto-reply/thinking.js";
 import {
@@ -39,7 +37,6 @@ import {
   extractAssistantText,
   inferToolMetaFromArgs,
 } from "./pi-embedded-utils.js";
-import { getAnthropicOAuthToken } from "./pi-oauth.js";
 import {
   createClawdisCodingTools,
   sanitizeContentBlocksImages,
@@ -49,10 +46,14 @@ import {
   applySkillEnvOverridesFromSnapshot,
   buildWorkspaceSkillSnapshot,
   loadWorkspaceSkillEntries,
+  type SkillEntry,
   type SkillSnapshot,
 } from "./skills.js";
-import { buildAgentSystemPrompt } from "./system-prompt.js";
-import { loadWorkspaceBootstrapFiles } from "./workspace.js";
+import { buildAgentSystemPromptAppend } from "./system-prompt.js";
+import {
+  loadWorkspaceBootstrapFiles,
+  type WorkspaceBootstrapFile,
+} from "./workspace.js";
 
 export type EmbeddedPiAgentMeta = {
   sessionId: string;
@@ -106,18 +107,16 @@ function mapThinkingLevel(level?: ThinkLevel): ThinkingLevel {
   return level;
 }
 
-function isKnownProvider(provider: string): provider is KnownProvider {
-  return getProviders().includes(provider as KnownProvider);
-}
-
 function resolveModel(
   provider: string,
   modelId: string,
-): Model<Api> | undefined {
-  if (!isKnownProvider(provider)) return undefined;
-  const models = getModels(provider);
-  const model = models.find((m) => m.id === modelId);
-  return model as Model<Api> | undefined;
+  agentDir?: string,
+): { model?: Model<Api>; error?: string } {
+  const result = findModel(provider, modelId, agentDir);
+  return {
+    model: (result.model ?? undefined) as Model<Api> | undefined,
+    error: result.error ?? undefined,
+  };
 }
 
 async function ensureSessionHeader(params: {
@@ -148,19 +147,21 @@ async function ensureSessionHeader(params: {
   await fs.writeFile(file, `${JSON.stringify(entry)}\n`, "utf-8");
 }
 
-async function getApiKeyForProvider(
-  provider: string,
-): Promise<string | undefined> {
-  if (provider === "anthropic") {
-    const oauthToken = await getAnthropicOAuthToken();
-    if (oauthToken) return oauthToken;
+const defaultApiKey = defaultGetApiKey();
+
+async function getApiKeyForModel(model: { provider: string }): Promise<string> {
+  if (model.provider === "anthropic") {
     const oauthEnv = process.env.ANTHROPIC_OAUTH_TOKEN;
     if (oauthEnv?.trim()) return oauthEnv.trim();
   }
-  return getApiKey(provider) ?? undefined;
+  const key = await defaultApiKey(model as unknown as Model<Api>);
+  if (key) return key;
+  throw new Error(`No API key found for provider "${model.provider}"`);
 }
 
 type ContentBlock = AgentToolResult<unknown>["content"][number];
+
+type ContextFile = { path: string; content: string };
 
 async function sanitizeSessionMessagesImages(
   messages: AppMessage[],
@@ -203,6 +204,36 @@ async function sanitizeSessionMessagesImages(
     out.push(msg);
   }
   return out;
+}
+
+function buildBootstrapContextFiles(
+  files: WorkspaceBootstrapFile[],
+): ContextFile[] {
+  return files.map((file) => ({
+    path: file.name,
+    content: file.missing
+      ? `[MISSING] Expected at: ${file.path}`
+      : (file.content ?? ""),
+  }));
+}
+
+function resolvePromptSkills(
+  snapshot: SkillSnapshot,
+  entries: SkillEntry[],
+): Skill[] {
+  if (snapshot.resolvedSkills?.length) {
+    return snapshot.resolvedSkills;
+  }
+
+  const snapshotNames = snapshot.skills.map((entry) => entry.name);
+  if (snapshotNames.length === 0) return [];
+
+  const entryByName = new Map(
+    entries.map((entry) => [entry.skill.name, entry.skill]),
+  );
+  return snapshotNames
+    .map((name) => entryByName.get(name))
+    .filter((skill): skill is Skill => Boolean(skill));
 }
 
 function formatAssistantErrorText(msg: AssistantMessage): string | undefined {
@@ -259,9 +290,12 @@ export async function runEmbeddedPiAgent(params: {
     const provider =
       (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
     const modelId = (params.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
-    const model = resolveModel(provider, modelId);
+    const agentDir =
+      process.env.PI_CODING_AGENT_DIR ??
+      path.join(os.homedir(), ".pi", "agent");
+    const { model, error } = resolveModel(provider, modelId, agentDir);
     if (!model) {
-      throw new Error(`Unknown model: ${provider}/${modelId}`);
+      throw new Error(error ?? `Unknown model: ${provider}/${modelId}`);
     }
 
     const thinkingLevel = mapThinkingLevel(params.thinkLevel);
@@ -279,11 +313,11 @@ export async function runEmbeddedPiAgent(params: {
     let restoreSkillEnv: (() => void) | undefined;
     process.chdir(resolvedWorkspace);
     try {
-      const skillEntries = params.skillsSnapshot
-        ? undefined
-        : loadWorkspaceSkillEntries(resolvedWorkspace, {
-            config: params.config,
-          });
+      const shouldLoadSkillEntries =
+        !params.skillsSnapshot || !params.skillsSnapshot.resolvedSkills;
+      const skillEntries = shouldLoadSkillEntries
+        ? loadWorkspaceSkillEntries(resolvedWorkspace)
+        : [];
       const skillsSnapshot =
         params.skillsSnapshot ??
         buildWorkspaceSkillSnapshot(resolvedWorkspace, {
@@ -302,60 +336,48 @@ export async function runEmbeddedPiAgent(params: {
 
       const bootstrapFiles =
         await loadWorkspaceBootstrapFiles(resolvedWorkspace);
-      const systemPrompt = buildAgentSystemPrompt({
-        workspaceDir: resolvedWorkspace,
-        bootstrapFiles: bootstrapFiles.map((f) => ({
-          name: f.name,
-          path: f.path,
-          content: f.content,
-          missing: f.missing,
-        })),
-        defaultThinkLevel: params.thinkLevel,
-      });
-      const systemPromptWithSkills = systemPrompt + skillsSnapshot.prompt;
-
-      const sessionManager = new SessionManager(false, params.sessionFile);
-      const settingsManager = new SettingsManager();
-
-      const agent = new Agent({
-        initialState: {
-          systemPrompt: systemPromptWithSkills,
-          model,
-          thinkingLevel,
-          // TODO(steipete): Once pi-mono publishes file-magic MIME detection in `read` image payloads,
-          // remove `createClawdisCodingTools()` and use upstream `codingTools` again.
-          tools: createClawdisCodingTools(),
-        },
-        messageTransformer,
-        queueMode: settingsManager.getQueueMode(),
-        transport: new ProviderTransport({
-          getApiKey: async (providerName) => {
-            const key = await getApiKeyForProvider(providerName);
-            if (!key) {
-              throw new Error(
-                `No API key found for provider "${providerName}"`,
-              );
-            }
-            return key;
-          },
+      const contextFiles = buildBootstrapContextFiles(bootstrapFiles);
+      const promptSkills = resolvePromptSkills(skillsSnapshot, skillEntries);
+      const tools = createClawdisCodingTools();
+      const systemPrompt = buildSystemPrompt({
+        appendPrompt: buildAgentSystemPromptAppend({
+          workspaceDir: resolvedWorkspace,
+          defaultThinkLevel: params.thinkLevel,
         }),
+        contextFiles,
+        skills: promptSkills,
+        cwd: resolvedWorkspace,
       });
 
-      // Resume messages from the transcript if present.
-      const priorRaw = sessionManager.loadSession().messages;
+      const sessionManager = SessionManager.open(params.sessionFile, agentDir);
+      const settingsManager = SettingsManager.create(
+        resolvedWorkspace,
+        agentDir,
+      );
+
+      const { session } = await createAgentSession({
+        cwd: resolvedWorkspace,
+        agentDir,
+        model,
+        thinkingLevel,
+        systemPrompt,
+        // TODO(steipete): Once pi-mono publishes file-magic MIME detection in `read` image payloads,
+        // remove `createClawdisCodingTools()` and use upstream `codingTools` again.
+        tools,
+        sessionManager,
+        settingsManager,
+        getApiKey: getApiKeyForModel,
+        skills: promptSkills,
+        contextFiles,
+      });
+
       const prior = await sanitizeSessionMessagesImages(
-        priorRaw,
+        session.messages,
         "session:history",
       );
       if (prior.length > 0) {
-        agent.replaceMessages(prior);
+        session.agent.replaceMessages(prior);
       }
-
-      const session = new AgentSession({
-        agent,
-        sessionManager,
-        settingsManager,
-      });
       const queueHandle: EmbeddedPiQueueHandle = {
         queueMessage: async (text: string) => {
           await session.queueMessage(text);

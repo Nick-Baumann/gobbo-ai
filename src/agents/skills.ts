@@ -51,6 +51,7 @@ export type SkillEntry = {
 export type SkillSnapshot = {
   prompt: string;
   skills: Array<{ name: string; primaryEnv?: string }>;
+  resolvedSkills?: Skill[];
 };
 
 function resolveBundledSkillsDir(): string | undefined {
@@ -505,12 +506,14 @@ export function buildWorkspaceSkillSnapshot(
 ): SkillSnapshot {
   const skillEntries = opts?.entries ?? loadSkillEntries(workspaceDir, opts);
   const eligible = filterSkillEntries(skillEntries, opts?.config);
+  const resolvedSkills = eligible.map((entry) => entry.skill);
   return {
-    prompt: formatSkillsForPrompt(eligible.map((entry) => entry.skill)),
+    prompt: formatSkillsForPrompt(resolvedSkills),
     skills: eligible.map((entry) => ({
       name: entry.skill.name,
       primaryEnv: entry.clawdis?.primaryEnv,
     })),
+    resolvedSkills,
   };
 }
 
