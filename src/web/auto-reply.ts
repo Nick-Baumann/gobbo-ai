@@ -588,14 +588,16 @@ async function deliverWebReply(params: {
 
   // Text-only replies
   if (mediaList.length === 0 && textChunks.length) {
-    for (const chunk of textChunks) {
+    const totalChunks = textChunks.length;
+    for (const [index, chunk] of textChunks.entries()) {
+      const chunkStarted = Date.now();
       await sendWithRetry(() => msg.reply(chunk), "text");
-    }
-    if (!skipLog) {
-      const durationMs = Date.now() - replyStarted;
-      whatsappOutboundLog.info(
-        `Sent reply to ${msg.from} (${durationMs.toFixed(0)}ms)`,
-      );
+      if (!skipLog) {
+        const durationMs = Date.now() - chunkStarted;
+        whatsappOutboundLog.debug(
+          `Sent chunk ${index + 1}/${totalChunks} to ${msg.from} (${durationMs.toFixed(0)}ms)`,
+        );
+      }
     }
     replyLogger.info(
       {
