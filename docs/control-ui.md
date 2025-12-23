@@ -14,8 +14,8 @@ It speaks **directly to the Gateway WebSocket** on the same port.
 
 Auth is supplied during the WebSocket handshake via:
 - `connect.params.auth.token`
-- `connect.params.auth.password` (optional `username` for system/PAM)
-The dashboard settings panel lets you store a token and optional username; passwords are not persisted.
+- `connect.params.auth.password`
+The dashboard settings panel lets you store a token; passwords are not persisted.
 
 ## What it can do (today)
 - Chat with the model via Gateway WS (`chat.history`, `chat.send`, `chat.abort`)

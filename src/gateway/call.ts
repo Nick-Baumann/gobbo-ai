@@ -5,7 +5,6 @@ import { PROTOCOL_VERSION } from "./protocol/index.js";
 export type CallGatewayOptions = {
   url?: string;
   token?: string;
-  username?: string;
   password?: string;
   method: string;
   params?: unknown;
@@ -37,7 +36,6 @@ export async function callGateway<T = unknown>(
     const client = new GatewayClient({
       url: opts.url,
       token: opts.token,
-      username: opts.username,
       password: opts.password,
       instanceId: opts.instanceId ?? randomUUID(),
       clientName: opts.clientName ?? "cli",

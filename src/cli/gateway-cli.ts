@@ -18,7 +18,6 @@ import { forceFreePortAndWait } from "./ports.js";
 type GatewayRpcOpts = {
   url?: string;
   token?: string;
-  username?: string;
   password?: string;
   timeout?: string;
   expectFinal?: boolean;
@@ -30,8 +29,7 @@ const gatewayCallOpts = (cmd: Command) =>
   cmd
     .option("--url <url>", "Gateway WebSocket URL", "ws://127.0.0.1:18789")
     .option("--token <token>", "Gateway token (if required)")
-    .option("--username <username>", "Gateway username (system auth)")
-    .option("--password <password>", "Gateway password (password/system auth)")
+    .option("--password <password>", "Gateway password (password auth)")
     .option("--timeout <ms>", "Timeout in ms", "10000")
     .option("--expect-final", "Wait for final response (agent)", false);
 
@@ -43,7 +41,6 @@ const callGatewayCli = async (
   callGateway({
     url: opts.url,
     token: opts.token,
-    username: opts.username,
     password: opts.password,
     method,
     params,
@@ -66,9 +63,8 @@ export function registerGatewayCli(program: Command) {
       "--token <token>",
       "Shared token required in connect.params.auth.token (default: CLAWDIS_GATEWAY_TOKEN env if set)",
     )
-    .option("--auth <mode>", 'Gateway auth mode ("token"|"password"|"system")')
+    .option("--auth <mode>", 'Gateway auth mode ("token"|"password")')
     .option("--password <password>", "Password for auth mode=password")
-    .option("--username <username>", "Default username for system auth")
     .option(
       "--tailscale <mode>",
       'Tailscale exposure mode ("off"|"serve"|"funnel")',
@@ -121,13 +117,12 @@ export function registerGatewayCli(program: Command) {
       const authModeRaw = opts.auth ? String(opts.auth) : undefined;
       const authMode =
         authModeRaw === "token" ||
-        authModeRaw === "password" ||
-        authModeRaw === "system"
+        authModeRaw === "password"
           ? authModeRaw
           : null;
       if (authModeRaw && !authMode) {
         defaultRuntime.error(
-          'Invalid --auth (use "token", "password", or "system")',
+          'Invalid --auth (use "token" or "password")',
         );
         defaultRuntime.exit(1);
         return;
@@ -205,11 +200,10 @@ export function registerGatewayCli(program: Command) {
         server = await startGatewayServer(port, {
           bind,
           auth:
-            authMode || opts.password || opts.username || authModeRaw
+            authMode || opts.password || authModeRaw
               ? {
                   mode: authMode ?? undefined,
                   password: opts.password ? String(opts.password) : undefined,
-                  username: opts.username ? String(opts.username) : undefined,
                 }
               : undefined,
           tailscale:
@@ -245,9 +239,8 @@ export function registerGatewayCli(program: Command) {
       "--token <token>",
       "Shared token required in connect.params.auth.token (default: CLAWDIS_GATEWAY_TOKEN env if set)",
     )
-    .option("--auth <mode>", 'Gateway auth mode ("token"|"password"|"system")')
+    .option("--auth <mode>", 'Gateway auth mode ("token"|"password")')
     .option("--password <password>", "Password for auth mode=password")
-    .option("--username <username>", "Default username for system auth")
     .option(
       "--tailscale <mode>",
       'Tailscale exposure mode ("off"|"serve"|"funnel")',
@@ -342,13 +335,12 @@ export function registerGatewayCli(program: Command) {
       const authModeRaw = opts.auth ? String(opts.auth) : undefined;
       const authMode =
         authModeRaw === "token" ||
-        authModeRaw === "password" ||
-        authModeRaw === "system"
+        authModeRaw === "password"
           ? authModeRaw
           : null;
       if (authModeRaw && !authMode) {
         defaultRuntime.error(
-          'Invalid --auth (use "token", "password", or "system")',
+          'Invalid --auth (use "token" or "password")',
         );
         defaultRuntime.exit(1);
         return;
@@ -443,11 +435,10 @@ export function registerGatewayCli(program: Command) {
         server = await startGatewayServer(port, {
           bind,
           auth:
-            authMode || opts.password || opts.username || authModeRaw
+            authMode || opts.password || authModeRaw
               ? {
                   mode: authMode ?? undefined,
                   password: opts.password ? String(opts.password) : undefined,
-                  username: opts.username ? String(opts.username) : undefined,
                 }
               : undefined,
           tailscale:

@@ -60,17 +60,6 @@ export function renderOverview(props: OverviewProps) {
             />
           </label>
           <label class="field">
-            <span>Username (system auth)</span>
-            <input
-              .value=${props.settings.username}
-              @input=${(e: Event) => {
-                const v = (e.target as HTMLInputElement).value;
-                props.onSettingsChange({ ...props.settings, username: v });
-              }}
-              placeholder="optional"
-            />
-          </label>
-          <label class="field">
             <span>Password (not stored)</span>
             <input
               type="password"

@@ -115,13 +115,11 @@ export type GatewayControlUiConfig = {
   enabled?: boolean;
 };
 
-export type GatewayAuthMode = "token" | "password" | "system";
+export type GatewayAuthMode = "token" | "password";
 
 export type GatewayAuthConfig = {
   /** Authentication mode for Gateway connections. Defaults to token when set. */
   mode?: GatewayAuthMode;
-  /** Username for system auth (PAM). Defaults to current user. */
-  username?: string;
   /** Shared password for password mode (consider env instead). */
   password?: string;
   /** Allow Tailscale identity headers when serve mode is enabled. */
@@ -522,10 +520,8 @@ const ClawdisSchema = z.object({
             .union([
               z.literal("token"),
               z.literal("password"),
-              z.literal("system"),
             ])
             .optional(),
-          username: z.string().optional(),
           password: z.string().optional(),
           allowTailscale: z.boolean().optional(),
         })

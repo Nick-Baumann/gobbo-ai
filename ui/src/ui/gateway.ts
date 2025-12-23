@@ -30,7 +30,6 @@ type Pending = {
 export type GatewayBrowserClientOptions = {
   url: string;
   token?: string;
-  username?: string;
   password?: string;
   clientName?: string;
   clientVersion?: string;
@@ -99,10 +98,9 @@ export class GatewayBrowserClient {
 
   private sendConnect() {
     const auth =
-      this.opts.token || this.opts.password || this.opts.username
+      this.opts.token || this.opts.password
         ? {
             token: this.opts.token,
-            username: this.opts.username,
             password: this.opts.password,
           }
         : undefined;

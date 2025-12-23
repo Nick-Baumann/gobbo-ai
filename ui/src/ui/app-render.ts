@@ -48,7 +48,7 @@ export type EventLogEntry = {
 };
 
 export type AppViewState = {
-  settings: { gatewayUrl: string; token: string; username: string; sessionKey: string };
+  settings: { gatewayUrl: string; token: string; sessionKey: string };
   password: string;
   tab: Tab;
   connected: boolean;

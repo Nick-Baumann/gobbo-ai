@@ -27,20 +27,6 @@ private enum GatewayTailscaleMode: String, CaseIterable, Identifiable {
     }
 }
 
-private enum GatewayAuthMode: String, CaseIterable, Identifiable {
-    case system
-    case password
-
-    var id: String { self.rawValue }
-
-    var label: String {
-        switch self {
-        case .system: "System password"
-        case .password: "Shared password"
-        }
-    }
-}
-
 struct TailscaleIntegrationSection: View {
     let connectionMode: AppState.ConnectionMode
     let isPaused: Bool
@@ -50,8 +36,6 @@ struct TailscaleIntegrationSection: View {
     @State private var hasLoaded = false
     @State private var tailscaleMode: GatewayTailscaleMode = .off
     @State private var requireCredentialsForServe = false
-    @State private var authMode: GatewayAuthMode = .system
-    @State private var username: String = ""
     @State private var password: String = ""
     @State private var statusMessage: String?
     @State private var validationMessage: String?
@@ -113,9 +97,6 @@ struct TailscaleIntegrationSection: View {
             self.applySettings()
         }
         .onChange(of: self.requireCredentialsForServe) { _, _ in
-            self.applySettings()
-        }
-        .onChange(of: self.authMode) { _, _ in
             self.applySettings()
         }
     }
@@ -210,7 +191,6 @@ struct TailscaleIntegrationSection: View {
             Toggle("Require credentials", isOn: self.$requireCredentialsForServe)
                 .toggleStyle(.checkbox)
             if self.requireCredentialsForServe {
-                self.authModePicker
                 self.authFields
             } else {
                 Text("Serve uses Tailscale identity headers; no password required.")
@@ -225,39 +205,22 @@ struct TailscaleIntegrationSection: View {
             Text("Funnel requires authentication.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            self.authModePicker
             self.authFields
         }
     }
 
-    private var authModePicker: some View {
-        Picker("Auth", selection: self.$authMode) {
-            ForEach(GatewayAuthMode.allCases) { mode in
-                Text(mode.label).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-    }
-
     @ViewBuilder
     private var authFields: some View {
-        if self.authMode == .system {
-            TextField("Username (optional)", text: self.$username)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 240)
-                .onSubmit { self.applySettings() }
-        } else {
-            SecureField("Password", text: self.$password)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 240)
-                .onSubmit { self.applySettings() }
-            Text("Stored in ~/.clawdis/clawdis.json. Prefer CLAWDIS_GATEWAY_PASSWORD for production.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Button("Update password") { self.applySettings() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-        }
+        SecureField("Password", text: self.$password)
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 240)
+            .onSubmit { self.applySettings() }
+        Text("Stored in ~/.clawdis/clawdis.json. Prefer CLAWDIS_GATEWAY_PASSWORD for production.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        Button("Update password") { self.applySettings() }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
     }
 
     private func loadConfig() {
@@ -270,17 +233,10 @@ struct TailscaleIntegrationSection: View {
         let authModeRaw = auth["mode"] as? String
         let allowTailscale = auth["allowTailscale"] as? Bool
 
-        if let authModeRaw, authModeRaw == "password" {
-            self.authMode = .password
-        } else {
-            self.authMode = .system
-        }
-
-        self.username = auth["username"] as? String ?? ""
         self.password = auth["password"] as? String ?? ""
 
         if self.tailscaleMode == .serve {
-            let usesExplicitAuth = authModeRaw == "password" || authModeRaw == "system"
+            let usesExplicitAuth = authModeRaw == "password"
             if let allowTailscale, allowTailscale == false {
                 self.requireCredentialsForServe = true
             } else {
@@ -299,7 +255,7 @@ struct TailscaleIntegrationSection: View {
         let trimmedPassword = self.password.trimmingCharacters(in: .whitespacesAndNewlines)
         let requiresPassword = self.tailscaleMode == .funnel
             || (self.tailscaleMode == .serve && self.requireCredentialsForServe)
-        if requiresPassword, self.authMode == .password, trimmedPassword.isEmpty {
+        if requiresPassword, trimmedPassword.isEmpty {
             self.validationMessage = "Password required for this mode."
             return
         }
@@ -320,22 +276,10 @@ struct TailscaleIntegrationSection: View {
                 auth["allowTailscale"] = true
                 auth.removeValue(forKey: "mode")
                 auth.removeValue(forKey: "password")
-                auth.removeValue(forKey: "username")
             } else {
                 auth["allowTailscale"] = false
-                auth["mode"] = self.authMode.rawValue
-                if self.authMode == .password {
-                    auth["password"] = trimmedPassword
-                    auth.removeValue(forKey: "username")
-                } else {
-                    let trimmedUsername = self.username.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if trimmedUsername.isEmpty {
-                        auth.removeValue(forKey: "username")
-                    } else {
-                        auth["username"] = trimmedUsername
-                    }
-                    auth.removeValue(forKey: "password")
-                }
+                auth["mode"] = "password"
+                auth["password"] = trimmedPassword
             }
 
             if auth.isEmpty {

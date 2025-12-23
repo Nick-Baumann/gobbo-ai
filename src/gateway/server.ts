@@ -76,7 +76,6 @@ import {
   requestNodePairing,
   verifyNodeToken,
 } from "../infra/node-pairing.js";
-import { getPamAvailability } from "../infra/pam.js";
 import { ensureClawdisCliOnPath } from "../infra/path-env.js";
 import {
   enqueueSystemEvent,
@@ -1211,30 +1210,24 @@ export async function startGatewayServer(
   const token = getGatewayToken();
   const password =
     authConfig.password ?? process.env.CLAWDIS_GATEWAY_PASSWORD ?? undefined;
-  const username =
-    authConfig.username ?? process.env.CLAWDIS_GATEWAY_USERNAME ?? undefined;
   const authMode: ResolvedGatewayAuth["mode"] =
     authConfig.mode ?? (password ? "password" : token ? "token" : "none");
   const allowTailscale =
     authConfig.allowTailscale ??
-    (tailscaleMode === "serve" &&
-      authMode !== "password" &&
-      authMode !== "system");
+    (tailscaleMode === "serve" && authMode !== "password");
   const resolvedAuth: ResolvedGatewayAuth = {
     mode: authMode,
     token,
     password,
-    username,
     allowTailscale,
   };
   const canvasHostEnabled =
     process.env.CLAWDIS_SKIP_CANVAS_HOST !== "1" &&
     cfgAtStart.canvasHost?.enabled !== false;
-  const pamAvailability = await getPamAvailability();
-  assertGatewayAuthConfigured(resolvedAuth, pamAvailability);
-  if (tailscaleMode === "funnel" && authMode === "none") {
+  assertGatewayAuthConfigured(resolvedAuth);
+  if (tailscaleMode === "funnel" && authMode !== "password") {
     throw new Error(
-      "tailscale funnel requires gateway auth (set gateway.auth or CLAWDIS_GATEWAY_TOKEN)",
+      "tailscale funnel requires gateway auth mode=password (set gateway.auth.password or CLAWDIS_GATEWAY_PASSWORD)",
     );
   }
   if (tailscaleMode !== "off" && !isLoopbackHost(bindHost)) {

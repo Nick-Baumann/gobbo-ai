@@ -281,7 +281,7 @@ Defaults:
     mode: "local", // or "remote"
     bind: "loopback",
     // controlUi: { enabled: true }
-    // auth: { mode: "token" | "password" | "system" }
+    // auth: { mode: "token" | "password" }
     // tailscale: { mode: "off" | "serve" | "funnel" }
   }
 }
@@ -291,10 +291,9 @@ Notes:
 - `clawdis gateway` refuses to start unless `gateway.mode` is set to `local` (or you pass the override flag).
 
 Auth and Tailscale:
-- `gateway.auth.mode` sets the handshake requirements (`token`, `password`, or `system`/PAM).
+- `gateway.auth.mode` sets the handshake requirements (`token` or `password`).
 - When `gateway.auth.mode` is set, only that method is accepted (plus optional Tailscale headers).
 - `gateway.auth.password` can be set here, or via `CLAWDIS_GATEWAY_PASSWORD` (recommended).
-- `gateway.auth.username` defaults to the current OS user; override with `CLAWDIS_GATEWAY_USERNAME`.
 - `gateway.auth.allowTailscale` controls whether Tailscale identity headers can satisfy auth.
 - `gateway.tailscale.mode: "serve"` uses Tailscale Serve (tailnet only, loopback bind).
 - `gateway.tailscale.mode: "funnel"` exposes the dashboard publicly; requires auth.

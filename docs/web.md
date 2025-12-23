@@ -86,7 +86,7 @@ Open:
   gateway: {
     bind: "loopback",
     tailscale: { mode: "funnel" },
-    auth: { mode: "system" } // or "password" with CLAWDIS_GATEWAY_PASSWORD
+    auth: { mode: "password" } // or CLAWDIS_GATEWAY_PASSWORD
   }
 }
 ```
@@ -94,9 +94,9 @@ Open:
 ## Security notes
 
 - Binding the Gateway to a non-loopback address **requires** auth (`CLAWDIS_GATEWAY_TOKEN` or `gateway.auth`).
-- `gateway.auth.mode: "system"` uses PAM to verify your OS password.
 - The UI sends `connect.params.auth.token` or `connect.params.auth.password`.
 - Use `gateway.auth.allowTailscale: false` to require explicit credentials even in Serve mode.
+- `gateway.tailscale.mode: "funnel"` requires `gateway.auth.mode: "password"` (shared password).
 
 ## Building the UI
 

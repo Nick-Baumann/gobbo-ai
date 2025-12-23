@@ -338,7 +338,6 @@ async function connectReq(
   ws: WebSocket,
   opts?: {
     token?: string;
-    username?: string;
     password?: string;
     minProtocol?: number;
     maxProtocol?: number;
@@ -368,10 +367,9 @@ async function connectReq(
         },
         caps: [],
         auth:
-          opts?.token || opts?.password || opts?.username
+          opts?.token || opts?.password
             ? {
                 token: opts?.token,
-                username: opts?.username,
                 password: opts?.password,
               }
             : undefined,

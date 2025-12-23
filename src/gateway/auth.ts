@@ -1,29 +1,23 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import os from "node:os";
-
-import { type PamAvailability, verifyPamCredentials } from "../infra/pam.js";
-
-export type ResolvedGatewayAuthMode = "none" | "token" | "password" | "system";
+export type ResolvedGatewayAuthMode = "none" | "token" | "password";
 
 export type ResolvedGatewayAuth = {
   mode: ResolvedGatewayAuthMode;
   token?: string;
   password?: string;
-  username?: string;
   allowTailscale: boolean;
 };
 
 export type GatewayAuthResult = {
   ok: boolean;
-  method?: "none" | "token" | "password" | "system" | "tailscale";
+  method?: "none" | "token" | "password" | "tailscale";
   user?: string;
   reason?: string;
 };
 
 type ConnectAuth = {
   token?: string;
-  username?: string;
   password?: string;
 };
 
@@ -104,10 +98,7 @@ function isTailscaleProxyRequest(req?: IncomingMessage): boolean {
   );
 }
 
-export function assertGatewayAuthConfigured(
-  auth: ResolvedGatewayAuth,
-  pam: PamAvailability,
-): void {
+export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
   if (auth.mode === "token" && !auth.token) {
     throw new Error(
       "gateway auth mode is token, but CLAWDIS_GATEWAY_TOKEN is not set",
@@ -116,13 +107,6 @@ export function assertGatewayAuthConfigured(
   if (auth.mode === "password" && !auth.password) {
     throw new Error(
       "gateway auth mode is password, but no password was configured",
-    );
-  }
-  if (auth.mode === "system" && !pam.available) {
-    throw new Error(
-      `gateway auth mode is system, but PAM auth is unavailable${
-        pam.error ? `: ${pam.error}` : ""
-      }`,
     );
   }
 }
@@ -168,21 +152,6 @@ export async function authorizeGatewayConnect(params: {
       return { ok: false, reason: "unauthorized" };
     }
     return { ok: true, method: "password" };
-  }
-
-  if (auth.mode === "system") {
-    const password = connectAuth?.password;
-    if (!password) return { ok: false, reason: "unauthorized" };
-    const username = (
-      connectAuth?.username ??
-      auth.username ??
-      os.userInfo().username
-    ).trim();
-    if (!username) return { ok: false, reason: "unauthorized" };
-    const ok = await verifyPamCredentials(username, password);
-    return ok
-      ? { ok: true, method: "system", user: username }
-      : { ok: false, reason: "unauthorized" };
   }
 
   if (auth.allowTailscale) {

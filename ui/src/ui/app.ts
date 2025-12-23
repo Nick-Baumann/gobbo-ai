@@ -188,9 +188,6 @@ export class ClawdisApp extends LitElement {
     this.client = new GatewayBrowserClient({
       url: this.settings.gatewayUrl,
       token: this.settings.token.trim() ? this.settings.token : undefined,
-      username: this.settings.username.trim()
-        ? this.settings.username.trim()
-        : undefined,
       password: this.password.trim() ? this.password : undefined,
       clientName: "clawdis-control-ui",
       mode: "webchat",

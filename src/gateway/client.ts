@@ -20,7 +20,6 @@ type Pending = {
 export type GatewayClientOptions = {
   url?: string; // ws://127.0.0.1:18789
   token?: string;
-  username?: string;
   password?: string;
   instanceId?: string;
   clientName?: string;
@@ -86,10 +85,9 @@ export class GatewayClient {
 
   private sendConnect() {
     const auth =
-      this.opts.token || this.opts.password || this.opts.username
+      this.opts.token || this.opts.password
         ? {
             token: this.opts.token,
-            username: this.opts.username,
             password: this.opts.password,
           }
         : undefined;
