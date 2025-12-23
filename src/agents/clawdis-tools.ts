@@ -80,6 +80,16 @@ type StringParamOptions = {
 function readStringParam(
   params: Record<string, unknown>,
   key: string,
+  options: StringParamOptions & { required: true },
+): string;
+function readStringParam(
+  params: Record<string, unknown>,
+  key: string,
+  options?: StringParamOptions,
+): string | undefined;
+function readStringParam(
+  params: Record<string, unknown>,
+  key: string,
   options: StringParamOptions = {},
 ) {
   const { required = false, trim = true, label = key } = options;
@@ -783,7 +793,12 @@ function createCanvasTool(): AnyAgentTool {
             payload?: { result?: string };
           };
           const result = raw?.payload?.result;
-          if (result) return { content: [{ type: "text", text: result }] };
+          if (result) {
+            return {
+              content: [{ type: "text", text: result }],
+              details: { result },
+            };
+          }
           return jsonResult({ ok: true });
         }
         case "snapshot": {

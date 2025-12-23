@@ -15,7 +15,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-async function readJson(pathname: string): Promise<unknown | null> {
+async function readJson(pathname: string): Promise<unknown> {
   try {
     const raw = await fs.readFile(pathname, "utf8");
     return JSON.parse(raw) as unknown;

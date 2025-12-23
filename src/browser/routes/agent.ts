@@ -251,9 +251,11 @@ export function registerBrowserAgentRoutes(
                 typeof rec.value === "boolean"
                   ? rec.value
                   : undefined;
-              return { ref, type, value };
+              const parsed: BrowserFormField =
+                value === undefined ? { ref, type } : { ref, type, value };
+              return parsed;
             })
-            .filter((field): field is BrowserFormField => Boolean(field));
+            .filter((field): field is BrowserFormField => field !== null);
           if (!fields.length) return jsonError(res, 400, "fields are required");
           await pw.fillFormViaPlaywright({
             cdpPort,

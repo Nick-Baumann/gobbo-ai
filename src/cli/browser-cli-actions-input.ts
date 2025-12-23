@@ -6,6 +6,7 @@ import {
   browserArmFileChooser,
   browserNavigate,
 } from "../browser/client-actions.js";
+import type { BrowserFormField } from "../browser/client-actions-core.js";
 import { danger } from "../globals.js";
 import { defaultRuntime } from "../runtime.js";
 import type { BrowserParentOpts } from "./browser-cli-shared.js";
@@ -18,14 +19,37 @@ async function readFile(path: string): Promise<string> {
 async function readFields(opts: {
   fields?: string;
   fieldsFile?: string;
-}): Promise<Array<Record<string, unknown>>> {
+}): Promise<BrowserFormField[]> {
   const payload = opts.fieldsFile
     ? await readFile(opts.fieldsFile)
     : (opts.fields ?? "");
   if (!payload.trim()) throw new Error("fields are required");
   const parsed = JSON.parse(payload) as unknown;
   if (!Array.isArray(parsed)) throw new Error("fields must be an array");
-  return parsed as Array<Record<string, unknown>>;
+  return parsed.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error(`fields[${index}] must be an object`);
+    }
+    const rec = entry as Record<string, unknown>;
+    const ref = typeof rec.ref === "string" ? rec.ref.trim() : "";
+    const type = typeof rec.type === "string" ? rec.type.trim() : "";
+    if (!ref || !type) {
+      throw new Error(`fields[${index}] must include ref and type`);
+    }
+    if (
+      typeof rec.value === "string" ||
+      typeof rec.value === "number" ||
+      typeof rec.value === "boolean"
+    ) {
+      return { ref, type, value: rec.value };
+    }
+    if (rec.value === undefined || rec.value === null) {
+      return { ref, type };
+    }
+    throw new Error(
+      `fields[${index}].value must be string, number, boolean, or null`,
+    );
+  });
 }
 
 export function registerBrowserActionInputCommands(

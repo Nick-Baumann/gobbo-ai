@@ -9,5 +9,8 @@ export function rawDataToString(
   if (typeof data === "string") return data;
   if (Buffer.isBuffer(data)) return data.toString(encoding);
   if (Array.isArray(data)) return Buffer.concat(data).toString(encoding);
-  return Buffer.from(data as ArrayBuffer | ArrayBufferView).toString(encoding);
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString(encoding);
+  }
+  return Buffer.from(String(data)).toString(encoding);
 }
