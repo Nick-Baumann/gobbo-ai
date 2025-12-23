@@ -18,6 +18,7 @@ export type SessionEntry = {
   thinkingLevel?: string;
   verboseLevel?: string;
   groupActivation?: "mention" | "always";
+  groupActivationNeedsSystemIntro?: boolean;
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;

@@ -563,6 +563,7 @@ export async function getReplyFromConfig(
     }
     if (sessionEntry && sessionStore && sessionKey) {
       sessionEntry.groupActivation = activationCommand.mode;
+      sessionEntry.groupActivationNeedsSystemIntro = true;
       sessionEntry.updatedAt = Date.now();
       sessionStore[sessionKey] = sessionEntry;
       await saveSessionStore(storePath, sessionStore);
@@ -648,8 +649,11 @@ export async function getReplyFromConfig(
   await startTypingLoop();
 
   const isFirstTurnInSession = isNewSession || !systemSent;
+  const shouldInjectGroupIntro =
+    sessionCtx.ChatType === "group" &&
+    (isFirstTurnInSession || sessionEntry?.groupActivationNeedsSystemIntro);
   const groupIntro =
-    isFirstTurnInSession && sessionCtx.ChatType === "group"
+    shouldInjectGroupIntro
       ? (() => {
           const activation =
             normalizeGroupActivation(sessionEntry?.groupActivation) ??
@@ -713,9 +717,6 @@ export async function getReplyFromConfig(
     ? "Note: The previous agent run was aborted by the user. Resume carefully or ask for clarification."
     : "";
   let prefixedBodyBase = baseBodyFinal;
-  if (groupIntro) {
-    prefixedBodyBase = `${groupIntro}\n\n${prefixedBodyBase}`;
-  }
   if (abortedHint) {
     prefixedBodyBase = `${abortedHint}\n\n${prefixedBodyBase}`;
     if (sessionEntry && sessionStore && sessionKey) {
@@ -875,6 +876,7 @@ export async function getReplyFromConfig(
       config: cfg,
       skillsSnapshot,
       prompt: commandBody,
+      extraSystemPrompt: groupIntro || undefined,
       provider,
       model,
       thinkLevel: resolvedThinkLevel,
@@ -897,6 +899,19 @@ export async function getReplyFromConfig(
             })
         : undefined,
     });
+
+    if (
+      shouldInjectGroupIntro &&
+      sessionEntry &&
+      sessionStore &&
+      sessionKey &&
+      sessionEntry.groupActivationNeedsSystemIntro
+    ) {
+      sessionEntry.groupActivationNeedsSystemIntro = false;
+      sessionEntry.updatedAt = Date.now();
+      sessionStore[sessionKey] = sessionEntry;
+      await saveSessionStore(storePath, sessionStore);
+    }
 
     const payloadArray = runResult.payloads ?? [];
     if (payloadArray.length === 0) return undefined;

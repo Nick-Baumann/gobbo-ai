@@ -142,6 +142,49 @@ describe("trigger handling", () => {
     });
   });
 
+  it("injects group activation context into the system prompt", async () => {
+    await withTempHome(async (home) => {
+      vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
+        payloads: [{ text: "ok" }],
+        meta: {
+          durationMs: 1,
+          agentMeta: { sessionId: "s", provider: "p", model: "m" },
+        },
+      });
+
+      const res = await getReplyFromConfig(
+        {
+          Body: "hello group",
+          From: "123@g.us",
+          To: "+2000",
+          ChatType: "group",
+          SenderE164: "+2000",
+          GroupSubject: "Test Group",
+          GroupMembers: "Alice (+1), Bob (+2)",
+        },
+        {},
+        {
+          inbound: {
+            allowFrom: ["*"],
+            workspace: join(home, "clawd"),
+            agent: { provider: "anthropic", model: "claude-opus-4-5" },
+            session: { store: join(home, "sessions.json") },
+            groupChat: { requireMention: false },
+          },
+        },
+      );
+
+      const text = Array.isArray(res) ? res[0]?.text : res?.text;
+      expect(text).toBe("ok");
+      expect(runEmbeddedPiAgent).toHaveBeenCalledOnce();
+      const extra =
+        vi.mocked(runEmbeddedPiAgent).mock.calls[0]?.[0]?.extraSystemPrompt ??
+        "";
+      expect(extra).toContain("Test Group");
+      expect(extra).toContain("Activation: always-on");
+    });
+  });
+
   it("runs a greeting prompt for a bare /new", async () => {
     await withTempHome(async (home) => {
       vi.mocked(runEmbeddedPiAgent).mockResolvedValue({

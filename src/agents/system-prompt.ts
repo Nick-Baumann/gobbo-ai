@@ -3,13 +3,16 @@ import type { ThinkLevel } from "../auto-reply/thinking.js";
 export function buildAgentSystemPromptAppend(params: {
   workspaceDir: string;
   defaultThinkLevel?: ThinkLevel;
+  extraSystemPrompt?: string;
 }) {
   const thinkHint =
     params.defaultThinkLevel && params.defaultThinkLevel !== "off"
       ? `Default thinking level: ${params.defaultThinkLevel}.`
       : "Default thinking level: off.";
 
-  return [
+  const extraSystemPrompt = params.extraSystemPrompt?.trim();
+
+  const lines = [
     "You are Clawd, a personal assistant running inside Clawdis.",
     "",
     "## Tooling",
@@ -35,6 +38,13 @@ export function buildAgentSystemPromptAppend(params: {
     "Never send streaming/partial replies to external messaging surfaces; only final replies should be delivered there.",
     "Clawdis handles message transport automatically; respond normally and your reply will be delivered to the current chat.",
     "",
+  ];
+
+  if (extraSystemPrompt) {
+    lines.push("## Group Chat Context", extraSystemPrompt, "");
+  }
+
+  lines.push(
     "## Heartbeats",
     'If you receive a heartbeat poll (a user message containing just "HEARTBEAT"), and there is nothing that needs attention, reply exactly:',
     "HEARTBEAT_OK",
@@ -42,7 +52,9 @@ export function buildAgentSystemPromptAppend(params: {
     "",
     "## Runtime",
     thinkHint,
-  ]
+  );
+
+  return lines
     .filter(Boolean)
     .join("\n");
 }

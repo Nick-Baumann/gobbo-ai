@@ -267,6 +267,7 @@ export async function runEmbeddedPiAgent(params: {
     data: Record<string, unknown>;
   }) => void;
   enqueue?: typeof enqueueCommand;
+  extraSystemPrompt?: string;
 }): Promise<EmbeddedPiRunResult> {
   const enqueue = params.enqueue ?? enqueueCommand;
   return enqueue(async () => {
@@ -326,6 +327,7 @@ export async function runEmbeddedPiAgent(params: {
         appendPrompt: buildAgentSystemPromptAppend({
           workspaceDir: resolvedWorkspace,
           defaultThinkLevel: params.thinkLevel,
+          extraSystemPrompt: params.extraSystemPrompt,
         }),
         contextFiles,
         skills: promptSkills,
