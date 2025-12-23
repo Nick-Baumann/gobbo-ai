@@ -13,6 +13,29 @@ import {
   inferToolMetaFromArgs,
 } from "./pi-embedded-utils.js";
 
+const THINKING_TAG_RE = /<\s*\/?\s*think(?:ing)?\s*>/gi;
+
+function stripThinkingSegments(text: string): string {
+  if (!text || !THINKING_TAG_RE.test(text)) return text;
+  THINKING_TAG_RE.lastIndex = 0;
+  let result = "";
+  let lastIndex = 0;
+  let inThinking = false;
+  for (const match of text.matchAll(THINKING_TAG_RE)) {
+    const idx = match.index ?? 0;
+    if (!inThinking) {
+      result += text.slice(lastIndex, idx);
+    }
+    const tag = match[0].toLowerCase();
+    inThinking = !tag.includes("/");
+    lastIndex = idx + match[0].length;
+  }
+  if (!inThinking) {
+    result += text.slice(lastIndex);
+  }
+  return result;
+}
+
 export function subscribeEmbeddedPiSession(params: {
   session: AgentSession;
   runId: string;
@@ -159,7 +182,7 @@ export function subscribeEmbeddedPiSession(params: {
                   : "";
             if (chunk) {
               deltaBuffer += chunk;
-              const next = deltaBuffer.trim();
+              const next = stripThinkingSegments(deltaBuffer).trim();
               if (next && next !== lastStreamedAssistant) {
                 lastStreamedAssistant = next;
                 const { text: cleanedText, mediaUrls } =
@@ -194,7 +217,9 @@ export function subscribeEmbeddedPiSession(params: {
       if (evt.type === "message_end") {
         const msg = (evt as AgentEvent & { message: AppMessage }).message;
         if (msg?.role === "assistant") {
-          const text = extractAssistantText(msg as AssistantMessage);
+          const text = stripThinkingSegments(
+            extractAssistantText(msg as AssistantMessage),
+          );
           if (text) assistantTexts.push(text);
           deltaBuffer = "";
         }

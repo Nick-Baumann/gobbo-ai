@@ -1143,6 +1143,7 @@ export async function monitorWebProvider(
           ),
           SenderName: msg.senderName,
           SenderE164: msg.senderE164,
+          WasMentioned: msg.wasMentioned,
           Surface: "whatsapp",
         },
         {
@@ -1306,6 +1307,7 @@ export async function monitorWebProvider(
             "group mention debug",
           );
           const wasMentioned = mentionDebug.wasMentioned;
+          msg.wasMentioned = wasMentioned;
           const activation = resolveGroupActivationFor(conversationId);
           const requireMention = activation !== "always";
           if (!shouldBypassMention && requireMention && !wasMentioned) {

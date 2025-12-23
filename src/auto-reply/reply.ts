@@ -653,8 +653,14 @@ export async function getReplyFromConfig(
   }
 
   const isFirstTurnInSession = isNewSession || !systemSent;
+  const isGroupChat = sessionCtx.ChatType === "group";
+  const wasMentioned = ctx.WasMentioned === true;
+  const shouldEagerType = !isGroupChat || wasMentioned;
+  if (shouldEagerType) {
+    await startTypingLoop();
+  }
   const shouldInjectGroupIntro =
-    sessionCtx.ChatType === "group" &&
+    isGroupChat &&
     (isFirstTurnInSession || sessionEntry?.groupActivationNeedsSystemIntro);
   const groupIntro =
     shouldInjectGroupIntro

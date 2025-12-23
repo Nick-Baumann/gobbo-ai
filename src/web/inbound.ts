@@ -58,6 +58,7 @@ export type WebInboundMessage = {
   mediaPath?: string;
   mediaType?: string;
   mediaUrl?: string;
+  wasMentioned?: boolean;
 };
 
 export async function monitorWebInbox(options: {

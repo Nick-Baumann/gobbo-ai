@@ -16,6 +16,7 @@ export type MsgContext = {
   SenderName?: string;
   SenderE164?: string;
   Surface?: string;
+  WasMentioned?: boolean;
 };
 
 export type TemplateContext = MsgContext & {
