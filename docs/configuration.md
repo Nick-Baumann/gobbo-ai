@@ -120,6 +120,56 @@ Controls the embedded agent runtime (provider/model/thinking/verbose/timeouts).
 }
 ```
 
+### `models` (custom providers + base URLs)
+
+Clawdis uses the **pi-coding-agent** model catalog. You can add custom providers
+(LiteLLM, local OpenAI-compatible servers, Anthropic proxies, etc.) by writing
+`~/.clawdis/agent/models.json` or by defining the same schema inside your
+Clawdis config under `models.providers`.
+
+When `models.providers` is present, Clawdis writes/merges a `models.json` into
+`~/.clawdis/agent/` on startup:
+- default behavior: **merge** (keeps existing providers, overrides on name)
+- set `models.mode: "replace"` to overwrite the file contents
+
+Select the model via `inbound.agent.provider` + `inbound.agent.model`.
+
+```json5
+{
+  inbound: {
+    agent: { provider: "custom-proxy", model: "llama-3.1-8b" }
+  },
+  models: {
+    mode: "merge",
+    providers: {
+      "custom-proxy": {
+        baseUrl: "http://localhost:4000/v1",
+        apiKey: "LITELLM_KEY",
+        api: "openai-completions",
+        models: [
+          {
+            id: "llama-3.1-8b",
+            name: "Llama 3.1 8B",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 128000,
+            maxTokens: 32000
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Notes:
+- Supported APIs: `openai-completions`, `openai-responses`, `anthropic-messages`,
+  `google-generative-ai`
+- Use `authHeader: true` + `headers` for custom auth needs.
+- Override the agent config root with `CLAWDIS_AGENT_DIR` (or `PI_CODING_AGENT_DIR`)
+  if you want `models.json` stored elsewhere.
+
 ### `inbound.session`
 
 Controls session scoping, idle expiry, reset triggers, and where the session store is written.
