@@ -99,3 +99,26 @@ Node targeting:
 - Avoid `system.run` (not exposed as a tool).
 - Respect user consent for camera/screen capture.
 - Use `status/describe` to ensure permissions before invoking media commands.
+
+## How the model sees tools (pi-mono internals)
+
+Tools are exposed to the model in **two parallel channels**:
+
+1) **System prompt text**: a human-readable list + guidelines.
+2) **Provider tool schema**: the actual function/tool declarations sent to the model API.
+
+In pi-mono:
+- System prompt builder: `packages/coding-agent/src/core/system-prompt.ts`
+  - Builds the `Available tools:` list from `toolDescriptions`.
+  - Appends skills and project context.
+- Tool schemas passed to providers:
+  - OpenAI: `packages/ai/src/providers/openai-responses.ts` (`convertTools`)
+  - Anthropic: `packages/ai/src/providers/anthropic.ts` (`convertTools`)
+  - Gemini: `packages/ai/src/providers/google-shared.ts` (`convertTools`)
+- Tool execution loop:
+  - Agent loop: `packages/ai/src/agent/agent-loop.ts`
+  - Validates tool arguments and executes tools, then appends `toolResult` messages.
+
+In Clawdis:
+- System prompt append: `src/agents/system-prompt.ts`
+- Tool list injected via `createClawdisCodingTools()` in `src/agents/pi-tools.ts`
