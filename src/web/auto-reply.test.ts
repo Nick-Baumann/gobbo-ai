@@ -1751,6 +1751,47 @@ describe("web auto-reply", () => {
     expect(callArg?.Body).toContain("hello");
   });
 
+  it("forwards reply-to context to resolver", async () => {
+    let capturedOnMessage:
+      | ((msg: import("./inbound.js").WebInboundMessage) => Promise<void>)
+      | undefined;
+    const listenerFactory = async (opts: {
+      onMessage: (
+        msg: import("./inbound.js").WebInboundMessage,
+      ) => Promise<void>;
+    }) => {
+      capturedOnMessage = opts.onMessage;
+      return { close: vi.fn() };
+    };
+
+    const resolver = vi.fn().mockResolvedValue({ text: "reply" });
+
+    await monitorWebProvider(false, listenerFactory, false, resolver);
+    expect(capturedOnMessage).toBeDefined();
+
+    await capturedOnMessage?.({
+      body: "hello",
+      from: "+1555",
+      to: "+2666",
+      id: "msg1",
+      replyToId: "q1",
+      replyToBody: "original",
+      replyToSender: "+1999",
+      sendComposing: vi.fn(),
+      reply: vi.fn(),
+      sendMedia: vi.fn(),
+    });
+
+    const callArg = resolver.mock.calls[0]?.[0] as {
+      ReplyToId?: string;
+      ReplyToBody?: string;
+      ReplyToSender?: string;
+    };
+    expect(callArg.ReplyToId).toBe("q1");
+    expect(callArg.ReplyToBody).toBe("original");
+    expect(callArg.ReplyToSender).toBe("+1999");
+  });
+
   it("applies responsePrefix to regular replies", async () => {
     setLoadConfigMock(() => ({
       inbound: {

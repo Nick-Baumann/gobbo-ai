@@ -107,9 +107,11 @@ describe("web monitor inbox", () => {
       "composing",
       "999@s.whatsapp.net",
     );
-    expect(sock.sendMessage).toHaveBeenCalledWith("999@s.whatsapp.net", {
-      text: "pong",
-    });
+    expect(sock.sendMessage).toHaveBeenCalledWith(
+      "999@s.whatsapp.net",
+      { text: "pong" },
+      { quoted: expect.objectContaining({ key: { id: "abc" } }) },
+    );
 
     await listener.close();
   });
@@ -148,6 +150,53 @@ describe("web monitor inbox", () => {
     expect(onMessage).toHaveBeenCalledTimes(2);
 
     resolveFirst?.();
+    await listener.close();
+  });
+
+  it("captures reply context from quoted messages", async () => {
+    const onMessage = vi.fn(async (msg) => {
+      await msg.reply("pong");
+    });
+
+    const listener = await monitorWebInbox({ verbose: false, onMessage });
+    const sock = await createWaSocket();
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: { id: "abc", fromMe: false, remoteJid: "999@s.whatsapp.net" },
+          message: {
+            extendedTextMessage: {
+              text: "reply",
+              contextInfo: {
+                stanzaId: "q1",
+                participant: "111@s.whatsapp.net",
+                quotedMessage: { conversation: "original" },
+              },
+            },
+          },
+          messageTimestamp: 1_700_000_000,
+          pushName: "Tester",
+        },
+      ],
+    };
+
+    sock.ev.emit("messages.upsert", upsert);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        replyToId: "q1",
+        replyToBody: "original",
+        replyToSender: "+111",
+      }),
+    );
+    expect(sock.sendMessage).toHaveBeenCalledWith(
+      "999@s.whatsapp.net",
+      { text: "pong" },
+      { quoted: expect.objectContaining({ key: { id: "abc" } }) },
+    );
+
     await listener.close();
   });
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — 2025-12-23
+
+### Fixes
+- Telegram/WhatsApp: native replies now target the original inbound message; reply context is captured in `ReplyTo*` fields for templates. (Thanks @joshp123 for the PR and follow-up question.)
+
 ## 2.0.0-beta2 — 2025-12-21
 
 Second beta focused on bundled gateway packaging, skills management, onboarding polish, and provider reliability.

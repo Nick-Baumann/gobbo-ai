@@ -39,6 +39,9 @@ export type WebInboundMessage = {
   senderJid?: string;
   senderE164?: string;
   senderName?: string;
+  replyToId?: string;
+  replyToBody?: string;
+  replyToSender?: string;
   groupSubject?: string;
   groupParticipants?: string[];
   mentionedJids?: string[];
@@ -187,6 +190,9 @@ export async function monitorWebInbox(options: {
         body = extractMediaPlaceholder(msg.message ?? undefined);
         if (!body) continue;
       }
+      const replyContext = describeReplyContext(
+        msg.message as proto.IMessage | undefined,
+      );
       let mediaPath: string | undefined;
       let mediaType: string | undefined;
       try {
@@ -211,10 +217,10 @@ export async function monitorWebInbox(options: {
         }
       };
       const reply = async (text: string) => {
-        await sock.sendMessage(chatJid, { text });
+        await sock.sendMessage(chatJid, { text }, { quoted: msg });
       };
       const sendMedia = async (payload: AnyMessageContent) => {
-        await sock.sendMessage(chatJid, payload);
+        await sock.sendMessage(chatJid, payload, { quoted: msg });
       };
       const timestamp = msg.messageTimestamp
         ? Number(msg.messageTimestamp) * 1000
@@ -249,6 +255,9 @@ export async function monitorWebInbox(options: {
             senderJid: participantJid,
             senderE164: senderE164 ?? undefined,
             senderName,
+            replyToId: replyContext?.id,
+            replyToBody: replyContext?.body,
+            replyToSender: replyContext?.sender,
             groupSubject,
             groupParticipants,
             mentionedJids: mentionedJids ?? undefined,
@@ -441,6 +450,36 @@ export function extractMediaPlaceholder(
   if (message.documentMessage) return "<media:document>";
   if (message.stickerMessage) return "<media:sticker>";
   return undefined;
+}
+
+function describeReplyContext(rawMessage: proto.IMessage | undefined): {
+  id?: string;
+  body: string;
+  sender: string;
+} | null {
+  const message = unwrapMessage(rawMessage);
+  if (!message) return null;
+  const contextInfo =
+    message.extendedTextMessage?.contextInfo ??
+    message.imageMessage?.contextInfo ??
+    message.videoMessage?.contextInfo ??
+    message.documentMessage?.contextInfo ??
+    message.audioMessage?.contextInfo ??
+    message.stickerMessage?.contextInfo ??
+    message.buttonsResponseMessage?.contextInfo ??
+    message.listResponseMessage?.contextInfo;
+  const quoted = contextInfo?.quotedMessage as proto.IMessage | undefined;
+  if (!quoted) return null;
+  const body = extractText(quoted) ?? extractMediaPlaceholder(quoted);
+  if (!body) return null;
+  const senderJid = contextInfo?.participant ?? undefined;
+  const senderE164 = senderJid ? jidToE164(senderJid) ?? senderJid : undefined;
+  const sender = senderE164 ?? "unknown sender";
+  return {
+    id: contextInfo?.stanzaId ? String(contextInfo.stanzaId) : undefined,
+    body,
+    sender,
+  };
 }
 
 async function downloadInboundMedia(

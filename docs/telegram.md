@@ -30,11 +30,11 @@ Status: ready for bot-mode use with grammY (long-polling by default; webhook sup
 - Sees only messages sent after it’s added to a chat; no pre-history access.
 - Cannot DM users first; they must initiate. Channels are receive-only unless the bot is an admin poster.
 - File size caps follow Telegram Bot API (up to 2 GB for documents; smaller for some media types).
-- Typing indicators (`sendChatAction`) supported; inline reply/threading supported where Telegram allows.
+- Typing indicators (`sendChatAction`) supported; outbound replies are sent as native replies to the triggering message (threaded where Telegram allows).
 
 ## Planned implementation details
 - Library: grammY is the only client for send + gateway (fetch fallback removed); grammY throttler is enabled by default to stay under Bot API limits.
-- Inbound normalization: maps Bot API updates to `MsgContext` with `Surface: "telegram"`, `ChatType: direct|group`, `SenderName`, `MediaPath`/`MediaType` when attachments arrive, and `Timestamp`; groups require @bot mention by default.
+- Inbound normalization: maps Bot API updates to `MsgContext` with `Surface: "telegram"`, `ChatType: direct|group`, `SenderName`, `MediaPath`/`MediaType` when attachments arrive, `Timestamp`, and reply-to metadata (`ReplyToId`, `ReplyToBody`, `ReplyToSender`) when the user replies; groups require @bot mention by default.
 - Outbound: text and media (photo/video/audio/document) with optional caption; chunked to limits. Typing cue sent best-effort.
 - Config: `TELEGRAM_BOT_TOKEN` env or `telegram.botToken` required; `telegram.requireMention`, `telegram.allowFrom`, `telegram.mediaMaxMb`, `telegram.proxy`, `telegram.webhookSecret`, `telegram.webhookUrl`, `telegram.webhookPath` supported.
 
