@@ -333,12 +333,15 @@ export async function runEmbeddedPiAgent(params: {
         node: process.version,
         model: `${provider}/${modelId}`,
       };
+      const reasoningTagHint =
+        provider === "lmstudio" || provider === "ollama";
       const systemPrompt = buildSystemPrompt({
         appendPrompt: buildAgentSystemPromptAppend({
           workspaceDir: resolvedWorkspace,
           defaultThinkLevel: params.thinkLevel,
           extraSystemPrompt: params.extraSystemPrompt,
           ownerNumbers: params.ownerNumbers,
+          reasoningTagHint,
           runtimeInfo,
         }),
         contextFiles,

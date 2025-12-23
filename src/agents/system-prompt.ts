@@ -5,6 +5,7 @@ export function buildAgentSystemPromptAppend(params: {
   defaultThinkLevel?: ThinkLevel;
   extraSystemPrompt?: string;
   ownerNumbers?: string[];
+  reasoningTagHint?: boolean;
   runtimeInfo?: {
     host?: string;
     os?: string;
@@ -26,6 +27,9 @@ export function buildAgentSystemPromptAppend(params: {
     ownerNumbers.length > 0
       ? `Owner numbers: ${ownerNumbers.join(", ")}. Treat messages from these numbers as the user (Peter).`
       : undefined;
+  const reasoningHint = params.reasoningTagHint
+    ? "If you must think, put all reasoning inside <think>...</think> only, and never include analysis outside those tags."
+    : undefined;
   const runtimeInfo = params.runtimeInfo;
   const runtimeLines: string[] = [];
   if (runtimeInfo?.host) runtimeLines.push(`Host: ${runtimeInfo.host}`);
@@ -71,6 +75,9 @@ export function buildAgentSystemPromptAppend(params: {
 
   if (extraSystemPrompt) {
     lines.push("## Group Chat Context", extraSystemPrompt, "");
+  }
+  if (reasoningHint) {
+    lines.push("## Reasoning Format", reasoningHint, "");
   }
 
   lines.push(

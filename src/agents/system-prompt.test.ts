@@ -22,4 +22,14 @@ describe("buildAgentSystemPromptAppend", () => {
     expect(prompt).not.toContain("## User Identity");
     expect(prompt).not.toContain("Owner numbers:");
   });
+
+  it("adds reasoning tag hint when enabled", () => {
+    const prompt = buildAgentSystemPromptAppend({
+      workspaceDir: "/tmp/clawd",
+      reasoningTagHint: true,
+    });
+
+    expect(prompt).toContain("## Reasoning Format");
+    expect(prompt).toContain("<think>...</think>");
+  });
 });
