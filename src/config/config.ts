@@ -173,6 +173,51 @@ export type SkillsInstallConfig = {
   nodeManager?: "npm" | "pnpm" | "yarn";
 };
 
+export type ModelApi =
+  | "openai-completions"
+  | "openai-responses"
+  | "anthropic-messages"
+  | "google-generative-ai";
+
+export type ModelCompatConfig = {
+  supportsStore?: boolean;
+  supportsDeveloperRole?: boolean;
+  supportsReasoningEffort?: boolean;
+  maxTokensField?: "max_completion_tokens" | "max_tokens";
+};
+
+export type ModelDefinitionConfig = {
+  id: string;
+  name: string;
+  api?: ModelApi;
+  reasoning: boolean;
+  input: Array<"text" | "image">;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
+  contextWindow: number;
+  maxTokens: number;
+  headers?: Record<string, string>;
+  compat?: ModelCompatConfig;
+};
+
+export type ModelProviderConfig = {
+  baseUrl: string;
+  apiKey: string;
+  api?: ModelApi;
+  headers?: Record<string, string>;
+  authHeader?: boolean;
+  models: ModelDefinitionConfig[];
+};
+
+export type ModelsConfig = {
+  mode?: "merge" | "replace";
+  providers?: Record<string, ModelProviderConfig>;
+};
+
 export type ClawdisConfig = {
   identity?: {
     name?: string;
@@ -183,6 +228,7 @@ export type ClawdisConfig = {
   browser?: BrowserConfig;
   skillsLoad?: SkillsLoadConfig;
   skillsInstall?: SkillsInstallConfig;
+  models?: ModelsConfig;
   inbound?: {
     allowFrom?: string[]; // E.164 numbers allowed to trigger auto-reply (without whatsapp:)
     /** Agent working directory (preferred). Used as the default cwd for agent runs. */
@@ -233,6 +279,58 @@ export const CONFIG_PATH_CLAWDIS = path.join(
   "clawdis.json",
 );
 
+const ModelApiSchema = z.union([
+  z.literal("openai-completions"),
+  z.literal("openai-responses"),
+  z.literal("anthropic-messages"),
+  z.literal("google-generative-ai"),
+]);
+
+const ModelCompatSchema = z
+  .object({
+    supportsStore: z.boolean().optional(),
+    supportsDeveloperRole: z.boolean().optional(),
+    supportsReasoningEffort: z.boolean().optional(),
+    maxTokensField: z
+      .union([z.literal("max_completion_tokens"), z.literal("max_tokens")])
+      .optional(),
+  })
+  .optional();
+
+const ModelDefinitionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  api: ModelApiSchema.optional(),
+  reasoning: z.boolean(),
+  input: z.array(z.union([z.literal("text"), z.literal("image")])),
+  cost: z.object({
+    input: z.number(),
+    output: z.number(),
+    cacheRead: z.number(),
+    cacheWrite: z.number(),
+  }),
+  contextWindow: z.number().positive(),
+  maxTokens: z.number().positive(),
+  headers: z.record(z.string()).optional(),
+  compat: ModelCompatSchema,
+});
+
+const ModelProviderSchema = z.object({
+  baseUrl: z.string().min(1),
+  apiKey: z.string().min(1),
+  api: ModelApiSchema.optional(),
+  headers: z.record(z.string()).optional(),
+  authHeader: z.boolean().optional(),
+  models: z.array(ModelDefinitionSchema),
+});
+
+const ModelsConfigSchema = z
+  .object({
+    mode: z.union([z.literal("merge"), z.literal("replace")]).optional(),
+    providers: z.record(ModelProviderSchema).optional(),
+  })
+  .optional();
+
 const ClawdisSchema = z.object({
   identity: z
     .object({
@@ -280,6 +378,7 @@ const ClawdisSchema = z.object({
       attachOnly: z.boolean().optional(),
     })
     .optional(),
+  models: ModelsConfigSchema,
   inbound: z
     .object({
       allowFrom: z.array(z.string()).optional(),

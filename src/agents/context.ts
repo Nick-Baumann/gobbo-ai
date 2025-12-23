@@ -1,13 +1,19 @@
 // Lazy-load pi-coding-agent model metadata so we can infer context windows when
 // the agent reports a model id. This includes custom models.json entries.
 
+import { loadConfig } from "../config/config.js";
+import { resolveClawdisAgentDir } from "./agent-paths.js";
+import { ensureClawdisModelsJson } from "./models-config.js";
+
 type ModelEntry = { id: string; contextWindow?: number };
 
 const MODEL_CACHE = new Map<string, number>();
 const loadPromise = (async () => {
   try {
     const { discoverModels } = await import("@mariozechner/pi-coding-agent");
-    const models = discoverModels() as ModelEntry[];
+    const cfg = loadConfig();
+    await ensureClawdisModelsJson(cfg);
+    const models = discoverModels(resolveClawdisAgentDir()) as ModelEntry[];
     for (const m of models) {
       if (!m?.id) continue;
       if (typeof m.contextWindow === "number" && m.contextWindow > 0) {

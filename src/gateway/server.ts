@@ -11,6 +11,8 @@ import chalk from "chalk";
 import { type WebSocket, WebSocketServer } from "ws";
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL } from "../agents/defaults.js";
+import { resolveClawdisAgentDir } from "../agents/agent-paths.js";
+import { ensureClawdisModelsJson } from "../agents/models-config.js";
 import { installSkill } from "../agents/skills-install.js";
 import { buildWorkspaceSkillStatus } from "../agents/skills-status.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR } from "../agents/workspace.js";
@@ -220,7 +222,7 @@ async function loadGatewayModelCatalog(): Promise<GatewayModelChoice[]> {
 
   modelCatalogPromise = (async () => {
     const piSdk = (await import("@mariozechner/pi-coding-agent")) as {
-      discoverModels: () => Array<{
+      discoverModels: (agentDir?: string) => Array<{
         id: string;
         name?: string;
         provider: string;
@@ -235,7 +237,9 @@ async function loadGatewayModelCatalog(): Promise<GatewayModelChoice[]> {
       contextWindow?: number;
     }> = [];
     try {
-      entries = piSdk.discoverModels();
+      const cfg = loadConfig();
+      await ensureClawdisModelsJson(cfg);
+      entries = piSdk.discoverModels(resolveClawdisAgentDir());
     } catch {
       entries = [];
     }

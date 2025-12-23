@@ -26,6 +26,8 @@ import type { ClawdisConfig } from "../config/config.js";
 import { splitMediaFromOutput } from "../media/parse.js";
 import { enqueueCommand } from "../process/command-queue.js";
 import { CONFIG_DIR, resolveUserPath } from "../utils.js";
+import { resolveClawdisAgentDir } from "./agent-paths.js";
+import { ensureClawdisModelsJson } from "./models-config.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "./defaults.js";
 import {
   buildBootstrapContextFiles,
@@ -84,7 +86,6 @@ const ACTIVE_EMBEDDED_RUNS = new Map<string, EmbeddedPiQueueHandle>();
 
 const OAUTH_FILENAME = "oauth.json";
 const DEFAULT_OAUTH_DIR = path.join(CONFIG_DIR, "credentials");
-const DEFAULT_AGENT_DIR = path.join(CONFIG_DIR, "agent");
 let oauthStorageConfigured = false;
 let cachedDefaultApiKey: ReturnType<typeof defaultGetApiKey> | null = null;
 
@@ -92,14 +93,6 @@ function resolveClawdisOAuthPath(): string {
   const overrideDir =
     process.env.CLAWDIS_OAUTH_DIR?.trim() || DEFAULT_OAUTH_DIR;
   return path.join(resolveUserPath(overrideDir), OAUTH_FILENAME);
-}
-
-function resolveAgentDir(): string {
-  const override =
-    process.env.CLAWDIS_AGENT_DIR?.trim() ||
-    process.env.PI_CODING_AGENT_DIR?.trim() ||
-    DEFAULT_AGENT_DIR;
-  return resolveUserPath(override);
 }
 
 function loadOAuthStorageAt(pathname: string): OAuthStorage | null {
@@ -284,10 +277,8 @@ export async function runEmbeddedPiAgent(params: {
     const provider =
       (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
     const modelId = (params.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
-    const agentDir = resolveAgentDir();
-    if (!process.env.PI_CODING_AGENT_DIR) {
-      process.env.PI_CODING_AGENT_DIR = agentDir;
-    }
+    await ensureClawdisModelsJson(params.config);
+    const agentDir = resolveClawdisAgentDir();
     const { model, error } = resolveModel(provider, modelId, agentDir);
     if (!model) {
       throw new Error(error ?? `Unknown model: ${provider}/${modelId}`);
