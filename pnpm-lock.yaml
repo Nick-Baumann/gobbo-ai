@@ -185,6 +185,19 @@ importers:
         specifier: 8.0.0-beta.3
         version: 8.0.0-beta.3(@types/node@25.0.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  ui:
+    dependencies:
+      lit:
+        specifier: ^3.3.1
+        version: 3.3.1
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 8.0.0-beta.3
+        version: 8.0.0-beta.3(@types/node@25.0.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
 packages:
 
   '@anthropic-ai/sdk@0.71.2':
