@@ -372,13 +372,6 @@ const SUBSYSTEM_COLORS = [
 ] as const;
 const SUBSYSTEM_PREFIXES_TO_DROP = ["gateway", "providers"] as const;
 const SUBSYSTEM_MAX_SEGMENTS = 2;
-const SUBSYSTEM_DISPLAY_ALIASES = new Map<string, string>([
-  ["whatsapp/inbound", "WhatsApp In"],
-  ["whatsapp/outbound", "WhatsApp Out"],
-  ["whatsapp/heartbeat", "WhatsApp Heartbeat"],
-  ["whatsapp", "WhatsApp"],
-  ["telegram", "Telegram"],
-]);
 
 function pickSubsystemColor(
   color: ChalkInstance,
@@ -405,12 +398,13 @@ function formatSubsystemForConsole(subsystem: string): string {
     parts.shift();
   }
   if (parts.length === 0) return original;
-  if (parts.length > SUBSYSTEM_MAX_SEGMENTS) {
-    const shortened = parts.slice(-SUBSYSTEM_MAX_SEGMENTS).join("/");
-    return SUBSYSTEM_DISPLAY_ALIASES.get(shortened) ?? shortened;
+  if (parts[0] === "whatsapp" || parts[0] === "telegram") {
+    return parts[0];
   }
-  const shortened = parts.join("/");
-  return SUBSYSTEM_DISPLAY_ALIASES.get(shortened) ?? shortened;
+  if (parts.length > SUBSYSTEM_MAX_SEGMENTS) {
+    return parts.slice(-SUBSYSTEM_MAX_SEGMENTS).join("/");
+  }
+  return parts.join("/");
 }
 
 function formatConsoleLine(opts: {
