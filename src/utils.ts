@@ -54,7 +54,9 @@ export function isSelfChatMode(
 }
 
 export function toWhatsappJid(number: string): string {
-  const e164 = normalizeE164(number);
+  const withoutPrefix = number.replace(/^whatsapp:/, "").trim();
+  if (withoutPrefix.includes("@")) return withoutPrefix;
+  const e164 = normalizeE164(withoutPrefix);
   const digits = e164.replace(/\D/g, "");
   return `${digits}@s.whatsapp.net`;
 }

@@ -69,6 +69,18 @@ describe("normalizeE164 & toWhatsappJid", () => {
       "5551234567@s.whatsapp.net",
     );
   });
+
+  it("preserves existing JIDs", () => {
+    expect(toWhatsappJid("123456789-987654321@g.us")).toBe(
+      "123456789-987654321@g.us",
+    );
+    expect(toWhatsappJid("whatsapp:123456789-987654321@g.us")).toBe(
+      "123456789-987654321@g.us",
+    );
+    expect(toWhatsappJid("1555123@s.whatsapp.net")).toBe(
+      "1555123@s.whatsapp.net",
+    );
+  });
 });
 
 describe("jidToE164", () => {

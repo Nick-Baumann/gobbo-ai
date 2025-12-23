@@ -13,7 +13,12 @@ import { loadConfig } from "../config/config.js";
 import { isVerbose, logVerbose } from "../globals.js";
 import { createSubsystemLogger, getChildLogger } from "../logging.js";
 import { saveMediaBuffer } from "../media/store.js";
-import { isSelfChatMode, jidToE164, normalizeE164 } from "../utils.js";
+import {
+  isSelfChatMode,
+  jidToE164,
+  normalizeE164,
+  toWhatsappJid,
+} from "../utils.js";
 import {
   createWaSocket,
   getStatusCode,
@@ -336,7 +341,7 @@ export async function monitorWebInbox(options: {
       mediaBuffer?: Buffer,
       mediaType?: string,
     ): Promise<{ messageId: string }> => {
-      const jid = `${to.replace(/^\+/, "")}@s.whatsapp.net`;
+      const jid = toWhatsappJid(to);
       let payload: AnyMessageContent;
       if (mediaBuffer && mediaType) {
         if (mediaType.startsWith("image/")) {
@@ -376,7 +381,7 @@ export async function monitorWebInbox(options: {
      * Used after IPC send to show more messages are coming.
      */
     sendComposingTo: async (to: string): Promise<void> => {
-      const jid = `${to.replace(/^\+/, "")}@s.whatsapp.net`;
+      const jid = toWhatsappJid(to);
       await sock.sendPresenceUpdate("composing", jid);
     },
   } as const;
