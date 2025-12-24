@@ -323,6 +323,13 @@ struct ChatTypingIndicatorBubble: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
         .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: .leading)
+        .focusable(false)
+    }
+}
+
+extension ChatTypingIndicatorBubble: @MainActor Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.style == rhs.style
     }
 }
 
@@ -342,6 +349,7 @@ struct ChatStreamingAssistantBubble: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
         .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: .leading)
+        .focusable(false)
     }
 }
 
@@ -376,12 +384,20 @@ struct ChatPendingToolsBubble: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
         .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: .leading)
+        .focusable(false)
+    }
+}
+
+extension ChatPendingToolsBubble: @MainActor Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.toolCalls == rhs.toolCalls
     }
 }
 
 @MainActor
 private struct TypingDots: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var animate = false
 
     var body: some View {
@@ -399,10 +415,22 @@ private struct TypingDots: View {
                         value: self.animate)
             }
         }
-        .onAppear {
-            guard !self.reduceMotion else { return }
-            self.animate = true
+        .onAppear { self.updateAnimationState() }
+        .onDisappear { self.animate = false }
+        .onChange(of: self.scenePhase) { _, _ in
+            self.updateAnimationState()
         }
+        .onChange(of: self.reduceMotion) { _, _ in
+            self.updateAnimationState()
+        }
+    }
+
+    private func updateAnimationState() {
+        guard !self.reduceMotion, self.scenePhase == .active else {
+            self.animate = false
+            return
+        }
+        self.animate = true
     }
 }
 

@@ -80,11 +80,13 @@ public struct ClawdisChatView: View {
 
                         if self.viewModel.pendingRunCount > 0 {
                             ChatTypingIndicatorBubble(style: self.style)
+                                .equatable()
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         if !self.viewModel.pendingToolCalls.isEmpty {
                             ChatPendingToolsBubble(toolCalls: self.viewModel.pendingToolCalls)
+                                .equatable()
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
