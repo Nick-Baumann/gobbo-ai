@@ -37,7 +37,7 @@ struct TailscaleIntegrationSection: View {
     #endif
 
     @State private var hasLoaded = false
-    @State private var tailscaleMode: GatewayTailscaleMode = .off
+    @State private var tailscaleMode: GatewayTailscaleMode = .serve
     @State private var requireCredentialsForServe = false
     @State private var password: String = ""
     @State private var statusMessage: String?
@@ -104,8 +104,8 @@ struct TailscaleIntegrationSection: View {
         .disabled(self.connectionMode != .local)
         .task {
             guard !self.hasLoaded else { return }
-            self.hasLoaded = true
             self.loadConfig()
+            self.hasLoaded = true
             await self.effectiveService.checkTailscaleStatus()
             self.startStatusTimer()
         }
@@ -245,7 +245,7 @@ struct TailscaleIntegrationSection: View {
     private func loadConfig() {
         let gateway = ClawdisConfigFile.loadGatewayDict()
         let tailscale = gateway["tailscale"] as? [String: Any] ?? [:]
-        let modeRaw = (tailscale["mode"] as? String) ?? "off"
+        let modeRaw = (tailscale["mode"] as? String) ?? "serve"
         self.tailscaleMode = GatewayTailscaleMode(rawValue: modeRaw) ?? .off
 
         let auth = gateway["auth"] as? [String: Any] ?? [:]
