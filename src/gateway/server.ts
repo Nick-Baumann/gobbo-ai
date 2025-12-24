@@ -143,6 +143,11 @@ import {
 } from "./auth.js";
 import { buildMessageWithAttachments } from "./chat-attachments.js";
 import { handleControlUiHttpRequest } from "./control-ui.js";
+import {
+  applyHookMappings,
+  type HookMappingResolved,
+  resolveHookMappings,
+} from "./hooks-mapping.js";
 
 ensureClawdisCliOnPath();
 
@@ -153,6 +158,7 @@ type HooksConfigResolved = {
   basePath: string;
   token: string;
   maxBodyBytes: number;
+  mappings: HookMappingResolved[];
 };
 
 function resolveHooksConfig(cfg: ClawdisConfig): HooksConfigResolved | null {
@@ -168,10 +174,16 @@ function resolveHooksConfig(cfg: ClawdisConfig): HooksConfigResolved | null {
   if (trimmed === "/") {
     throw new Error("hooks.path may not be '/'");
   }
+  const maxBodyBytes =
+    cfg.hooks?.maxBodyBytes && cfg.hooks.maxBodyBytes > 0
+      ? cfg.hooks.maxBodyBytes
+      : DEFAULT_HOOKS_MAX_BODY_BYTES;
+  const mappings = resolveHookMappings(cfg.hooks);
   return {
     basePath: trimmed,
     token,
-    maxBodyBytes: DEFAULT_HOOKS_MAX_BODY_BYTES,
+    maxBodyBytes,
+    mappings,
   };
 }
 
@@ -1296,6 +1308,181 @@ export async function startGatewayServer(
     );
   }
 
+  const normalizeHookHeaders = (req: IncomingMessage) => {
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (typeof value === "string") {
+        headers[key.toLowerCase()] = value;
+      } else if (Array.isArray(value) && value.length > 0) {
+        headers[key.toLowerCase()] = value.join(", ");
+      }
+    }
+    return headers;
+  };
+
+  const normalizeWakePayload = (
+    payload: Record<string, unknown>,
+  ):
+    | { ok: true; value: { text: string; mode: "now" | "next-heartbeat" } }
+    | { ok: false; error: string } => {
+    const text = typeof payload.text === "string" ? payload.text.trim() : "";
+    if (!text) return { ok: false, error: "text required" };
+    const mode = payload.mode === "next-heartbeat" ? "next-heartbeat" : "now";
+    return { ok: true, value: { text, mode } };
+  };
+
+  const normalizeAgentPayload = (
+    payload: Record<string, unknown>,
+  ):
+    | {
+        ok: true;
+        value: {
+          message: string;
+          name: string;
+          wakeMode: "now" | "next-heartbeat";
+          sessionKey: string;
+          deliver: boolean;
+          channel: "last" | "whatsapp" | "telegram";
+          to?: string;
+          thinking?: string;
+          timeoutSeconds?: number;
+        };
+      }
+    | { ok: false; error: string } => {
+    const message =
+      typeof payload.message === "string" ? payload.message.trim() : "";
+    if (!message) return { ok: false, error: "message required" };
+    const nameRaw = payload.name;
+    const name =
+      typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "Hook";
+    const wakeMode =
+      payload.wakeMode === "next-heartbeat" ? "next-heartbeat" : "now";
+    const sessionKeyRaw = payload.sessionKey;
+    const sessionKey =
+      typeof sessionKeyRaw === "string" && sessionKeyRaw.trim()
+        ? sessionKeyRaw.trim()
+        : `hook:${randomUUID()}`;
+    const channelRaw = payload.channel;
+    const channel =
+      channelRaw === "whatsapp" ||
+      channelRaw === "telegram" ||
+      channelRaw === "last"
+        ? channelRaw
+        : channelRaw === undefined
+          ? "last"
+          : null;
+    if (channel === null) {
+      return { ok: false, error: "channel must be last|whatsapp|telegram" };
+    }
+    const toRaw = payload.to;
+    const to =
+      typeof toRaw === "string" && toRaw.trim() ? toRaw.trim() : undefined;
+    const deliver = payload.deliver === true;
+    const thinkingRaw = payload.thinking;
+    const thinking =
+      typeof thinkingRaw === "string" && thinkingRaw.trim()
+        ? thinkingRaw.trim()
+        : undefined;
+    const timeoutRaw = payload.timeoutSeconds;
+    const timeoutSeconds =
+      typeof timeoutRaw === "number" &&
+      Number.isFinite(timeoutRaw) &&
+      timeoutRaw > 0
+        ? Math.floor(timeoutRaw)
+        : undefined;
+    return {
+      ok: true,
+      value: {
+        message,
+        name,
+        wakeMode,
+        sessionKey,
+        deliver,
+        channel,
+        to,
+        thinking,
+        timeoutSeconds,
+      },
+    };
+  };
+
+  const dispatchWakeHook = (value: {
+    text: string;
+    mode: "now" | "next-heartbeat";
+  }) => {
+    enqueueSystemEvent(value.text);
+    if (value.mode === "now") {
+      requestReplyHeartbeatNow({ reason: "hook:wake" });
+    }
+  };
+
+  const dispatchAgentHook = (value: {
+    message: string;
+    name: string;
+    wakeMode: "now" | "next-heartbeat";
+    sessionKey: string;
+    deliver: boolean;
+    channel: "last" | "whatsapp" | "telegram";
+    to?: string;
+    thinking?: string;
+    timeoutSeconds?: number;
+  }) => {
+    const jobId = randomUUID();
+    const now = Date.now();
+    const job: CronJob = {
+      id: jobId,
+      name: value.name,
+      enabled: true,
+      createdAtMs: now,
+      updatedAtMs: now,
+      schedule: { kind: "at", atMs: now },
+      sessionTarget: "isolated",
+      wakeMode: value.wakeMode,
+      payload: {
+        kind: "agentTurn",
+        message: value.message,
+        thinking: value.thinking,
+        timeoutSeconds: value.timeoutSeconds,
+        deliver: value.deliver,
+        channel: value.channel,
+        to: value.to,
+      },
+      state: { nextRunAtMs: now },
+    };
+
+    const runId = randomUUID();
+    void (async () => {
+      try {
+        const cfg = loadConfig();
+        const result = await runCronIsolatedAgentTurn({
+          cfg,
+          deps,
+          job,
+          message: value.message,
+          sessionKey: value.sessionKey,
+          lane: "cron",
+        });
+        const summary =
+          result.summary?.trim() || result.error?.trim() || result.status;
+        const prefix =
+          result.status === "ok"
+            ? `Hook ${value.name}`
+            : `Hook ${value.name} (${result.status})`;
+        enqueueSystemEvent(`${prefix}: ${summary}`.trim());
+        if (value.wakeMode === "now") {
+          requestReplyHeartbeatNow({ reason: `hook:${jobId}` });
+        }
+      } catch (err) {
+        logHooks.warn(`hook agent failed: ${String(err)}`);
+        enqueueSystemEvent(`Hook ${value.name} (error): ${String(err)}`);
+        if (value.wakeMode === "now") {
+          requestReplyHeartbeatNow({ reason: `hook:${jobId}:error` });
+        }
+      }
+    })();
+
+    return runId;
+  };
   let canvasHost: CanvasHostHandler | null = null;
   let canvasHostServer: CanvasHostServer | null = null;
   if (canvasHostEnabled) {
@@ -1361,135 +1548,74 @@ export async function startGatewayServer(
 
     const payload =
       typeof body.value === "object" && body.value !== null ? body.value : {};
+    const headers = normalizeHookHeaders(req);
 
     if (subPath === "wake") {
-      const textRaw = (payload as { text?: unknown }).text;
-      const text = typeof textRaw === "string" ? textRaw.trim() : "";
-      if (!text) {
-        sendJson(res, 400, { ok: false, error: "text required" });
+      const normalized = normalizeWakePayload(
+        payload as Record<string, unknown>,
+      );
+      if (!normalized.ok) {
+        sendJson(res, 400, { ok: false, error: normalized.error });
         return true;
       }
-      const modeRaw = (payload as { mode?: unknown }).mode;
-      const mode = modeRaw === "next-heartbeat" ? "next-heartbeat" : "now";
-      enqueueSystemEvent(text);
-      if (mode === "now") {
-        requestReplyHeartbeatNow({ reason: "hook:wake" });
-      }
-      sendJson(res, 200, { ok: true, mode });
+      dispatchWakeHook(normalized.value);
+      sendJson(res, 200, { ok: true, mode: normalized.value.mode });
       return true;
     }
 
     if (subPath === "agent") {
-      const messageRaw = (payload as { message?: unknown }).message;
-      const message = typeof messageRaw === "string" ? messageRaw.trim() : "";
-      if (!message) {
-        sendJson(res, 400, { ok: false, error: "message required" });
+      const normalized = normalizeAgentPayload(
+        payload as Record<string, unknown>,
+      );
+      if (!normalized.ok) {
+        sendJson(res, 400, { ok: false, error: normalized.error });
         return true;
       }
-
-      const nameRaw = (payload as { name?: unknown }).name;
-      const name =
-        typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "Hook";
-      const wakeModeRaw = (payload as { wakeMode?: unknown }).wakeMode;
-      const wakeMode =
-        wakeModeRaw === "next-heartbeat" ? "next-heartbeat" : "now";
-      const sessionKeyRaw = (payload as { sessionKey?: unknown }).sessionKey;
-      const sessionKey =
-        typeof sessionKeyRaw === "string" && sessionKeyRaw.trim()
-          ? sessionKeyRaw.trim()
-          : `hook:${randomUUID()}`;
-
-      const channelRaw = (payload as { channel?: unknown }).channel;
-      const channel =
-        channelRaw === "whatsapp" ||
-        channelRaw === "telegram" ||
-        channelRaw === "last"
-          ? channelRaw
-          : channelRaw === undefined
-            ? undefined
-            : null;
-      if (channel === null) {
-        sendJson(res, 400, {
-          ok: false,
-          error: "channel must be last|whatsapp|telegram",
-        });
-        return true;
-      }
-
-      const toRaw = (payload as { to?: unknown }).to;
-      const to =
-        typeof toRaw === "string" && toRaw.trim() ? toRaw.trim() : undefined;
-      const deliver = (payload as { deliver?: unknown }).deliver === true;
-      const thinkingRaw = (payload as { thinking?: unknown }).thinking;
-      const thinking =
-        typeof thinkingRaw === "string" && thinkingRaw.trim()
-          ? thinkingRaw.trim()
-          : undefined;
-      const timeoutRaw = (payload as { timeoutSeconds?: unknown })
-        .timeoutSeconds;
-      const timeoutSeconds =
-        typeof timeoutRaw === "number" &&
-        Number.isFinite(timeoutRaw) &&
-        timeoutRaw > 0
-          ? Math.floor(timeoutRaw)
-          : undefined;
-
-      const jobId = randomUUID();
-      const now = Date.now();
-      const job: CronJob = {
-        id: jobId,
-        name,
-        enabled: true,
-        createdAtMs: now,
-        updatedAtMs: now,
-        schedule: { kind: "at", atMs: now },
-        sessionTarget: "isolated",
-        wakeMode,
-        payload: {
-          kind: "agentTurn",
-          message,
-          thinking,
-          timeoutSeconds,
-          deliver,
-          channel: channel ?? "last",
-          to,
-        },
-        state: { nextRunAtMs: now },
-      };
-
-      const runId = randomUUID();
+      const runId = dispatchAgentHook(normalized.value);
       sendJson(res, 202, { ok: true, runId });
-
-      void (async () => {
-        try {
-          const cfg = loadConfig();
-          const result = await runCronIsolatedAgentTurn({
-            cfg,
-            deps,
-            job,
-            message,
-            sessionKey,
-            lane: "cron",
-          });
-          const summary =
-            result.summary?.trim() || result.error?.trim() || result.status;
-          const prefix =
-            result.status === "ok"
-              ? `Hook ${name}`
-              : `Hook ${name} (${result.status})`;
-          enqueueSystemEvent(`${prefix}: ${summary}`.trim());
-          if (wakeMode === "now") {
-            requestReplyHeartbeatNow({ reason: `hook:${jobId}` });
-          }
-        } catch (err) {
-          logHooks.warn("hook agent failed", { err: String(err) });
-          enqueueSystemEvent(`Hook ${name} (error): ${String(err)}`);
-          if (wakeMode === "now") {
-            requestReplyHeartbeatNow({ reason: `hook:${jobId}:error` });
-          }
-        }
-      })();
       return true;
+    }
+
+    if (hooksConfig.mappings.length > 0) {
+      try {
+        const mapped = await applyHookMappings(hooksConfig.mappings, {
+          payload: payload as Record<string, unknown>,
+          headers,
+          url,
+          path: subPath,
+        });
+        if (mapped) {
+          if (!mapped.ok) {
+            sendJson(res, 400, { ok: false, error: mapped.error });
+            return true;
+          }
+          if (mapped.action.kind === "wake") {
+            dispatchWakeHook({
+              text: mapped.action.text,
+              mode: mapped.action.mode,
+            });
+            sendJson(res, 200, { ok: true, mode: mapped.action.mode });
+            return true;
+          }
+          const runId = dispatchAgentHook({
+            message: mapped.action.message,
+            name: mapped.action.name ?? "Hook",
+            wakeMode: mapped.action.wakeMode,
+            sessionKey: mapped.action.sessionKey ?? `hook:${randomUUID()}`,
+            deliver: mapped.action.deliver === true,
+            channel: mapped.action.channel ?? "last",
+            to: mapped.action.to,
+            thinking: mapped.action.thinking,
+            timeoutSeconds: mapped.action.timeoutSeconds,
+          });
+          sendJson(res, 202, { ok: true, runId });
+          return true;
+        }
+      } catch (err) {
+        logHooks.warn(`hook mapping failed: ${String(err)}`);
+        sendJson(res, 500, { ok: false, error: "hook mapping failed" });
+        return true;
+      }
     }
 
     res.statusCode = 404;
