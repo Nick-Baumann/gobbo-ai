@@ -72,6 +72,14 @@ actor VoiceWakeRuntime {
         let sendChime: VoiceWakeChime
     }
 
+    private struct RecognitionUpdate {
+        let transcript: String?
+        let segments: [WakeWordSegment]
+        let isFinal: Bool
+        let error: Error?
+        let generation: Int
+    }
+
     func refresh(state: AppState) async {
         let snapshot = await MainActor.run { () -> (Bool, RuntimeConfig) in
             let enabled = state.swabbleEnabled
@@ -154,13 +162,13 @@ actor VoiceWakeRuntime {
                         .map { WakeWordSpeechSegments.from(transcription: result.bestTranscription, transcript: $0) }
                 } ?? []
                 let isFinal = result?.isFinal ?? false
-                Task { await self.handleRecognition(
+                let update = RecognitionUpdate(
                     transcript: transcript,
                     segments: segments,
                     isFinal: isFinal,
                     error: error,
-                    config: config,
-                    generation: generation) }
+                    generation: generation)
+                Task { await self.handleRecognition(update, config: config) }
             }
 
             self.logger.info("voicewake runtime started")
@@ -212,22 +220,15 @@ actor VoiceWakeRuntime {
         self.recognizer = SFSpeechRecognizer(locale: locale)
     }
 
-    private func handleRecognition(
-        transcript: String?,
-        segments: [WakeWordSegment],
-        isFinal: Bool,
-        error: Error?,
-        config: RuntimeConfig,
-        generation: Int) async
-    {
-        if generation != self.recognitionGeneration {
+    private func handleRecognition(_ update: RecognitionUpdate, config: RuntimeConfig) async {
+        if update.generation != self.recognitionGeneration {
             return // stale callback from a superseded recognizer session
         }
-        if let error {
+        if let error = update.error {
             self.logger.debug("voicewake recognition error: \(error.localizedDescription, privacy: .public)")
         }
 
-        guard let transcript else { return }
+        guard let transcript = update.transcript else { return }
 
         let now = Date()
         if !transcript.isEmpty {
@@ -240,7 +241,7 @@ actor VoiceWakeRuntime {
                     triggers: config.triggers)
                 self.capturedTranscript = trimmed
                 self.updateHeardBeyondTrigger(withTrimmed: trimmed)
-                if isFinal {
+                if update.isFinal {
                     self.committedTranscript = trimmed
                     self.volatileTranscript = ""
                 } else {
@@ -250,7 +251,7 @@ actor VoiceWakeRuntime {
                 let attributed = Self.makeAttributed(
                     committed: self.committedTranscript,
                     volatile: self.volatileTranscript,
-                    isFinal: isFinal)
+                    isFinal: update.isFinal)
                 let snapshot = self.committedTranscript + self.volatileTranscript
                 if let token = self.overlayToken {
                     await MainActor.run {
@@ -266,7 +267,7 @@ actor VoiceWakeRuntime {
         if self.isCapturing { return }
 
         let gateConfig = WakeWordGateConfig(triggers: config.triggers)
-        if let match = WakeWordGate.match(transcript: transcript, segments: segments, config: gateConfig) {
+        if let match = WakeWordGate.match(transcript: transcript, segments: update.segments, config: gateConfig) {
             if let cooldown = cooldownUntil, now < cooldown {
                 return
             }
