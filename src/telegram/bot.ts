@@ -363,8 +363,7 @@ async function sendTelegramText(
       runtime.log?.(
         `telegram markdown parse failed; retrying without formatting: ${errText}`,
       );
-      const res = await bot.api.sendMessage(chatId, text, {
-      });
+      const res = await bot.api.sendMessage(chatId, text, {});
       return res.message_id;
     }
     throw err;
