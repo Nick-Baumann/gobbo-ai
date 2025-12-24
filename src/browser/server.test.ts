@@ -318,7 +318,7 @@ describe("browser control server", () => {
       }),
     }).then((r) => r.json())) as { ok: boolean };
     expect(click.ok).toBe(true);
-    expect(pwMocks.clickViaPlaywright).toHaveBeenCalledWith({
+    expect(pwMocks.clickViaPlaywright).toHaveBeenNthCalledWith(1, {
       cdpPort: testPort + 1,
       targetId: "abcd1234",
       ref: "1",
@@ -327,18 +327,54 @@ describe("browser control server", () => {
       modifiers: ["Shift"],
     });
 
+    const clickSelector = (await realFetch(`${base}/act`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "click",
+        selector: "button.save",
+      }),
+    }).then((r) => r.json())) as { ok: boolean };
+    expect(clickSelector.ok).toBe(true);
+    expect(pwMocks.clickViaPlaywright).toHaveBeenNthCalledWith(2, {
+      cdpPort: testPort + 1,
+      targetId: "abcd1234",
+      selector: "button.save",
+      doubleClick: false,
+    });
+
     const type = (await realFetch(`${base}/act`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: "type", ref: "1", text: "" }),
     }).then((r) => r.json())) as { ok: boolean };
     expect(type.ok).toBe(true);
-    expect(pwMocks.typeViaPlaywright).toHaveBeenCalledWith({
+    expect(pwMocks.typeViaPlaywright).toHaveBeenNthCalledWith(1, {
       cdpPort: testPort + 1,
       targetId: "abcd1234",
       ref: "1",
       text: "",
       submit: false,
+      slowly: false,
+    });
+
+    const typeSelector = (await realFetch(`${base}/act`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "type",
+        selector: "input[name=q]",
+        text: "hello",
+        submit: true,
+      }),
+    }).then((r) => r.json())) as { ok: boolean };
+    expect(typeSelector.ok).toBe(true);
+    expect(pwMocks.typeViaPlaywright).toHaveBeenNthCalledWith(2, {
+      cdpPort: testPort + 1,
+      targetId: "abcd1234",
+      selector: "input[name=q]",
+      text: "hello",
+      submit: true,
       slowly: false,
     });
 

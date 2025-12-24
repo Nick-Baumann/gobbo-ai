@@ -356,6 +356,7 @@ const BrowserActSchema = Type.Object({
     Type.Literal("close"),
   ]),
   ref: Type.Optional(Type.String()),
+  selector: Type.Optional(Type.String()),
   targetId: Type.Optional(Type.String()),
   doubleClick: Type.Optional(Type.Boolean()),
   button: Type.Optional(Type.String()),

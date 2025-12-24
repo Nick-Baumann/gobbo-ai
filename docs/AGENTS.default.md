@@ -112,4 +112,4 @@ git commit -m "Add Clawd workspace"
 - Canvas UI runs full-screen with native overlays. Avoid placing critical controls in the top-left/top-right/bottom edges; add explicit gutters in the layout and don’t rely on safe-area insets.
 - For browser-driven verification, use `clawdis browser` (tabs/status/screenshot) with the clawd-managed Chrome profile.
 - For DOM inspection, use `clawdis browser eval|query|dom|snapshot` (and `--json`/`--out` when you need machine output).
-- For interactions, use `clawdis browser click|type|hover|drag|select|upload|press|wait|navigate|back|evaluate|run`.
+- For interactions, use `clawdis browser click|type|hover|drag|select|upload|press|wait|navigate|back|evaluate|run` (click/type accept `--selector`).

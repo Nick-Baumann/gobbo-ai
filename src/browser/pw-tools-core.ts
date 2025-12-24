@@ -10,6 +10,19 @@ import {
 let nextUploadArmId = 0;
 let nextDialogArmId = 0;
 
+type LocatorPage = Parameters<typeof refLocator>[0];
+
+function resolveLocator(
+  page: LocatorPage,
+  opts: { ref?: string; selector?: string },
+) {
+  const selector = typeof opts.selector === "string" ? opts.selector.trim() : "";
+  if (selector) return page.locator(selector);
+  const ref = typeof opts.ref === "string" ? opts.ref.trim() : "";
+  if (ref) return refLocator(page, ref);
+  throw new Error("ref or selector is required");
+}
+
 export async function snapshotAiViaPlaywright(opts: {
   cdpPort: number;
   targetId?: string;
@@ -41,21 +54,22 @@ export async function snapshotAiViaPlaywright(opts: {
 export async function clickViaPlaywright(opts: {
   cdpPort: number;
   targetId?: string;
-  ref: string;
+  ref?: string;
+  selector?: string;
   doubleClick?: boolean;
   button?: "left" | "right" | "middle";
   modifiers?: Array<"Alt" | "Control" | "ControlOrMeta" | "Meta" | "Shift">;
   timeoutMs?: number;
 }): Promise<void> {
-  const ref = String(opts.ref ?? "").trim();
-  if (!ref) throw new Error("ref is required");
-
   const page = await getPageForTargetId({
     cdpPort: opts.cdpPort,
     targetId: opts.targetId,
   });
   ensurePageState(page);
-  const locator = refLocator(page, ref);
+  const locator = resolveLocator(page, {
+    ref: opts.ref,
+    selector: opts.selector,
+  });
   const timeout = Math.max(
     500,
     Math.min(60_000, Math.floor(opts.timeoutMs ?? 8000)),
@@ -142,18 +156,20 @@ export async function pressKeyViaPlaywright(opts: {
 export async function typeViaPlaywright(opts: {
   cdpPort: number;
   targetId?: string;
-  ref: string;
+  ref?: string;
+  selector?: string;
   text: string;
   submit?: boolean;
   slowly?: boolean;
   timeoutMs?: number;
 }): Promise<void> {
-  const ref = String(opts.ref ?? "").trim();
-  if (!ref) throw new Error("ref is required");
   const text = String(opts.text ?? "");
   const page = await getPageForTargetId(opts);
   ensurePageState(page);
-  const locator = refLocator(page, ref);
+  const locator = resolveLocator(page, {
+    ref: opts.ref,
+    selector: opts.selector,
+  });
   const timeout = Math.max(500, Math.min(60_000, opts.timeoutMs ?? 8000));
   if (opts.slowly) {
     await locator.click({ timeout });

@@ -174,7 +174,9 @@ Actions:
 - `clawdis browser navigate https://example.com`
 - `clawdis browser resize 1280 720`
 - `clawdis browser click 12 --double`
+- `clawdis browser click --selector 'button.save'`
 - `clawdis browser type 23 "hello" --submit`
+- `clawdis browser type --selector "input[name=q]" "hello"`
 - `clawdis browser press Enter`
 - `clawdis browser hover 44`
 - `clawdis browser drag 10 11`
@@ -191,6 +193,7 @@ Notes:
 - `upload` and `dialog` are **arming** calls; run them before the click/press that triggers the chooser/dialog.
 - The arm default timeout is **2 minutes** (clamped to max 2 minutes); pass `timeoutMs` if you need shorter.
 - `snapshot --format ai` returns AI snapshot markup used for ref-based actions.
+- `click`/`type` accept `--selector` to target CSS selectors instead of AI refs.
 
 ## Security & privacy notes
 

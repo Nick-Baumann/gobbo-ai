@@ -139,7 +139,9 @@ export function registerBrowserAgentRoutes(
       switch (kind) {
         case "click": {
           const ref = toStringOrEmpty(body.ref);
-          if (!ref) return jsonError(res, 400, "ref is required");
+          const selector = toStringOrEmpty(body.selector);
+          if (!ref && !selector)
+            return jsonError(res, 400, "ref or selector is required");
           const doubleClick = toBoolean(body.doubleClick) ?? false;
           const buttonRaw = toStringOrEmpty(body.button) || "";
           const button = buttonRaw ? parseClickButton(buttonRaw) : undefined;
@@ -166,32 +168,38 @@ export function registerBrowserAgentRoutes(
           const modifiers = modifiersRaw.length
             ? (modifiersRaw as ClickModifier[])
             : undefined;
-          await pw.clickViaPlaywright({
+          const clickRequest: Parameters<typeof pw.clickViaPlaywright>[0] = {
             cdpPort,
             targetId: tab.targetId,
-            ref,
             doubleClick,
-            button,
-            modifiers,
-          });
+          };
+          if (ref) clickRequest.ref = ref;
+          if (selector) clickRequest.selector = selector;
+          if (button) clickRequest.button = button;
+          if (modifiers) clickRequest.modifiers = modifiers;
+          await pw.clickViaPlaywright(clickRequest);
           return res.json({ ok: true, targetId: tab.targetId, url: tab.url });
         }
         case "type": {
           const ref = toStringOrEmpty(body.ref);
-          if (!ref) return jsonError(res, 400, "ref is required");
+          const selector = toStringOrEmpty(body.selector);
+          if (!ref && !selector)
+            return jsonError(res, 400, "ref or selector is required");
           if (typeof body.text !== "string")
             return jsonError(res, 400, "text is required");
           const text = body.text;
           const submit = toBoolean(body.submit) ?? false;
           const slowly = toBoolean(body.slowly) ?? false;
-          await pw.typeViaPlaywright({
+          const typeRequest: Parameters<typeof pw.typeViaPlaywright>[0] = {
             cdpPort,
             targetId: tab.targetId,
-            ref,
             text,
             submit,
             slowly,
-          });
+          };
+          if (ref) typeRequest.ref = ref;
+          if (selector) typeRequest.selector = selector;
+          await pw.typeViaPlaywright(typeRequest);
           return res.json({ ok: true, targetId: tab.targetId });
         }
         case "press": {

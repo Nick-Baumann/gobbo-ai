@@ -114,15 +114,24 @@ export function registerBrowserActionInputCommands(
 
   browser
     .command("click")
-    .description("Click an element by ref from an ai snapshot (e.g. 76)")
-    .argument("<ref>", "Ref id from ai snapshot")
+    .description("Click an element by ai ref or CSS selector")
+    .argument("[ref]", "Ref id from ai snapshot")
+    .option("--selector <css>", "CSS selector (instead of ref)")
     .option("--target-id <id>", "CDP target id (or unique prefix)")
     .option("--double", "Double click", false)
     .option("--button <left|right|middle>", "Mouse button to use")
     .option("--modifiers <list>", "Comma-separated modifiers (Shift,Alt,Meta)")
-    .action(async (ref: string, opts, cmd) => {
+    .action(async (ref: string | undefined, opts, cmd) => {
       const parent = parentOpts(cmd);
       const baseUrl = resolveBrowserControlUrl(parent?.url);
+      const selector =
+        typeof opts.selector === "string" ? opts.selector.trim() : "";
+      const refValue = typeof ref === "string" ? ref.trim() : "";
+      if (!selector && !refValue) {
+        defaultRuntime.error(danger("ref or --selector is required"));
+        defaultRuntime.exit(1);
+        return;
+      }
       const modifiers = opts.modifiers
         ? String(opts.modifiers)
             .split(",")
@@ -132,7 +141,8 @@ export function registerBrowserActionInputCommands(
       try {
         const result = await browserAct(baseUrl, {
           kind: "click",
-          ref,
+          ref: refValue || undefined,
+          selector: selector || undefined,
           targetId: opts.targetId?.trim() || undefined,
           doubleClick: Boolean(opts.double),
           button: opts.button?.trim() || undefined,
@@ -143,7 +153,11 @@ export function registerBrowserActionInputCommands(
           return;
         }
         const suffix = result.url ? ` on ${result.url}` : "";
-        defaultRuntime.log(`clicked ref ${ref}${suffix}`);
+        if (selector) {
+          defaultRuntime.log(`clicked ${selector}${suffix}`);
+        } else {
+          defaultRuntime.log(`clicked ref ${refValue}${suffix}`);
+        }
       } catch (err) {
         defaultRuntime.error(danger(String(err)));
         defaultRuntime.exit(1);
@@ -152,19 +166,29 @@ export function registerBrowserActionInputCommands(
 
   browser
     .command("type")
-    .description("Type into an element by ai ref")
-    .argument("<ref>", "Ref id from ai snapshot")
+    .description("Type into an element by ai ref or CSS selector")
+    .argument("[ref]", "Ref id from ai snapshot")
     .argument("<text>", "Text to type")
+    .option("--selector <css>", "CSS selector (instead of ref)")
     .option("--submit", "Press Enter after typing", false)
     .option("--slowly", "Type slowly (human-like)", false)
     .option("--target-id <id>", "CDP target id (or unique prefix)")
-    .action(async (ref: string, text: string, opts, cmd) => {
+    .action(async (ref: string | undefined, text: string, opts, cmd) => {
       const parent = parentOpts(cmd);
       const baseUrl = resolveBrowserControlUrl(parent?.url);
+      const selector =
+        typeof opts.selector === "string" ? opts.selector.trim() : "";
+      const refValue = typeof ref === "string" ? ref.trim() : "";
+      if (!selector && !refValue) {
+        defaultRuntime.error(danger("ref or --selector is required"));
+        defaultRuntime.exit(1);
+        return;
+      }
       try {
         const result = await browserAct(baseUrl, {
           kind: "type",
-          ref,
+          ref: refValue || undefined,
+          selector: selector || undefined,
           text,
           submit: Boolean(opts.submit),
           slowly: Boolean(opts.slowly),
@@ -174,7 +198,11 @@ export function registerBrowserActionInputCommands(
           defaultRuntime.log(JSON.stringify(result, null, 2));
           return;
         }
-        defaultRuntime.log(`typed into ref ${ref}`);
+        if (selector) {
+          defaultRuntime.log(`typed into ${selector}`);
+        } else {
+          defaultRuntime.log(`typed into ref ${refValue}`);
+        }
       } catch (err) {
         defaultRuntime.error(danger(String(err)));
         defaultRuntime.exit(1);
