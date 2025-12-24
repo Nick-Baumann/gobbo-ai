@@ -36,6 +36,22 @@ final class TailscaleService {
         Task { await self.checkTailscaleStatus() }
     }
 
+#if DEBUG
+    init(
+        isInstalled: Bool,
+        isRunning: Bool,
+        tailscaleHostname: String? = nil,
+        tailscaleIP: String? = nil,
+        statusError: String? = nil)
+    {
+        self.isInstalled = isInstalled
+        self.isRunning = isRunning
+        self.tailscaleHostname = tailscaleHostname
+        self.tailscaleIP = tailscaleIP
+        self.statusError = statusError
+    }
+#endif
+
     func checkAppInstallation() -> Bool {
         let installed = FileManager.default.fileExists(atPath: "/Applications/Tailscale.app")
         self.logger.info("Tailscale app installed: \(installed)")

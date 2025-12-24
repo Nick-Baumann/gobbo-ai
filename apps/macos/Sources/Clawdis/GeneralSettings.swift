@@ -651,4 +651,42 @@ struct GeneralSettings_Previews: PreviewProvider {
             .environment(TailscaleService.shared)
     }
 }
+
+@MainActor
+extension GeneralSettings {
+    static func exerciseForTesting() {
+        let state = AppState(preview: true)
+        state.connectionMode = .remote
+        state.remoteTarget = "user@host:2222"
+        state.remoteIdentity = "/tmp/id_ed25519"
+        state.remoteProjectRoot = "/tmp/clawdis"
+        state.remoteCliPath = "/tmp/clawdis"
+
+        var view = GeneralSettings(state: state)
+        view.gatewayStatus = GatewayEnvironmentStatus(
+            kind: .ok,
+            nodeVersion: "1.0.0",
+            gatewayVersion: "1.0.0",
+            requiredGateway: nil,
+            message: "Gateway ready")
+        view.remoteStatus = .failed("SSH failed")
+        view.showRemoteAdvanced = true
+        view.cliInstalled = true
+        view.cliInstallLocation = "/usr/local/bin/clawdis"
+        view.cliStatus = "Installed"
+        _ = view.body
+
+        state.connectionMode = .unconfigured
+        _ = view.body
+
+        state.connectionMode = .local
+        view.gatewayStatus = GatewayEnvironmentStatus(
+            kind: .error("Gateway offline"),
+            nodeVersion: nil,
+            gatewayVersion: nil,
+            requiredGateway: nil,
+            message: "Gateway offline")
+        _ = view.body
+    }
+}
 #endif

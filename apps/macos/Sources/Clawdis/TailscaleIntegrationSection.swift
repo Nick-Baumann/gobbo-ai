@@ -32,6 +32,9 @@ struct TailscaleIntegrationSection: View {
     let isPaused: Bool
 
     @Environment(TailscaleService.self) private var tailscaleService
+#if DEBUG
+    private var testingService: TailscaleService?
+#endif
 
     @State private var hasLoaded = false
     @State private var tailscaleMode: GatewayTailscaleMode = .off
@@ -41,6 +44,22 @@ struct TailscaleIntegrationSection: View {
     @State private var validationMessage: String?
     @State private var statusTimer: Timer?
 
+    init(connectionMode: AppState.ConnectionMode, isPaused: Bool) {
+        self.connectionMode = connectionMode
+        self.isPaused = isPaused
+#if DEBUG
+        self.testingService = nil
+#endif
+    }
+
+    private var effectiveService: TailscaleService {
+#if DEBUG
+        return self.testingService ?? self.tailscaleService
+#else
+        return self.tailscaleService
+#endif
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Tailscale (dashboard access)")
@@ -48,7 +67,7 @@ struct TailscaleIntegrationSection: View {
 
             self.statusRow
 
-            if !self.tailscaleService.isInstalled {
+            if !self.effectiveService.isInstalled {
                 self.installButtons
             } else {
                 self.modePicker
@@ -87,7 +106,7 @@ struct TailscaleIntegrationSection: View {
             guard !self.hasLoaded else { return }
             self.hasLoaded = true
             self.loadConfig()
-            await self.tailscaleService.checkTailscaleStatus()
+            await self.effectiveService.checkTailscaleStatus()
             self.startStatusTimer()
         }
         .onDisappear {
@@ -110,7 +129,7 @@ struct TailscaleIntegrationSection: View {
                 .font(.callout)
             Spacer()
             Button("Refresh") {
-                Task { await self.tailscaleService.checkTailscaleStatus() }
+                Task { await self.effectiveService.checkTailscaleStatus() }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -118,24 +137,24 @@ struct TailscaleIntegrationSection: View {
     }
 
     private var statusColor: Color {
-        if !self.tailscaleService.isInstalled { return .yellow }
-        if self.tailscaleService.isRunning { return .green }
+        if !self.effectiveService.isInstalled { return .yellow }
+        if self.effectiveService.isRunning { return .green }
         return .orange
     }
 
     private var statusText: String {
-        if !self.tailscaleService.isInstalled { return "Tailscale is not installed" }
-        if self.tailscaleService.isRunning { return "Tailscale is installed and running" }
+        if !self.effectiveService.isInstalled { return "Tailscale is not installed" }
+        if self.effectiveService.isRunning { return "Tailscale is installed and running" }
         return "Tailscale is installed but not running"
     }
 
     private var installButtons: some View {
         HStack(spacing: 12) {
-            Button("App Store") { self.tailscaleService.openAppStore() }
+            Button("App Store") { self.effectiveService.openAppStore() }
                 .buttonStyle(.link)
-            Button("Direct Download") { self.tailscaleService.openDownloadPage() }
+            Button("Direct Download") { self.effectiveService.openDownloadPage() }
                 .buttonStyle(.link)
-            Button("Setup Guide") { self.tailscaleService.openSetupGuide() }
+            Button("Setup Guide") { self.effectiveService.openSetupGuide() }
                 .buttonStyle(.link)
         }
         .controlSize(.small)
@@ -159,7 +178,7 @@ struct TailscaleIntegrationSection: View {
 
     @ViewBuilder
     private var accessURLRow: some View {
-        if let host = self.tailscaleService.tailscaleHostname {
+        if let host = self.effectiveService.tailscaleHostname {
             let url = "https://\(host)/ui/"
             HStack(spacing: 8) {
                 Text("Dashboard URL:")
@@ -173,14 +192,14 @@ struct TailscaleIntegrationSection: View {
                         .font(.system(.caption, design: .monospaced))
                 }
             }
-        } else if !self.tailscaleService.isRunning {
+        } else if !self.effectiveService.isRunning {
             Text("Start Tailscale to get your tailnet hostname.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
 
-        if self.tailscaleService.isInstalled, !self.tailscaleService.isRunning {
-            Button("Start Tailscale") { self.tailscaleService.openTailscaleApp() }
+        if self.effectiveService.isInstalled, !self.effectiveService.isRunning {
+            Button("Start Tailscale") { self.effectiveService.openTailscaleApp() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
         }
@@ -304,8 +323,11 @@ struct TailscaleIntegrationSection: View {
 
     private func startStatusTimer() {
         self.stopStatusTimer()
+        if ProcessInfo.processInfo.isRunningTests {
+            return
+        }
         self.statusTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            Task { await self.tailscaleService.checkTailscaleStatus() }
+            Task { await self.effectiveService.checkTailscaleStatus() }
         }
     }
 
@@ -314,3 +336,27 @@ struct TailscaleIntegrationSection: View {
         self.statusTimer = nil
     }
 }
+
+#if DEBUG
+extension TailscaleIntegrationSection {
+    mutating func setTestingState(
+        mode: String,
+        requireCredentials: Bool,
+        password: String = "secret",
+        statusMessage: String? = nil,
+        validationMessage: String? = nil)
+    {
+        if let mode = GatewayTailscaleMode(rawValue: mode) {
+            self.tailscaleMode = mode
+        }
+        self.requireCredentialsForServe = requireCredentials
+        self.password = password
+        self.statusMessage = statusMessage
+        self.validationMessage = validationMessage
+    }
+
+    mutating func setTestingService(_ service: TailscaleService?) {
+        self.testingService = service
+    }
+}
+#endif

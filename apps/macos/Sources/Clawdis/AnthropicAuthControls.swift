@@ -15,7 +15,14 @@ struct AnthropicAuthControls: View {
     @State private var autoConnectClipboard = true
     @State private var lastPasteboardChangeCount = NSPasteboard.general.changeCount
 
-    private static let clipboardPoll = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
+    private static let clipboardPoll: AnyPublisher<Date, Never> = {
+        if ProcessInfo.processInfo.isRunningTests {
+            return Empty(completeImmediately: false).eraseToAnyPublisher()
+        }
+        return Timer.publish(every: 0.4, on: .main, in: .common)
+            .autoconnect()
+            .eraseToAnyPublisher()
+    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -200,3 +207,28 @@ struct AnthropicAuthControls: View {
         Task { await self.finishOAuth() }
     }
 }
+
+#if DEBUG
+extension AnthropicAuthControls {
+    init(
+        connectionMode: AppState.ConnectionMode,
+        oauthStatus: ClawdisOAuthStore.AnthropicOAuthStatus,
+        pkce: AnthropicOAuth.PKCE? = nil,
+        code: String = "",
+        busy: Bool = false,
+        statusText: String? = nil,
+        autoDetectClipboard: Bool = true,
+        autoConnectClipboard: Bool = true)
+    {
+        self.connectionMode = connectionMode
+        self._oauthStatus = State(initialValue: oauthStatus)
+        self._pkce = State(initialValue: pkce)
+        self._code = State(initialValue: code)
+        self._busy = State(initialValue: busy)
+        self._statusText = State(initialValue: statusText)
+        self._autoDetectClipboard = State(initialValue: autoDetectClipboard)
+        self._autoConnectClipboard = State(initialValue: autoConnectClipboard)
+        self._lastPasteboardChangeCount = State(initialValue: NSPasteboard.general.changeCount)
+    }
+}
+#endif

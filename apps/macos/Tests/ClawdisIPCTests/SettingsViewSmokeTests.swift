@@ -13,6 +13,7 @@ struct SettingsViewSmokeTests {
         let job1 = CronJob(
             id: "job-1",
             name: "  Morning Check-in  ",
+            description: nil,
             enabled: true,
             createdAtMs: 1_700_000_000_000,
             updatedAtMs: 1_700_000_100_000,
@@ -31,7 +32,8 @@ struct SettingsViewSmokeTests {
 
         let job2 = CronJob(
             id: "job-2",
-            name: nil,
+            name: "",
+            description: nil,
             enabled: false,
             createdAtMs: 1_700_000_000_000,
             updatedAtMs: 1_700_000_100_000,
@@ -74,6 +76,10 @@ struct SettingsViewSmokeTests {
         _ = view.body
     }
 
+    @Test func cronSettingsExercisesPrivateViews() {
+        CronSettings.exerciseForTesting()
+    }
+
     @Test func configSettingsBuildsBody() {
         let view = ConfigSettings()
         _ = view.body
@@ -88,6 +94,10 @@ struct SettingsViewSmokeTests {
         let state = AppState(preview: true)
         let view = GeneralSettings(state: state)
         _ = view.body
+    }
+
+    @Test func generalSettingsExercisesBranches() {
+        GeneralSettings.exerciseForTesting()
     }
 
     @Test func sessionsSettingsBuildsBody() {
