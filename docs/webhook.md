@@ -80,6 +80,20 @@ Effect:
 - Always posts a summary into the **main** session
 - If `wakeMode=now`, triggers an immediate heartbeat
 
+### `POST /hooks/<name>` (mapped)
+
+Custom hook names are resolved via `hooks.mappings` (see configuration). A mapping can
+turn arbitrary payloads into `wake` or `agent` actions, with optional templates or
+code transforms.
+
+Mapping options (summary):
+- `hooks.presets: ["gmail"]` enables the built-in Gmail mapping.
+- `hooks.mappings` lets you define `match`, `action`, and templates in config.
+- `hooks.transformsDir` + `transform.module` loads a JS/TS module for custom logic.
+- Use `match.source` to keep a generic ingest endpoint (payload-driven routing).
+- TS transforms require a TS loader (e.g. `tsx`) or precompiled `.js` at runtime.
+- `clawdis hooks gmail setup` writes `hooks.gmail` config for `clawdis hooks gmail run`.
+
 ## Responses
 
 - `200` for `/hooks/wake`
@@ -102,6 +116,13 @@ curl -X POST http://127.0.0.1:18789/hooks/agent \
   -H 'x-clawdis-token: SECRET' \
   -H 'Content-Type: application/json' \
   -d '{"message":"Summarize inbox","name":"Email","wakeMode":"next-heartbeat"}'
+```
+
+```bash
+curl -X POST http://127.0.0.1:18789/hooks/gmail \
+  -H 'Authorization: Bearer SECRET' \
+  -H 'Content-Type: application/json' \
+  -d '{"source":"gmail","messages":[{"from":"Ada","subject":"Hello","snippet":"Hi"}]}'
 ```
 
 ## Security

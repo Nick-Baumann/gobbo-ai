@@ -318,13 +318,27 @@ Enable a simple HTTP webhook surface on the Gateway HTTP server.
 Defaults:
 - enabled: `false`
 - path: `/hooks`
+- maxBodyBytes: `262144` (256 KB)
 
 ```json5
 {
   hooks: {
     enabled: true,
     token: "shared-secret",
-    path: "/hooks"
+    path: "/hooks",
+    presets: ["gmail"],
+    transformsDir: "~/.clawdis/hooks",
+    mappings: [
+      {
+        match: { path: "gmail" },
+        action: "agent",
+        wakeMode: "now",
+        name: "Gmail",
+        sessionKey: "hook:gmail:{{messages[0].id}}",
+        messageTemplate:
+          "From: {{messages[0].from}}\nSubject: {{messages[0].subject}}\n{{messages[0].snippet}}",
+      },
+    ],
   }
 }
 ```
@@ -337,8 +351,36 @@ Requests must include the hook token:
 Endpoints:
 - `POST /hooks/wake` → `{ text, mode?: "now"|"next-heartbeat" }`
 - `POST /hooks/agent` → `{ message, name?, sessionKey?, wakeMode?, deliver?, channel?, to?, thinking?, timeoutSeconds? }`
+- `POST /hooks/<name>` → resolved via `hooks.mappings`
 
 `/hooks/agent` always posts a summary into the main session (and can optionally trigger an immediate heartbeat via `wakeMode: "now"`).
+
+Mapping notes:
+- `match.path` matches the sub-path after `/hooks` (e.g. `/hooks/gmail` → `gmail`).
+- `match.source` matches a payload field (e.g. `{ source: "gmail" }`) so you can use a generic `/hooks/ingest` path.
+- Templates like `{{messages[0].subject}}` read from the payload.
+- `transform` can point to a JS/TS module that returns a hook action.
+
+Gmail helper config (used by `clawdis hooks gmail setup` / `run`):
+
+```json5
+{
+  hooks: {
+    gmail: {
+      account: "clawdbot@gmail.com",
+      topic: "projects/<project-id>/topics/gog-gmail-watch",
+      subscription: "gog-gmail-watch-push",
+      pushToken: "shared-push-token",
+      hookUrl: "http://127.0.0.1:18789/hooks/gmail",
+      includeBody: true,
+      maxBytes: 20000,
+      renewEveryMinutes: 720,
+      serve: { bind: "127.0.0.1", port: 8788, path: "/gmail-pubsub" },
+      tailscale: { mode: "funnel", path: "/gmail-pubsub" },
+    }
+  }
+}
+```
 
 ### `canvasHost` (LAN/tailnet Canvas file server + live reload)
 
