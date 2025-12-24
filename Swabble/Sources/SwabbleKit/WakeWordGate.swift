@@ -68,9 +68,7 @@ public enum WakeWordGate {
         let tokens = self.normalizeSegments(segments)
         guard !tokens.isEmpty else { return nil }
 
-        var bestIndex: Int?
-        var bestTriggerEnd: TimeInterval = 0
-        var bestGap: TimeInterval = 0
+        var best: (index: Int, triggerEnd: TimeInterval, gap: TimeInterval)?
 
         for trigger in triggerTokens {
             let count = trigger.tokens.count
@@ -90,19 +88,17 @@ public enum WakeWordGate {
                 let gap = nextToken.start - triggerEnd
                 if gap < config.minPostTriggerGap { continue }
 
-                if let bestIndex, i <= bestIndex { continue }
+                if let best, i <= best.index { continue }
 
-                bestIndex = i
-                bestTriggerEnd = triggerEnd
-                bestGap = gap
+                best = (i, triggerEnd, gap)
             }
         }
 
-        guard let bestIndex else { return nil }
-        let command = self.commandText(transcript: transcript, segments: segments, triggerEndTime: bestTriggerEnd)
+        guard let best else { return nil }
+        let command = self.commandText(transcript: transcript, segments: segments, triggerEndTime: best.triggerEnd)
             .trimmingCharacters(in: Self.whitespaceAndPunctuation)
         guard command.count >= config.minCommandLength else { return nil }
-        return WakeWordGateMatch(triggerEndTime: bestTriggerEnd, postGap: bestGap, command: command)
+        return WakeWordGateMatch(triggerEndTime: best.triggerEnd, postGap: best.gap, command: command)
     }
 
     public static func commandText(
