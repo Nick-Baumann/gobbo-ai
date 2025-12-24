@@ -55,6 +55,7 @@
 
 ### Tests
 - Coverage added for models config merging, WhatsApp reply context, QR login flows, auto-reply behavior, and gateway SIGTERM timeouts.
+- Added gateway webhook coverage (auth, validation, and summary posting).
 
 ## 2.0.0-beta2 — 2025-12-21
 
