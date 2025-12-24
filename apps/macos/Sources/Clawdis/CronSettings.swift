@@ -1095,4 +1095,96 @@ struct CronSettings_Previews: PreviewProvider {
             .frame(width: SettingsTab.windowWidth, height: SettingsTab.windowHeight)
     }
 }
+
+@MainActor
+extension CronSettings {
+    static func exerciseForTesting() {
+        let store = CronJobsStore(isPreview: true)
+        store.schedulerEnabled = false
+        store.schedulerStorePath = "/tmp/clawdis-cron-store.json"
+
+        let job = CronJob(
+            id: "job-1",
+            name: "Daily summary",
+            description: "Summary job",
+            enabled: true,
+            createdAtMs: 1_700_000_000_000,
+            updatedAtMs: 1_700_000_100_000,
+            schedule: .cron(expr: "0 8 * * *", tz: "UTC"),
+            sessionTarget: .isolated,
+            wakeMode: .nextHeartbeat,
+            payload: .agentTurn(
+                message: "Summarize",
+                thinking: "low",
+                timeoutSeconds: 120,
+                deliver: true,
+                channel: "whatsapp",
+                to: "+15551234567",
+                bestEffortDeliver: true),
+            isolation: CronIsolation(postToMainPrefix: "[cron] "),
+            state: CronJobState(
+                nextRunAtMs: 1_700_000_200_000,
+                runningAtMs: nil,
+                lastRunAtMs: 1_700_000_050_000,
+                lastStatus: "ok",
+                lastError: nil,
+                lastDurationMs: 1200))
+
+        let run = CronRunLogEntry(
+            ts: 1_700_000_050_000,
+            jobId: job.id,
+            action: "finished",
+            status: "ok",
+            error: nil,
+            summary: "done",
+            runAtMs: 1_700_000_050_000,
+            durationMs: 1200,
+            nextRunAtMs: 1_700_000_200_000)
+
+        store.jobs = [job]
+        store.selectedJobId = job.id
+        store.runEntries = [run]
+
+        var view = CronSettings(store: store)
+        _ = view.body
+        _ = view.jobRow(job)
+        _ = view.jobContextMenu(job)
+        _ = view.detailHeader(job)
+        _ = view.detailCard(job)
+        _ = view.runHistoryCard(job)
+        _ = view.runRow(run)
+        _ = view.payloadSummary(job.payload)
+        _ = view.scheduleSummary(job.schedule)
+        _ = view.statusTint(job.state.lastStatus)
+        _ = view.nextRunLabel(Date())
+        _ = view.formatDuration(ms: 1234)
+    }
+}
+
+extension CronJobEditor {
+    mutating func exerciseForTesting() {
+        self.name = "Test job"
+        self.description = "Test description"
+        self.enabled = true
+        self.sessionTarget = .isolated
+        self.wakeMode = .now
+
+        self.scheduleKind = .every
+        self.everyText = "15m"
+
+        self.payloadKind = .agentTurn
+        self.agentMessage = "Run diagnostic"
+        self.deliver = true
+        self.channel = .last
+        self.to = "+15551230000"
+        self.thinking = "low"
+        self.timeoutSeconds = "90"
+        self.bestEffortDeliver = true
+        self.postPrefix = "Cron"
+
+        _ = self.buildAgentTurnPayload()
+        _ = try? self.buildPayload()
+        _ = self.formatDuration(ms: 45000)
+    }
+}
 #endif

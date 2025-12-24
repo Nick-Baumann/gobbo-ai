@@ -55,5 +55,14 @@ struct CronJobEditorSmokeTests {
             onSave: { _ in })
         _ = view.body
     }
-}
 
+    @Test func cronJobEditorExercisesBuilders() {
+        var view = CronJobEditor(
+            job: nil,
+            isSaving: .constant(false),
+            error: .constant(nil),
+            onCancel: {},
+            onSave: { _ in })
+        view.exerciseForTesting()
+    }
+}

@@ -6,21 +6,9 @@ import Testing
 struct AnthropicAuthResolverTests {
     @Test
     func prefersOAuthFileOverEnv() throws {
-        let key = "CLAWDIS_OAUTH_DIR"
-        let previous = ProcessInfo.processInfo.environment[key]
-        defer {
-            if let previous {
-                setenv(key, previous, 1)
-            } else {
-                unsetenv(key)
-            }
-        }
-
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("clawdis-oauth-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        setenv(key, dir.path, 1)
-
         let oauthFile = dir.appendingPathComponent("oauth.json")
         let payload = [
             "anthropic": [
@@ -33,9 +21,10 @@ struct AnthropicAuthResolverTests {
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: oauthFile, options: [.atomic])
 
+        let status = ClawdisOAuthStore.anthropicOAuthStatus(at: oauthFile)
         let mode = AnthropicAuthResolver.resolve(environment: [
             "ANTHROPIC_API_KEY": "sk-ant-ignored",
-        ])
+        ], oauthStatus: status)
         #expect(mode == .oauthFile)
     }
 
