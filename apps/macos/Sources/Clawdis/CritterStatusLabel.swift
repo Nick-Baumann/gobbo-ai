@@ -257,54 +257,37 @@ enum CritterIconRenderer {
     private struct Canvas {
         let w: CGFloat
         let h: CGFloat
+        let stepX: CGFloat
+        let stepY: CGFloat
         let snapX: (CGFloat) -> CGFloat
         let snapY: (CGFloat) -> CGFloat
         let context: CGContext
     }
 
-    static func makeIcon(
-        blink: CGFloat,
-        legWiggle: CGFloat = 0,
-        earWiggle: CGFloat = 0,
-        earScale: CGFloat = 1,
-        earHoles: Bool = false,
-        eyesClosedLines: Bool = false,
-        badge: Badge? = nil) -> NSImage
-    {
-        // Force a 36×36px backing store (2× for the 18pt logical canvas) so the menu bar icon stays crisp on Retina.
-        let pixelsWide = 36
-        let pixelsHigh = 36
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: pixelsWide,
-            pixelsHigh: pixelsHigh,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bitmapFormat: [],
-            bytesPerRow: 0,
-            bitsPerPixel: 0)
-        else {
-            return NSImage(size: self.size)
-        }
-        rep.size = self.size
+    private struct Geometry {
+        let bodyRect: CGRect
+        let bodyCorner: CGFloat
+        let leftEarRect: CGRect
+        let rightEarRect: CGRect
+        let earCorner: CGFloat
+        let earW: CGFloat
+        let earH: CGFloat
+        let legW: CGFloat
+        let legH: CGFloat
+        let legSpacing: CGFloat
+        let legStartX: CGFloat
+        let legYBase: CGFloat
+        let legLift: CGFloat
+        let legHeightScale: CGFloat
+        let eyeW: CGFloat
+        let eyeY: CGFloat
+        let eyeOffset: CGFloat
 
-        NSGraphicsContext.saveGraphicsState()
-        if let context = NSGraphicsContext(bitmapImageRep: rep) {
-            NSGraphicsContext.current = context
-            context.imageInterpolation = .none
-            context.cgContext.setShouldAntialias(false)
-            defer { NSGraphicsContext.restoreGraphicsState() }
-
-            let stepX = self.size.width / max(CGFloat(rep.pixelsWide), 1)
-            let stepY = self.size.height / max(CGFloat(rep.pixelsHigh), 1)
-            let snapX: (CGFloat) -> CGFloat = { ($0 / stepX).rounded() * stepX }
-            let snapY: (CGFloat) -> CGFloat = { ($0 / stepY).rounded() * stepY }
-
-            let w = snapX(size.width)
-            let h = snapY(size.height)
+        init(canvas: Canvas, legWiggle: CGFloat, earWiggle: CGFloat, earScale: CGFloat) {
+            let w = canvas.w
+            let h = canvas.h
+            let snapX = canvas.snapX
+            let snapY = canvas.snapY
 
             let bodyW = snapX(w * 0.78)
             let bodyH = snapY(h * 0.58)
@@ -333,138 +316,257 @@ enum CritterIconRenderer {
             let legStartX = snapX((w - legsWidth) / 2)
             let legLift = snapY(legH * 0.35 * legWiggle)
             let legYBase = snapY(bodyY - legH + h * 0.05)
+            let legHeightScale = 1 - 0.12 * legWiggle
 
             let eyeW = snapX(bodyW * 0.2)
             let eyeY = snapY(bodyY + bodyH * 0.56)
             let eyeOffset = snapX(bodyW * 0.24)
 
-            context.cgContext.setFillColor(NSColor.labelColor.cgColor)
+            self.bodyRect = CGRect(x: bodyX, y: bodyY, width: bodyW, height: bodyH)
+            self.bodyCorner = bodyCorner
+            self.leftEarRect = leftEarRect
+            self.rightEarRect = rightEarRect
+            self.earCorner = earCorner
+            self.earW = earW
+            self.earH = earH
+            self.legW = legW
+            self.legH = legH
+            self.legSpacing = legSpacing
+            self.legStartX = legStartX
+            self.legYBase = legYBase
+            self.legLift = legLift
+            self.legHeightScale = legHeightScale
+            self.eyeW = eyeW
+            self.eyeY = eyeY
+            self.eyeOffset = eyeOffset
+        }
+    }
 
-            context.cgContext.addPath(CGPath(
-                roundedRect: CGRect(x: bodyX, y: bodyY, width: bodyW, height: bodyH),
-                cornerWidth: bodyCorner,
-                cornerHeight: bodyCorner,
-                transform: nil))
-            context.cgContext.addPath(CGPath(
-                roundedRect: leftEarRect,
-                cornerWidth: earCorner,
-                cornerHeight: earCorner,
-                transform: nil))
-            context.cgContext.addPath(CGPath(
-                roundedRect: rightEarRect,
-                cornerWidth: earCorner,
-                cornerHeight: earCorner,
-                transform: nil))
-            for i in 0..<4 {
-                let x = legStartX + CGFloat(i) * (legW + legSpacing)
-                let lift = (i % 2 == 0 ? legLift : -legLift)
-                let rect = CGRect(
-                    x: x,
-                    y: legYBase + lift,
-                    width: legW,
-                    height: legH * (1 - 0.12 * legWiggle))
-                context.cgContext.addPath(CGPath(
-                    roundedRect: rect,
-                    cornerWidth: legW * 0.34,
-                    cornerHeight: legW * 0.34,
-                    transform: nil))
-            }
-            context.cgContext.fillPath()
+    private struct FaceOptions {
+        let blink: CGFloat
+        let earHoles: Bool
+        let earScale: CGFloat
+        let eyesClosedLines: Bool
+    }
 
-            context.cgContext.saveGState()
-            context.cgContext.setBlendMode(CGBlendMode.clear)
-
-            let leftCenter = CGPoint(x: snapX(w / 2 - eyeOffset), y: snapY(eyeY))
-            let rightCenter = CGPoint(x: snapX(w / 2 + eyeOffset), y: snapY(eyeY))
-
-            if earHoles || earScale > 1.05 {
-                let holeW = snapX(earW * 0.6)
-                let holeH = snapY(earH * 0.46)
-                let holeCorner = snapX(holeW * 0.34)
-                let leftHoleRect = CGRect(
-                    x: snapX(leftEarRect.midX - holeW / 2),
-                    y: snapY(leftEarRect.midY - holeH / 2 + earH * 0.04),
-                    width: holeW,
-                    height: holeH)
-                let rightHoleRect = CGRect(
-                    x: snapX(rightEarRect.midX - holeW / 2),
-                    y: snapY(rightEarRect.midY - holeH / 2 + earH * 0.04),
-                    width: holeW,
-                    height: holeH)
-
-                context.cgContext.addPath(CGPath(
-                    roundedRect: leftHoleRect,
-                    cornerWidth: holeCorner,
-                    cornerHeight: holeCorner,
-                    transform: nil))
-                context.cgContext.addPath(CGPath(
-                    roundedRect: rightHoleRect,
-                    cornerWidth: holeCorner,
-                    cornerHeight: holeCorner,
-                    transform: nil))
-            }
-
-            if eyesClosedLines {
-                let lineW = snapX(eyeW * 0.95)
-                let lineH = snapY(max(stepY * 2, bodyH * 0.06))
-                let corner = snapX(lineH * 0.6)
-                let leftRect = CGRect(
-                    x: snapX(leftCenter.x - lineW / 2),
-                    y: snapY(leftCenter.y - lineH / 2),
-                    width: lineW,
-                    height: lineH)
-                let rightRect = CGRect(
-                    x: snapX(rightCenter.x - lineW / 2),
-                    y: snapY(rightCenter.y - lineH / 2),
-                    width: lineW,
-                    height: lineH)
-                context.cgContext.addPath(CGPath(
-                    roundedRect: leftRect,
-                    cornerWidth: corner,
-                    cornerHeight: corner,
-                    transform: nil))
-                context.cgContext.addPath(CGPath(
-                    roundedRect: rightRect,
-                    cornerWidth: corner,
-                    cornerHeight: corner,
-                    transform: nil))
-            } else {
-                let eyeOpen = max(0.05, 1 - blink)
-                let eyeH = snapY(bodyH * 0.26 * eyeOpen)
-
-                let left = CGMutablePath()
-                left.move(to: CGPoint(x: snapX(leftCenter.x - eyeW / 2), y: snapY(leftCenter.y - eyeH)))
-                left.addLine(to: CGPoint(x: snapX(leftCenter.x + eyeW / 2), y: snapY(leftCenter.y)))
-                left.addLine(to: CGPoint(x: snapX(leftCenter.x - eyeW / 2), y: snapY(leftCenter.y + eyeH)))
-                left.closeSubpath()
-
-                let right = CGMutablePath()
-                right.move(to: CGPoint(x: snapX(rightCenter.x + eyeW / 2), y: snapY(rightCenter.y - eyeH)))
-                right.addLine(to: CGPoint(x: snapX(rightCenter.x - eyeW / 2), y: snapY(rightCenter.y)))
-                right.addLine(to: CGPoint(x: snapX(rightCenter.x + eyeW / 2), y: snapY(rightCenter.y + eyeH)))
-                right.closeSubpath()
-
-                context.cgContext.addPath(left)
-                context.cgContext.addPath(right)
-            }
-
-            context.cgContext.fillPath()
-            context.cgContext.restoreGState()
-
-            if let badge {
-                self.drawBadge(
-                    badge,
-                    canvas: Canvas(w: w, h: h, snapX: snapX, snapY: snapY, context: context.cgContext))
-            }
-        } else {
-            NSGraphicsContext.restoreGraphicsState()
+    static func makeIcon(
+        blink: CGFloat,
+        legWiggle: CGFloat = 0,
+        earWiggle: CGFloat = 0,
+        earScale: CGFloat = 1,
+        earHoles: Bool = false,
+        eyesClosedLines: Bool = false,
+        badge: Badge? = nil) -> NSImage
+    {
+        guard let rep = self.makeBitmapRep() else {
             return NSImage(size: self.size)
+        }
+        rep.size = self.size
+
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            return NSImage(size: self.size)
+        }
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .none
+        context.cgContext.setShouldAntialias(false)
+
+        let canvas = self.makeCanvas(for: rep, context: context)
+        let geometry = Geometry(canvas: canvas, legWiggle: legWiggle, earWiggle: earWiggle, earScale: earScale)
+
+        self.drawBody(in: canvas, geometry: geometry)
+        let face = FaceOptions(
+            blink: blink,
+            earHoles: earHoles,
+            earScale: earScale,
+            eyesClosedLines: eyesClosedLines)
+        self.drawFace(in: canvas, geometry: geometry, options: face)
+
+        if let badge {
+            self.drawBadge(badge, canvas: canvas)
         }
 
         let image = NSImage(size: size)
         image.addRepresentation(rep)
         image.isTemplate = true
         return image
+    }
+
+    private static func makeBitmapRep() -> NSBitmapImageRep? {
+        // Force a 36×36px backing store (2× for the 18pt logical canvas) so the menu bar icon stays crisp on Retina.
+        let pixelsWide = 36
+        let pixelsHigh = 36
+        return NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pixelsWide,
+            pixelsHigh: pixelsHigh,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bitmapFormat: [],
+            bytesPerRow: 0,
+            bitsPerPixel: 0)
+    }
+
+    private static func makeCanvas(for rep: NSBitmapImageRep, context: NSGraphicsContext) -> Canvas {
+        let stepX = self.size.width / max(CGFloat(rep.pixelsWide), 1)
+        let stepY = self.size.height / max(CGFloat(rep.pixelsHigh), 1)
+        let snapX: (CGFloat) -> CGFloat = { ($0 / stepX).rounded() * stepX }
+        let snapY: (CGFloat) -> CGFloat = { ($0 / stepY).rounded() * stepY }
+
+        let w = snapX(size.width)
+        let h = snapY(size.height)
+
+        return Canvas(
+            w: w,
+            h: h,
+            stepX: stepX,
+            stepY: stepY,
+            snapX: snapX,
+            snapY: snapY,
+            context: context.cgContext)
+    }
+
+    private static func drawBody(in canvas: Canvas, geometry: Geometry) {
+        canvas.context.setFillColor(NSColor.labelColor.cgColor)
+
+        canvas.context.addPath(CGPath(
+            roundedRect: geometry.bodyRect,
+            cornerWidth: geometry.bodyCorner,
+            cornerHeight: geometry.bodyCorner,
+            transform: nil))
+        canvas.context.addPath(CGPath(
+            roundedRect: geometry.leftEarRect,
+            cornerWidth: geometry.earCorner,
+            cornerHeight: geometry.earCorner,
+            transform: nil))
+        canvas.context.addPath(CGPath(
+            roundedRect: geometry.rightEarRect,
+            cornerWidth: geometry.earCorner,
+            cornerHeight: geometry.earCorner,
+            transform: nil))
+
+        for i in 0..<4 {
+            let x = geometry.legStartX + CGFloat(i) * (geometry.legW + geometry.legSpacing)
+            let lift = i % 2 == 0 ? geometry.legLift : -geometry.legLift
+            let rect = CGRect(
+                x: x,
+                y: geometry.legYBase + lift,
+                width: geometry.legW,
+                height: geometry.legH * geometry.legHeightScale)
+            canvas.context.addPath(CGPath(
+                roundedRect: rect,
+                cornerWidth: geometry.legW * 0.34,
+                cornerHeight: geometry.legW * 0.34,
+                transform: nil))
+        }
+        canvas.context.fillPath()
+    }
+
+    private static func drawFace(
+        in canvas: Canvas,
+        geometry: Geometry,
+        options: FaceOptions)
+    {
+        canvas.context.saveGState()
+        canvas.context.setBlendMode(.clear)
+
+        let leftCenter = CGPoint(
+            x: canvas.snapX(canvas.w / 2 - geometry.eyeOffset),
+            y: canvas.snapY(geometry.eyeY))
+        let rightCenter = CGPoint(
+            x: canvas.snapX(canvas.w / 2 + geometry.eyeOffset),
+            y: canvas.snapY(geometry.eyeY))
+
+        if options.earHoles || options.earScale > 1.05 {
+            let holeW = canvas.snapX(geometry.earW * 0.6)
+            let holeH = canvas.snapY(geometry.earH * 0.46)
+            let holeCorner = canvas.snapX(holeW * 0.34)
+            let leftHoleRect = CGRect(
+                x: canvas.snapX(geometry.leftEarRect.midX - holeW / 2),
+                y: canvas.snapY(geometry.leftEarRect.midY - holeH / 2 + geometry.earH * 0.04),
+                width: holeW,
+                height: holeH)
+            let rightHoleRect = CGRect(
+                x: canvas.snapX(geometry.rightEarRect.midX - holeW / 2),
+                y: canvas.snapY(geometry.rightEarRect.midY - holeH / 2 + geometry.earH * 0.04),
+                width: holeW,
+                height: holeH)
+
+            canvas.context.addPath(CGPath(
+                roundedRect: leftHoleRect,
+                cornerWidth: holeCorner,
+                cornerHeight: holeCorner,
+                transform: nil))
+            canvas.context.addPath(CGPath(
+                roundedRect: rightHoleRect,
+                cornerWidth: holeCorner,
+                cornerHeight: holeCorner,
+                transform: nil))
+        }
+
+        if options.eyesClosedLines {
+            let lineW = canvas.snapX(geometry.eyeW * 0.95)
+            let lineH = canvas.snapY(max(canvas.stepY * 2, geometry.bodyRect.height * 0.06))
+            let corner = canvas.snapX(lineH * 0.6)
+            let leftRect = CGRect(
+                x: canvas.snapX(leftCenter.x - lineW / 2),
+                y: canvas.snapY(leftCenter.y - lineH / 2),
+                width: lineW,
+                height: lineH)
+            let rightRect = CGRect(
+                x: canvas.snapX(rightCenter.x - lineW / 2),
+                y: canvas.snapY(rightCenter.y - lineH / 2),
+                width: lineW,
+                height: lineH)
+            canvas.context.addPath(CGPath(
+                roundedRect: leftRect,
+                cornerWidth: corner,
+                cornerHeight: corner,
+                transform: nil))
+            canvas.context.addPath(CGPath(
+                roundedRect: rightRect,
+                cornerWidth: corner,
+                cornerHeight: corner,
+                transform: nil))
+        } else {
+            let eyeOpen = max(0.05, 1 - options.blink)
+            let eyeH = canvas.snapY(geometry.bodyRect.height * 0.26 * eyeOpen)
+
+            let left = CGMutablePath()
+            left.move(to: CGPoint(
+                x: canvas.snapX(leftCenter.x - geometry.eyeW / 2),
+                y: canvas.snapY(leftCenter.y - eyeH)))
+            left.addLine(to: CGPoint(
+                x: canvas.snapX(leftCenter.x + geometry.eyeW / 2),
+                y: canvas.snapY(leftCenter.y)))
+            left.addLine(to: CGPoint(
+                x: canvas.snapX(leftCenter.x - geometry.eyeW / 2),
+                y: canvas.snapY(leftCenter.y + eyeH)))
+            left.closeSubpath()
+
+            let right = CGMutablePath()
+            right.move(to: CGPoint(
+                x: canvas.snapX(rightCenter.x + geometry.eyeW / 2),
+                y: canvas.snapY(rightCenter.y - eyeH)))
+            right.addLine(to: CGPoint(
+                x: canvas.snapX(rightCenter.x - geometry.eyeW / 2),
+                y: canvas.snapY(rightCenter.y)))
+            right.addLine(to: CGPoint(
+                x: canvas.snapX(rightCenter.x + geometry.eyeW / 2),
+                y: canvas.snapY(rightCenter.y + eyeH)))
+            right.closeSubpath()
+
+            canvas.context.addPath(left)
+            canvas.context.addPath(right)
+        }
+
+        canvas.context.fillPath()
+        canvas.context.restoreGState()
     }
 
     private static func drawBadge(_ badge: Badge, canvas: Canvas) {
