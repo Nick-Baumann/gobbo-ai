@@ -62,10 +62,65 @@ export type CronConfig = {
   maxConcurrentRuns?: number;
 };
 
+export type HookMappingMatch = {
+  path?: string;
+  source?: string;
+};
+
+export type HookMappingTransform = {
+  module: string;
+  export?: string;
+};
+
+export type HookMappingConfig = {
+  id?: string;
+  match?: HookMappingMatch;
+  action?: "wake" | "agent";
+  wakeMode?: "now" | "next-heartbeat";
+  name?: string;
+  sessionKey?: string;
+  messageTemplate?: string;
+  textTemplate?: string;
+  deliver?: boolean;
+  channel?: "last" | "whatsapp" | "telegram";
+  to?: string;
+  thinking?: string;
+  timeoutSeconds?: number;
+  transform?: HookMappingTransform;
+};
+
+export type HooksGmailTailscaleMode = "off" | "serve" | "funnel";
+
+export type HooksGmailConfig = {
+  account?: string;
+  label?: string;
+  topic?: string;
+  subscription?: string;
+  pushToken?: string;
+  hookUrl?: string;
+  includeBody?: boolean;
+  maxBytes?: number;
+  renewEveryMinutes?: number;
+  serve?: {
+    bind?: string;
+    port?: number;
+    path?: string;
+  };
+  tailscale?: {
+    mode?: HooksGmailTailscaleMode;
+    path?: string;
+  };
+};
+
 export type HooksConfig = {
   enabled?: boolean;
   path?: string;
   token?: string;
+  maxBodyBytes?: number;
+  presets?: string[];
+  transformsDir?: string;
+  mappings?: HookMappingConfig[];
+  gmail?: HooksGmailConfig;
 };
 
 export type TelegramConfig = {
@@ -387,6 +442,68 @@ const RoutingSchema = z
   })
   .optional();
 
+const HookMappingSchema = z
+  .object({
+    id: z.string().optional(),
+    match: z
+      .object({
+        path: z.string().optional(),
+        source: z.string().optional(),
+      })
+      .optional(),
+    action: z.union([z.literal("wake"), z.literal("agent")]).optional(),
+    wakeMode: z
+      .union([z.literal("now"), z.literal("next-heartbeat")])
+      .optional(),
+    name: z.string().optional(),
+    sessionKey: z.string().optional(),
+    messageTemplate: z.string().optional(),
+    textTemplate: z.string().optional(),
+    deliver: z.boolean().optional(),
+    channel: z
+      .union([z.literal("last"), z.literal("whatsapp"), z.literal("telegram")])
+      .optional(),
+    to: z.string().optional(),
+    thinking: z.string().optional(),
+    timeoutSeconds: z.number().int().positive().optional(),
+    transform: z
+      .object({
+        module: z.string(),
+        export: z.string().optional(),
+      })
+      .optional(),
+  })
+  .optional();
+
+const HooksGmailSchema = z
+  .object({
+    account: z.string().optional(),
+    label: z.string().optional(),
+    topic: z.string().optional(),
+    subscription: z.string().optional(),
+    pushToken: z.string().optional(),
+    hookUrl: z.string().optional(),
+    includeBody: z.boolean().optional(),
+    maxBytes: z.number().int().positive().optional(),
+    renewEveryMinutes: z.number().int().positive().optional(),
+    serve: z
+      .object({
+        bind: z.string().optional(),
+        port: z.number().int().positive().optional(),
+        path: z.string().optional(),
+      })
+      .optional(),
+    tailscale: z
+      .object({
+        mode: z
+          .union([z.literal("off"), z.literal("serve"), z.literal("funnel")])
+          .optional(),
+        path: z.string().optional(),
+      })
+      .optional(),
+  })
+  .optional();
+
 const ClawdisSchema = z.object({
   identity: z
     .object({
@@ -473,6 +590,11 @@ const ClawdisSchema = z.object({
       enabled: z.boolean().optional(),
       path: z.string().optional(),
       token: z.string().optional(),
+      maxBodyBytes: z.number().int().positive().optional(),
+      presets: z.array(z.string()).optional(),
+      transformsDir: z.string().optional(),
+      mappings: z.array(HookMappingSchema).optional(),
+      gmail: HooksGmailSchema,
     })
     .optional(),
   web: z
