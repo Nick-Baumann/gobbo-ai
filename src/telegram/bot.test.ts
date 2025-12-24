@@ -148,7 +148,7 @@ describe("createTelegramBot", () => {
     expect(payload.ReplyToSender).toBe("Ada");
   });
 
-  it("sends replies as native replies without chaining", async () => {
+  it("sends replies without native reply threading", async () => {
     onSpy.mockReset();
     sendMessageSpy.mockReset();
     const replySpy = replyModule.__replySpy as unknown as ReturnType<
@@ -174,7 +174,7 @@ describe("createTelegramBot", () => {
 
     expect(sendMessageSpy.mock.calls.length).toBeGreaterThan(1);
     for (const call of sendMessageSpy.mock.calls) {
-      expect(call[2]?.reply_to_message_id).toBe(101);
+      expect(call[2]?.reply_to_message_id).toBeUndefined();
     }
   });
 });

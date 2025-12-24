@@ -223,10 +223,10 @@ export async function monitorWebInbox(options: {
         }
       };
       const reply = async (text: string) => {
-        await sock.sendMessage(chatJid, { text }, { quoted: msg });
+        await sock.sendMessage(chatJid, { text });
       };
       const sendMedia = async (payload: AnyMessageContent) => {
-        await sock.sendMessage(chatJid, payload, { quoted: msg });
+        await sock.sendMessage(chatJid, payload);
       };
       const timestamp = msg.messageTimestamp
         ? Number(msg.messageTimestamp) * 1000

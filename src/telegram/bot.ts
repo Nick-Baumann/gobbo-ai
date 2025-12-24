@@ -199,7 +199,6 @@ export function createTelegramBot(opts: TelegramBotOptions) {
         token: opts.token,
         runtime,
         bot,
-        replyToMessageId: msg.message_id,
       });
     } catch (err) {
       runtime.error?.(danger(`Telegram handler failed: ${String(err)}`));
@@ -222,10 +221,8 @@ async function deliverReplies(params: {
   token: string;
   runtime: RuntimeEnv;
   bot: Bot;
-  replyToMessageId?: number;
 }) {
   const { replies, chatId, runtime, bot } = params;
-  const replyTarget = params.replyToMessageId;
   for (const reply of replies) {
     if (!reply?.text && !reply?.mediaUrl && !(reply?.mediaUrls?.length ?? 0)) {
       runtime.error?.(danger("Telegram reply missing text/media"));
@@ -236,14 +233,9 @@ async function deliverReplies(params: {
       : reply.mediaUrl
         ? [reply.mediaUrl]
         : [];
-    if (replyTarget && isVerbose()) {
-      logVerbose(
-        `telegram reply-send: chatId=${chatId} replyToMessageId=${replyTarget} kind=${mediaList.length ? "media" : "text"}`,
-      );
-    }
     if (mediaList.length === 0) {
       for (const chunk of chunkText(reply.text || "", 4000)) {
-        await sendTelegramText(bot, chatId, chunk, runtime, replyTarget);
+        await sendTelegramText(bot, chatId, chunk, runtime);
       }
       continue;
     }
@@ -255,18 +247,14 @@ async function deliverReplies(params: {
       const file = new InputFile(media.buffer, media.fileName ?? "file");
       const caption = first ? (reply.text ?? undefined) : undefined;
       first = false;
-      const replyOpts = replyTarget ? { reply_to_message_id: replyTarget } : {};
       if (kind === "image") {
-        await bot.api.sendPhoto(chatId, file, { caption, ...replyOpts });
+        await bot.api.sendPhoto(chatId, file, { caption });
       } else if (kind === "video") {
-        await bot.api.sendVideo(chatId, file, { caption, ...replyOpts });
+        await bot.api.sendVideo(chatId, file, { caption });
       } else if (kind === "audio") {
-        await bot.api.sendAudio(chatId, file, { caption, ...replyOpts });
+        await bot.api.sendAudio(chatId, file, { caption });
       } else {
-        await bot.api.sendDocument(chatId, file, {
-          caption,
-          ...replyOpts,
-        });
+        await bot.api.sendDocument(chatId, file, { caption });
       }
     }
   }
@@ -363,12 +351,10 @@ async function sendTelegramText(
   chatId: string,
   text: string,
   runtime: RuntimeEnv,
-  replyToMessageId?: number,
 ): Promise<number | undefined> {
   try {
     const res = await bot.api.sendMessage(chatId, text, {
       parse_mode: "Markdown",
-      reply_to_message_id: replyToMessageId,
     });
     return res.message_id;
   } catch (err) {
@@ -378,7 +364,6 @@ async function sendTelegramText(
         `telegram markdown parse failed; retrying without formatting: ${errText}`,
       );
       const res = await bot.api.sendMessage(chatId, text, {
-        reply_to_message_id: replyToMessageId,
       });
       return res.message_id;
     }
