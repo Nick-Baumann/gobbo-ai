@@ -117,6 +117,7 @@ export type NodeBridgeServer = {
     payloadJSON?: string | null;
   }) => void;
   listConnected: () => NodeBridgeClientInfo[];
+  listeners: Array<{ host: string; port: number }>;
 };
 
 export type NodeBridgeClientInfo = {
@@ -177,6 +178,7 @@ export async function startNodeBridgeServer(
       },
       sendEvent: () => {},
       listConnected: () => [],
+      listeners: [],
     };
   }
 
@@ -672,7 +674,7 @@ export async function startNodeBridgeServer(
     });
   };
 
-  const servers: net.Server[] = [];
+  const listeners: Array<{ host: string; server: net.Server }> = [];
   const primary = net.createServer(onConnection);
   await new Promise<void>((resolve, reject) => {
     const onError = (err: Error) => reject(err);
@@ -682,7 +684,10 @@ export async function startNodeBridgeServer(
       resolve();
     });
   });
-  servers.push(primary);
+  listeners.push({
+    host: String(opts.host ?? "").trim() || "(default)",
+    server: primary,
+  });
 
   const address = primary.address();
   const port =
@@ -699,7 +704,7 @@ export async function startNodeBridgeServer(
           resolve();
         });
       });
-      servers.push(loopback);
+      listeners.push({ host: loopbackHost, server: loopback });
     } catch {
       try {
         loopback.close();
@@ -721,15 +726,16 @@ export async function startNodeBridgeServer(
       }
       connections.clear();
       await Promise.all(
-        servers.map(
-          (s) =>
+        listeners.map(
+          (l) =>
             new Promise<void>((resolve, reject) =>
-              s.close((err) => (err ? reject(err) : resolve())),
+              l.server.close((err) => (err ? reject(err) : resolve())),
             ),
         ),
       );
     },
     listConnected: () => [...connections.values()].map((c) => c.nodeInfo),
+    listeners: listeners.map((l) => ({ host: l.host, port })),
     sendEvent: ({ nodeId, event, payloadJSON }) => {
       const normalizedNodeId = String(nodeId ?? "").trim();
       const normalizedEvent = String(event ?? "").trim();

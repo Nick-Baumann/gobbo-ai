@@ -88,6 +88,26 @@ describe("node bridge server", () => {
     await server.close();
   });
 
+  it("does not add a loopback listener when bind already includes loopback", async () => {
+    const loopback = await startNodeBridgeServer({
+      host: "127.0.0.1",
+      port: 0,
+      pairingBaseDir: baseDir,
+    });
+    expect(loopback.listeners).toHaveLength(1);
+    expect(loopback.listeners[0]?.host).toBe("127.0.0.1");
+    await loopback.close();
+
+    const wildcard = await startNodeBridgeServer({
+      host: "0.0.0.0",
+      port: 0,
+      pairingBaseDir: baseDir,
+    });
+    expect(wildcard.listeners).toHaveLength(1);
+    expect(wildcard.listeners[0]?.host).toBe("0.0.0.0");
+    await wildcard.close();
+  });
+
   it("also listens on loopback when bound to a non-loopback host", async () => {
     const host = pickNonLoopbackIPv4();
     if (!host) return;
@@ -97,6 +117,10 @@ describe("node bridge server", () => {
       port: 0,
       pairingBaseDir: baseDir,
     });
+
+    expect(server.listeners.map((l) => l.host).sort()).toEqual(
+      [host, "127.0.0.1"].sort(),
+    );
 
     const socket = net.connect({ host: "127.0.0.1", port: server.port });
     await new Promise<void>((resolve, reject) => {
