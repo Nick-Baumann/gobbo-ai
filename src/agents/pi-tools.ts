@@ -306,11 +306,12 @@ export function createClawdisCodingTools(options?: {
   const processTool = createProcessTool({
     cleanupMs: options?.bash?.cleanupMs,
   });
-  return [
+  const tools: AnyAgentTool[] = [
     ...base,
-    bashTool,
-    processTool,
+    bashTool as unknown as AnyAgentTool,
+    processTool as unknown as AnyAgentTool,
     createWhatsAppLoginTool(),
     ...createClawdisTools(),
-  ].map(normalizeToolParameters);
+  ];
+  return tools.map(normalizeToolParameters);
 }
