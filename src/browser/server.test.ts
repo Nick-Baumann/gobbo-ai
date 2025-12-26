@@ -336,8 +336,10 @@ describe("browser control server", () => {
       }),
     });
     expect(clickSelector.status).toBe(400);
-    const clickSelectorBody = (await clickSelector.json()) as { error?: string };
-    expect(clickSelectorBody.error).toMatch(/selector is not supported/i);
+    const clickSelectorBody = (await clickSelector.json()) as {
+      error?: string;
+    };
+    expect(clickSelectorBody.error).toMatch(/'selector' is not supported/i);
 
     const type = (await realFetch(`${base}/act`, {
       method: "POST",

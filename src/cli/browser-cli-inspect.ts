@@ -45,7 +45,9 @@ export function registerBrowserInspectCommands(
 
   browser
     .command("snapshot")
-    .description("Capture a snapshot (default: ai; aria is the accessibility tree)")
+    .description(
+      "Capture a snapshot (default: ai; aria is the accessibility tree)",
+    )
     .option("--format <aria|ai>", "Snapshot format (default: ai)", "ai")
     .option("--target-id <id>", "CDP target id (or unique prefix)")
     .option("--limit <n>", "Max nodes (default: 500/800)", (v: string) =>

@@ -11,8 +11,8 @@ import {
   buildAllowedModelSet,
   buildModelAliasIndex,
   modelKey,
-  resolveModelRefFromString,
   resolveConfiguredModelRef,
+  resolveModelRefFromString,
 } from "../agents/model-selection.js";
 import {
   abortEmbeddedPiRun,
@@ -579,7 +579,9 @@ export async function getReplyFromConfig(
         const label = `${entry.provider}/${entry.id}`;
         const aliases = aliasIndex.byKey.get(label);
         const aliasSuffix =
-          aliases && aliases.length > 0 ? ` (alias: ${aliases.join(", ")})` : "";
+          aliases && aliases.length > 0
+            ? ` (alias: ${aliases.join(", ")})`
+            : "";
         const suffix =
           entry.name && entry.name !== entry.id ? ` — ${entry.name}` : "";
         lines.push(`- ${label}${aliasSuffix}${suffix}`);

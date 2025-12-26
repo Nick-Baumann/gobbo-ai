@@ -46,7 +46,10 @@ export function buildModelAliasIndex(params: {
   for (const [aliasRaw, targetRaw] of Object.entries(rawAliases)) {
     const alias = aliasRaw.trim();
     if (!alias) continue;
-    const parsed = parseModelRef(String(targetRaw ?? ""), params.defaultProvider);
+    const parsed = parseModelRef(
+      String(targetRaw ?? ""),
+      params.defaultProvider,
+    );
     if (!parsed) continue;
     const aliasKey = normalizeAliasKey(alias);
     byAlias.set(aliasKey, { alias, ref: parsed });

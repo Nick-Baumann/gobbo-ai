@@ -405,10 +405,7 @@ describe("directive parsing", () => {
           agent: {
             model: "openai/gpt-4.1-mini",
             workspace: path.join(home, "clawd"),
-            allowedModels: [
-              "openai/gpt-4.1-mini",
-              "anthropic/claude-opus-4-5",
-            ],
+            allowedModels: ["openai/gpt-4.1-mini", "anthropic/claude-opus-4-5"],
             modelAliases: {
               Opus: "anthropic/claude-opus-4-5",
             },

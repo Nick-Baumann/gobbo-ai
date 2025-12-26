@@ -123,7 +123,7 @@ export function registerBrowserAgentRoutes(
     const body = readBody(req);
     const kind = toStringOrEmpty(body.kind) as ActKind;
     const targetId = toStringOrEmpty(body.targetId) || undefined;
-    if (Object.prototype.hasOwnProperty.call(body, "selector")) {
+    if (Object.hasOwn(body, "selector")) {
       return jsonError(res, 400, SELECTOR_UNSUPPORTED_MESSAGE);
     }
 
