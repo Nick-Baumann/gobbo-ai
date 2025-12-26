@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { HEARTBEAT_PROMPT } from "../auto-reply/heartbeat.js";
+import * as replyModule from "../auto-reply/reply.js";
 import type { ClawdisConfig } from "../config/config.js";
 import {
+  runHeartbeatOnce,
   resolveHeartbeatDeliveryTarget,
   resolveHeartbeatIntervalMs,
   resolveHeartbeatPrompt,
@@ -111,5 +116,62 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       channel: "telegram",
       to: "123",
     });
+  });
+});
+
+describe("runHeartbeatOnce", () => {
+  it("uses the last non-empty payload for delivery", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-hb-"));
+    const storePath = path.join(tmpDir, "sessions.json");
+    const replySpy = vi.spyOn(replyModule, "getReplyFromConfig");
+    try {
+      await fs.writeFile(
+        storePath,
+        JSON.stringify(
+          {
+            main: {
+              sessionId: "sid",
+              updatedAt: Date.now(),
+              lastChannel: "whatsapp",
+              lastTo: "+1555",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const cfg: ClawdisConfig = {
+        agent: {
+          heartbeat: { every: "5m", target: "whatsapp", to: "+1555" },
+        },
+        routing: { allowFrom: ["*"] },
+        session: { store: storePath },
+      };
+
+      replySpy.mockResolvedValue([
+        { text: "Let me check..." },
+        { text: "Final alert" },
+      ]);
+      const sendWhatsApp = vi.fn().mockResolvedValue({
+        messageId: "m1",
+        toJid: "jid",
+      });
+
+      await runHeartbeatOnce({
+        cfg,
+        deps: { sendWhatsApp, getQueueSize: () => 0, nowMs: () => 0 },
+      });
+
+      expect(sendWhatsApp).toHaveBeenCalledTimes(1);
+      expect(sendWhatsApp).toHaveBeenCalledWith(
+        "+1555",
+        "Final alert",
+        expect.any(Object),
+      );
+    } finally {
+      replySpy.mockRestore();
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });

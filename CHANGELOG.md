@@ -21,6 +21,7 @@
 
 ### Fixes
 - Heartbeat replies now strip repeated `HEARTBEAT_OK` tails to avoid accidental “OK OK” spam.
+- Heartbeat delivery now uses the last non-empty payload, preventing tool preambles from swallowing the final reply.
 - Heartbeat failure logs now include the error reason instead of `[object Object]`.
 - Duration strings now accept `h` (hours) where durations are parsed (e.g., heartbeat intervals).
 - WhatsApp inbound now normalizes more wrapper types so quoted reply bodies are extracted reliably.

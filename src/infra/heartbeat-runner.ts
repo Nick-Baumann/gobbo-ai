@@ -93,6 +93,25 @@ function resolveHeartbeatSession(cfg: ClawdisConfig) {
   return { sessionKey, storePath, store, entry };
 }
 
+function resolveHeartbeatReplyPayload(
+  replyResult: ReplyPayload | ReplyPayload[] | undefined,
+): ReplyPayload | undefined {
+  if (!replyResult) return undefined;
+  if (!Array.isArray(replyResult)) return replyResult;
+  for (let idx = replyResult.length - 1; idx >= 0; idx -= 1) {
+    const payload = replyResult[idx];
+    if (!payload) continue;
+    if (
+      payload.text ||
+      payload.mediaUrl ||
+      (payload.mediaUrls && payload.mediaUrls.length > 0)
+    ) {
+      return payload;
+    }
+  }
+  return undefined;
+}
+
 function resolveHeartbeatSender(params: {
   allowFrom: Array<string | number>;
   lastTo?: string;
@@ -318,9 +337,7 @@ export async function runHeartbeatOnce(opts: {
       { isHeartbeat: true },
       cfg,
     );
-    const replyPayload = Array.isArray(replyResult)
-      ? replyResult[0]
-      : replyResult;
+    const replyPayload = resolveHeartbeatReplyPayload(replyResult);
 
     if (
       !replyPayload ||
