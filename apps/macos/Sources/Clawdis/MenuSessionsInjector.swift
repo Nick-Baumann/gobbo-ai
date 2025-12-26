@@ -737,6 +737,7 @@ final class MenuSessionsInjector: NSObject, NSMenuDelegate {
 
     private func initialWidth(for menu: NSMenu) -> CGFloat {
         let candidates: [CGFloat] = [
+            menu.size.width,
             menu.minimumWidth,
             self.lastKnownMenuWidth ?? 0,
             self.fallbackWidth,
