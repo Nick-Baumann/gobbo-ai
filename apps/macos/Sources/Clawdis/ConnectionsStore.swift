@@ -61,9 +61,34 @@ struct ProvidersStatusSnapshot: Codable {
         let lastProbeAt: Double?
     }
 
+    struct DiscordBot: Codable {
+        let id: String?
+        let username: String?
+    }
+
+    struct DiscordProbe: Codable {
+        let ok: Bool
+        let status: Int?
+        let error: String?
+        let elapsedMs: Double?
+        let bot: DiscordBot?
+    }
+
+    struct DiscordStatus: Codable {
+        let configured: Bool
+        let tokenSource: String?
+        let running: Bool
+        let lastStartAt: Double?
+        let lastStopAt: Double?
+        let lastError: String?
+        let probe: DiscordProbe?
+        let lastProbeAt: Double?
+    }
+
     let ts: Double
     let whatsapp: WhatsAppStatus
     let telegram: TelegramStatus
+    let discord: DiscordStatus?
 }
 
 struct ConfigSnapshot: Codable {
@@ -104,6 +129,12 @@ final class ConnectionsStore {
     var telegramWebhookSecret: String = ""
     var telegramWebhookPath: String = ""
     var telegramBusy = false
+    var discordToken: String = ""
+    var discordRequireMention = true
+    var discordAllowFrom: String = ""
+    var discordGuildAllowFrom: String = ""
+    var discordGuildUsersAllowFrom: String = ""
+    var discordMediaMaxMb: String = ""
     var configStatus: String?
     var isSavingConfig = false
 
@@ -281,6 +312,53 @@ final class ConnectionsStore {
             self.telegramWebhookUrl = telegram?["webhookUrl"]?.stringValue ?? ""
             self.telegramWebhookSecret = telegram?["webhookSecret"]?.stringValue ?? ""
             self.telegramWebhookPath = telegram?["webhookPath"]?.stringValue ?? ""
+
+            let discord = snap.config?["discord"]?.dictionaryValue
+            self.discordToken = discord?["token"]?.stringValue ?? ""
+            self.discordRequireMention = discord?["requireMention"]?.boolValue ?? true
+            if let allow = discord?["allowFrom"]?.arrayValue {
+                let strings = allow.compactMap { entry -> String? in
+                    if let str = entry.stringValue { return str }
+                    if let intVal = entry.intValue { return String(intVal) }
+                    if let doubleVal = entry.doubleValue { return String(Int(doubleVal)) }
+                    return nil
+                }
+                self.discordAllowFrom = strings.joined(separator: ", ")
+            } else {
+                self.discordAllowFrom = ""
+            }
+            if let guildAllow = discord?["guildAllowFrom"]?.dictionaryValue {
+                if let guilds = guildAllow["guilds"]?.arrayValue {
+                    let strings = guilds.compactMap { entry -> String? in
+                        if let str = entry.stringValue { return str }
+                        if let intVal = entry.intValue { return String(intVal) }
+                        if let doubleVal = entry.doubleValue { return String(Int(doubleVal)) }
+                        return nil
+                    }
+                    self.discordGuildAllowFrom = strings.joined(separator: ", ")
+                } else {
+                    self.discordGuildAllowFrom = ""
+                }
+                if let users = guildAllow["users"]?.arrayValue {
+                    let strings = users.compactMap { entry -> String? in
+                        if let str = entry.stringValue { return str }
+                        if let intVal = entry.intValue { return String(intVal) }
+                        if let doubleVal = entry.doubleValue { return String(Int(doubleVal)) }
+                        return nil
+                    }
+                    self.discordGuildUsersAllowFrom = strings.joined(separator: ", ")
+                } else {
+                    self.discordGuildUsersAllowFrom = ""
+                }
+            } else {
+                self.discordGuildAllowFrom = ""
+                self.discordGuildUsersAllowFrom = ""
+            }
+            if let media = discord?["mediaMaxMb"]?.doubleValue ?? discord?["mediaMaxMb"]?.intValue.map(Double.init) {
+                self.discordMediaMaxMb = String(Int(media))
+            } else {
+                self.discordMediaMaxMb = ""
+            }
         } catch {
             self.configStatus = error.localizedDescription
         }
@@ -350,6 +428,94 @@ final class ConnectionsStore {
             self.configRoot.removeValue(forKey: "telegram")
         } else {
             self.configRoot["telegram"] = telegram
+        }
+
+        do {
+            let data = try JSONSerialization.data(
+                withJSONObject: self.configRoot,
+                options: [.prettyPrinted, .sortedKeys])
+            guard let raw = String(data: data, encoding: .utf8) else {
+                self.configStatus = "Failed to encode config."
+                return
+            }
+            let params: [String: AnyCodable] = ["raw": AnyCodable(raw)]
+            _ = try await GatewayConnection.shared.requestRaw(
+                method: .configSet,
+                params: params,
+                timeoutMs: 10000)
+            self.configStatus = "Saved to ~/.clawdis/clawdis.json."
+            await self.refresh(probe: true)
+        } catch {
+            self.configStatus = error.localizedDescription
+        }
+    }
+
+    func saveDiscordConfig() async {
+        guard !self.isSavingConfig else { return }
+        self.isSavingConfig = true
+        defer { self.isSavingConfig = false }
+        if !self.configLoaded {
+            await self.loadConfig()
+        }
+
+        var discord: [String: Any] = (self.configRoot["discord"] as? [String: Any]) ?? [:]
+        let token = self.discordToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        if token.isEmpty {
+            discord.removeValue(forKey: "token")
+        } else {
+            discord["token"] = token
+        }
+
+        discord["requireMention"] = self.discordRequireMention
+
+        let allow = self.discordAllowFrom
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if allow.isEmpty {
+            discord.removeValue(forKey: "allowFrom")
+        } else {
+            discord["allowFrom"] = allow
+        }
+
+        var guildAllow: [String: Any] = (discord["guildAllowFrom"] as? [String: Any]) ?? [:]
+        let guilds = self.discordGuildAllowFrom
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if guilds.isEmpty {
+            guildAllow.removeValue(forKey: "guilds")
+        } else {
+            guildAllow["guilds"] = guilds
+        }
+
+        let users = self.discordGuildUsersAllowFrom
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if users.isEmpty {
+            guildAllow.removeValue(forKey: "users")
+        } else {
+            guildAllow["users"] = users
+        }
+
+        if guildAllow.isEmpty {
+            discord.removeValue(forKey: "guildAllowFrom")
+        } else {
+            discord["guildAllowFrom"] = guildAllow
+        }
+
+        let media = self.discordMediaMaxMb.trimmingCharacters(in: .whitespacesAndNewlines)
+        if media.isEmpty {
+            discord.removeValue(forKey: "mediaMaxMb")
+        } else if let value = Double(media) {
+            discord["mediaMaxMb"] = value
+        }
+
+        if discord.isEmpty {
+            self.configRoot.removeValue(forKey: "discord")
+        } else {
+            self.configRoot["discord"] = discord
         }
 
         do {

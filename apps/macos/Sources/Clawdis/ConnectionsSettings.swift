@@ -4,6 +4,7 @@ import SwiftUI
 struct ConnectionsSettings: View {
     @Bindable var store: ConnectionsStore
     @State private var showTelegramToken = false
+    @State private var showDiscordToken = false
 
     init(store: ConnectionsStore = .shared) {
         self.store = store
@@ -15,6 +16,7 @@ struct ConnectionsSettings: View {
                 self.header
                 self.whatsAppSection
                 self.telegramSection
+                self.discordSection
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -29,7 +31,7 @@ struct ConnectionsSettings: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Connections")
                 .font(.title3.weight(.semibold))
-            Text("Link and monitor WhatsApp and Telegram providers.")
+            Text("Link and monitor WhatsApp, Telegram, and Discord providers.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -216,6 +218,107 @@ struct ConnectionsSettings: View {
         }
     }
 
+    private var discordSection: some View {
+        GroupBox("Discord") {
+            VStack(alignment: .leading, spacing: 10) {
+                self.providerHeader(
+                    title: "Discord Bot",
+                    color: self.discordTint,
+                    subtitle: self.discordSummary)
+
+                if let details = self.discordDetails {
+                    Text(details)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let status = self.store.configStatus {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Divider().padding(.vertical, 2)
+
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 10) {
+                    GridRow {
+                        self.gridLabel("Bot token")
+                        if self.showDiscordToken {
+                            TextField("bot token", text: self.$store.discordToken)
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(self.isDiscordTokenLocked)
+                        } else {
+                            SecureField("bot token", text: self.$store.discordToken)
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(self.isDiscordTokenLocked)
+                        }
+                        Toggle("Show", isOn: self.$showDiscordToken)
+                            .toggleStyle(.switch)
+                            .disabled(self.isDiscordTokenLocked)
+                    }
+                    GridRow {
+                        self.gridLabel("Require mention")
+                        Toggle("", isOn: self.$store.discordRequireMention)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                    }
+                    GridRow {
+                        self.gridLabel("Allow from")
+                        TextField("discord:123, user:456", text: self.$store.discordAllowFrom)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    GridRow {
+                        self.gridLabel("Allow guilds")
+                        TextField("guildId1, guildId2", text: self.$store.discordGuildAllowFrom)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    GridRow {
+                        self.gridLabel("Allow guild users")
+                        TextField("userId1, userId2", text: self.$store.discordGuildUsersAllowFrom)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    GridRow {
+                        self.gridLabel("Media max MB")
+                        TextField("8", text: self.$store.discordMediaMaxMb)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+
+                if self.isDiscordTokenLocked {
+                    Text("Token set via DISCORD_BOT_TOKEN env; config edits won’t override it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 12) {
+                    Button {
+                        Task { await self.store.saveDiscordConfig() }
+                    } label: {
+                        if self.store.isSavingConfig {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(self.store.isSavingConfig)
+
+                    Spacer()
+
+                    Button("Refresh") {
+                        Task { await self.store.refresh(probe: true) }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(self.store.isRefreshing)
+                }
+                .font(.caption)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private var whatsAppTint: Color {
         guard let status = self.store.snapshot?.whatsapp else { return .secondary }
         if !status.linked { return .red }
@@ -232,6 +335,14 @@ struct ConnectionsSettings: View {
         return .secondary
     }
 
+    private var discordTint: Color {
+        guard let status = self.store.snapshot?.discord else { return .secondary }
+        if !status.configured { return .secondary }
+        if status.running { return .green }
+        if status.lastError != nil { return .orange }
+        return .secondary
+    }
+
     private var whatsAppSummary: String {
         guard let status = self.store.snapshot?.whatsapp else { return "Checking…" }
         if !status.linked { return "Not linked" }
@@ -242,6 +353,13 @@ struct ConnectionsSettings: View {
 
     private var telegramSummary: String {
         guard let status = self.store.snapshot?.telegram else { return "Checking…" }
+        if !status.configured { return "Not configured" }
+        if status.running { return "Running" }
+        return "Configured"
+    }
+
+    private var discordSummary: String {
+        guard let status = self.store.snapshot?.discord else { return "Checking…" }
         if !status.configured { return "Not configured" }
         if status.running { return "Running" }
         return "Configured"
@@ -308,8 +426,40 @@ struct ConnectionsSettings: View {
         return lines.isEmpty ? nil : lines.joined(separator: " · ")
     }
 
+    private var discordDetails: String? {
+        guard let status = self.store.snapshot?.discord else { return nil }
+        var lines: [String] = []
+        if let source = status.tokenSource {
+            lines.append("Token source: \(source)")
+        }
+        if let probe = status.probe {
+            if probe.ok {
+                if let name = probe.bot?.username {
+                    lines.append("Bot: @\(name)")
+                }
+                if let elapsed = probe.elapsedMs {
+                    lines.append("Probe \(Int(elapsed))ms")
+                }
+            } else {
+                let code = probe.status.map { String($0) } ?? "unknown"
+                lines.append("Probe failed (\(code))")
+            }
+        }
+        if let last = self.date(fromMs: status.lastProbeAt) {
+            lines.append("Last probe \(relativeAge(from: last))")
+        }
+        if let err = status.lastError, !err.isEmpty {
+            lines.append("Error: \(err)")
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: " · ")
+    }
+
     private var isTelegramTokenLocked: Bool {
         self.store.snapshot?.telegram.tokenSource == "env"
+    }
+
+    private var isDiscordTokenLocked: Bool {
+        self.store.snapshot?.discord?.tokenSource == "env"
     }
 
     private func providerHeader(title: String, color: Color, subtitle: String) -> some View {
