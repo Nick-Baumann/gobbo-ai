@@ -19,11 +19,7 @@ export function parseDurationMs(
     throw new Error(`invalid duration: ${raw}`);
   }
 
-  const unit = (m[2] ?? opts?.defaultUnit ?? "ms") as
-    | "ms"
-    | "s"
-    | "m"
-    | "h";
+  const unit = (m[2] ?? opts?.defaultUnit ?? "ms") as "ms" | "s" | "m" | "h";
   const multiplier =
     unit === "ms" ? 1 : unit === "s" ? 1000 : unit === "m" ? 60_000 : 3_600_000;
   const ms = Math.round(value * multiplier);

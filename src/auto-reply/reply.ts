@@ -1063,7 +1063,7 @@ export async function getReplyFromConfig(
 
     if (sessionStore && sessionKey) {
       const usage = runResult.meta.agentMeta?.usage;
-    const modelUsed = runResult.meta.agentMeta?.model ?? defaultModel;
+      const modelUsed = runResult.meta.agentMeta?.model ?? defaultModel;
       const contextTokensUsed =
         agentCfg?.contextTokens ??
         lookupContextTokens(modelUsed) ??

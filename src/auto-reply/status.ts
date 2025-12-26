@@ -202,9 +202,7 @@ export function buildStatusMessage(args: StatusArgs): string {
 
   const optionsLine = `Options: thinking=${thinkLevel} | verbose=${verboseLevel} (set with /think <level>, /verbose on|off, /model <id>)`;
 
-  const modelLabel = model
-    ? `${resolved.provider}/${model}`
-    : "unknown";
+  const modelLabel = model ? `${resolved.provider}/${model}` : "unknown";
 
   const agentLine = `Agent: embedded pi • ${modelLabel}`;
 

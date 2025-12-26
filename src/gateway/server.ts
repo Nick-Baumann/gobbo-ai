@@ -875,7 +875,10 @@ function getSessionDefaults(cfg: ClawdisConfig): GatewaySessionsDefaults {
     cfg.agent?.contextTokens ??
     lookupContextTokens(resolved.model) ??
     DEFAULT_CONTEXT_TOKENS;
-  return { model: resolved.model ?? null, contextTokens: contextTokens ?? null };
+  return {
+    model: resolved.model ?? null,
+    contextTokens: contextTokens ?? null,
+  };
 }
 
 function listSessionsFromStore(params: {
