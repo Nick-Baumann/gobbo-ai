@@ -148,4 +148,80 @@ describe("subscribeEmbeddedPiSession", () => {
     await waitPromise;
     expect(resolved).toBe(true);
   });
+
+  it("resolves after compaction ends without retry", async () => {
+    const listeners: Array<(evt: any) => void> = [];
+    const session = {
+      subscribe: (listener: (evt: any) => void) => {
+        listeners.push(listener);
+        return () => {};
+      },
+    } as any;
+
+    const subscription = subscribeEmbeddedPiSession({
+      session,
+      runId: "run-2",
+    });
+
+    for (const listener of listeners) {
+      listener({ type: "auto_compaction_start" });
+    }
+
+    let resolved = false;
+    const waitPromise = subscription.waitForCompactionRetry().then(() => {
+      resolved = true;
+    });
+
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    for (const listener of listeners) {
+      listener({ type: "auto_compaction_end", willRetry: false });
+    }
+
+    await waitPromise;
+    expect(resolved).toBe(true);
+  });
+
+  it("waits for multiple compaction retries before resolving", async () => {
+    const listeners: Array<(evt: any) => void> = [];
+    const session = {
+      subscribe: (listener: (evt: any) => void) => {
+        listeners.push(listener);
+        return () => {};
+      },
+    } as any;
+
+    const subscription = subscribeEmbeddedPiSession({
+      session,
+      runId: "run-3",
+    });
+
+    for (const listener of listeners) {
+      listener({ type: "auto_compaction_end", willRetry: true });
+      listener({ type: "auto_compaction_end", willRetry: true });
+    }
+
+    let resolved = false;
+    const waitPromise = subscription.waitForCompactionRetry().then(() => {
+      resolved = true;
+    });
+
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    for (const listener of listeners) {
+      listener({ type: "agent_end" });
+    }
+
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    for (const listener of listeners) {
+      listener({ type: "agent_end" });
+    }
+
+    await waitPromise;
+    expect(resolved).toBe(true);
+  });
 });
