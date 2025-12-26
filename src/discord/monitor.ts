@@ -197,7 +197,7 @@ export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
       };
 
       if (isDirectMessage) {
-        const sessionCfg = cfg.inbound?.reply?.session;
+        const sessionCfg = cfg.session;
         const mainKey = (sessionCfg?.mainKey ?? "main").trim() || "main";
         const storePath = resolveStorePath(sessionCfg?.store);
         await updateLastRoute({
@@ -274,16 +274,12 @@ async function resolveMedia(
     );
   }
   const buffer = Buffer.from(await res.arrayBuffer());
-  const saved = await saveMediaBuffer(
+  const mime = await detectMime({
     buffer,
-    detectMime({
-      buffer,
-      headerMime: attachment.contentType ?? res.headers.get("content-type"),
-      filePath: attachment.name ?? attachment.url,
-    }),
-    "inbound",
-    maxBytes,
-  );
+    headerMime: attachment.contentType ?? res.headers.get("content-type"),
+    filePath: attachment.name ?? attachment.url,
+  });
+  const saved = await saveMediaBuffer(buffer, mime, "inbound", maxBytes);
   return {
     path: saved.path,
     contentType: saved.contentType,

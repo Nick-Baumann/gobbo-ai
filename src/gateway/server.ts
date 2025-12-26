@@ -1361,7 +1361,7 @@ export async function startGatewayServer(
           wakeMode: "now" | "next-heartbeat";
           sessionKey: string;
           deliver: boolean;
-          channel: "last" | "whatsapp" | "telegram";
+          channel: "last" | "whatsapp" | "telegram" | "discord";
           to?: string;
           thinking?: string;
           timeoutSeconds?: number;
@@ -1445,7 +1445,7 @@ export async function startGatewayServer(
     wakeMode: "now" | "next-heartbeat";
     sessionKey: string;
     deliver: boolean;
-    channel: "last" | "whatsapp" | "telegram";
+    channel: "last" | "whatsapp" | "telegram" | "discord";
     to?: string;
     thinking?: string;
     timeoutSeconds?: number;

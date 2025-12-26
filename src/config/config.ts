@@ -501,6 +501,7 @@ const HeartbeatSchema = z
         z.literal("last"),
         z.literal("whatsapp"),
         z.literal("telegram"),
+        z.literal("discord"),
         z.literal("none"),
       ])
       .optional(),
