@@ -115,9 +115,12 @@ export async function monitorWebInbox(options: {
     }
   };
 
-  sock.ev.on("messages.upsert", async (upsert) => {
+  const handleMessagesUpsert = async (upsert: {
+    type?: string;
+    messages?: Array<import("@whiskeysockets/baileys").WAMessage>;
+  }) => {
     if (upsert.type !== "notify") return;
-    for (const msg of upsert.messages) {
+    for (const msg of upsert.messages ?? []) {
       const id = msg.key?.id ?? undefined;
       // De-dupe on message id; Baileys can emit retries.
       if (id && seen.has(id)) continue;
@@ -295,11 +298,12 @@ export async function monitorWebInbox(options: {
         );
       }
     }
-  });
+  };
+  sock.ev.on("messages.upsert", handleMessagesUpsert);
 
-  sock.ev.on(
-    "connection.update",
-    (update: Partial<import("@whiskeysockets/baileys").ConnectionState>) => {
+  const handleConnectionUpdate = (
+    update: Partial<import("@whiskeysockets/baileys").ConnectionState>,
+  ) => {
       try {
         if (update.connection === "close") {
           const status = getStatusCode(update.lastDisconnect?.error);
@@ -320,12 +324,22 @@ export async function monitorWebInbox(options: {
           error: err,
         });
       }
-    },
-  );
+    };
+  sock.ev.on("connection.update", handleConnectionUpdate);
 
   return {
     close: async () => {
       try {
+        if (typeof sock.ev.off === "function") {
+          sock.ev.off("messages.upsert", handleMessagesUpsert);
+          sock.ev.off("connection.update", handleConnectionUpdate);
+        } else {
+          sock.ev.removeListener?.("messages.upsert", handleMessagesUpsert);
+          sock.ev.removeListener?.(
+            "connection.update",
+            handleConnectionUpdate,
+          );
+        }
         sock.ws?.close();
       } catch (err) {
         logVerbose(`Socket close failed: ${String(err)}`);
