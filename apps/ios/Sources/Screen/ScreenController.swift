@@ -129,7 +129,8 @@ final class ScreenController {
                   } catch (_) { return false; }
                 })()
                 """)
-                if res == "true" { return true }
+                let trimmed = res.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if trimmed == "true" || trimmed == "1" { return true }
             } catch {
                 // ignore; page likely still loading
             }
