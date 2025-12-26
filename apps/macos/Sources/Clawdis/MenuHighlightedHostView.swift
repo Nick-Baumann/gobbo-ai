@@ -55,7 +55,6 @@ final class HighlightedMenuItemHostView: NSView {
 
     override func layout() {
         super.layout()
-        self.updateTargetWidthFromWindow()
         self.hosting.frame = self.bounds
     }
 
@@ -85,17 +84,6 @@ final class HighlightedMenuItemHostView: NSView {
         self.frame = NSRect(origin: .zero, size: NSSize(width: self.targetWidth, height: size.height))
     }
 
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        self.updateTargetWidthFromWindow()
-    }
-
-    private func updateTargetWidthFromWindow() {
-        guard let width = self.window?.contentView?.bounds.width, width > 0 else { return }
-        if abs(width - self.targetWidth) < 0.5 { return }
-        self.targetWidth = width
-        self.updateSizing()
-    }
 }
 
 struct MenuHostedHighlightedItem: NSViewRepresentable {
