@@ -26,15 +26,23 @@ struct NodeMenuEntryFormatter {
     static func detailText(_ entry: InstanceInfo) -> String {
         var parts: [String] = []
 
+        var modeLabel: String?
         if self.isGateway(entry) {
-            parts.append("gateway")
+            modeLabel = "gateway"
         } else if let mode = entry.mode?.nonEmpty {
-            parts.append(mode)
+            modeLabel = mode
         }
+        if let version = entry.version?.nonEmpty {
+            let base = modeLabel ?? "node"
+            modeLabel = "\(base) v\(version)"
+        }
+        if let modeLabel { parts.append(modeLabel) }
 
-        if let ip = entry.ip?.nonEmpty { parts.append(ip) }
-        if let version = entry.version?.nonEmpty { parts.append("app \(version)") }
-        if let platform = entry.platform?.nonEmpty { parts.append(platform) }
+        if let ip = entry.ip?.nonEmpty {
+            parts.append(ip)
+        } else if let platform = entry.platform?.nonEmpty {
+            parts.append(platform)
+        }
 
         if parts.isEmpty, let text = entry.text.nonEmpty {
             let trimmed = text
