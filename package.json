@@ -36,7 +36,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "docs:list": "tsx scripts/docs-list.ts",
-    "build": "pnpm canvas:a2ui:bundle && tsc -p tsconfig.json && tsx scripts/canvas-a2ui-copy.ts",
+    "build": "tsc -p tsconfig.json && tsx scripts/canvas-a2ui-copy.ts",
     "ui:install": "pnpm -C ui install",
     "ui:dev": "pnpm -C ui dev",
     "ui:build": "pnpm -C ui build",

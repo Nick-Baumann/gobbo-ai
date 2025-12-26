@@ -17,6 +17,7 @@ Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tag
 - [ ] If dependencies changed, run `pnpm install` so `pnpm-lock.yaml` is current.
 
 2) **Build & artifacts**
+- [ ] If A2UI inputs changed, run `pnpm canvas:a2ui:bundle` and commit any updated `src/canvas-host/a2ui/a2ui.bundle.js`.
 - [ ] `pnpm run build` (regenerates `dist/`).
 - [ ] Optional: `npm pack --pack-destination /tmp` after the build; inspect the tarball contents and keep it handy for the GitHub release (do **not** commit it).
 
