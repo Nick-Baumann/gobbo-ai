@@ -148,7 +148,15 @@ describe("canvas-cli coverage", () => {
 
     await expect(
       program.parseAsync(
-        ["canvas", "a2ui", "push", "--node", "mac-1", "--jsonl", "/tmp/a2ui.jsonl"],
+        [
+          "canvas",
+          "a2ui",
+          "push",
+          "--node",
+          "mac-1",
+          "--jsonl",
+          "/tmp/a2ui.jsonl",
+        ],
         { from: "user" },
       ),
     ).rejects.toThrow("__exit__:1");

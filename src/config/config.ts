@@ -868,10 +868,8 @@ function applyIdentityDefaults(cfg: ClawdisConfig): ClawdisConfig {
   const identity = cfg.identity;
   if (!identity) return cfg;
 
-  const emoji = identity.emoji?.trim();
   const name = identity.name?.trim();
 
-  const messages = cfg.messages ?? {};
   const routing = cfg.routing ?? {};
   const groupChat = routing.groupChat ?? {};
 

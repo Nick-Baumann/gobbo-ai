@@ -51,7 +51,10 @@ export function resolveCanvasHostUrl(params: CanvasHostUrlParams) {
       : "http");
 
   const override = normalizeHost(params.hostOverride, true);
-  const requestHost = normalizeHost(parseHostHeader(params.requestHost), !!override);
+  const requestHost = normalizeHost(
+    parseHostHeader(params.requestHost),
+    !!override,
+  );
   const localAddress = normalizeHost(
     params.localAddress,
     Boolean(override || requestHost),

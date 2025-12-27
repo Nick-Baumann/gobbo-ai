@@ -91,8 +91,8 @@ import { getMachineDisplayName } from "../infra/machine-name.js";
 import {
   approveNodePairing,
   listNodePairing,
-  renamePairedNode,
   rejectNodePairing,
+  renamePairedNode,
   requestNodePairing,
   verifyNodeToken,
 } from "../infra/node-pairing.js";
