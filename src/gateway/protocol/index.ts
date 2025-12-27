@@ -60,6 +60,8 @@ import {
   NodePairRequestParamsSchema,
   type NodePairVerifyParams,
   NodePairVerifyParamsSchema,
+  type NodeRenameParams,
+  NodeRenameParamsSchema,
   PROTOCOL_VERSION,
   type PresenceEntry,
   PresenceEntrySchema,
@@ -134,6 +136,9 @@ export const validateNodePairRejectParams = ajv.compile<NodePairRejectParams>(
 );
 export const validateNodePairVerifyParams = ajv.compile<NodePairVerifyParams>(
   NodePairVerifyParamsSchema,
+);
+export const validateNodeRenameParams = ajv.compile<NodeRenameParams>(
+  NodeRenameParamsSchema,
 );
 export const validateNodeListParams =
   ajv.compile<NodeListParams>(NodeListParamsSchema);

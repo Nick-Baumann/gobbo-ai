@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import net from "node:net";
 import os from "node:os";
 
+import { resolveCanvasHostUrl } from "../canvas-host-url.js";
 import {
   getPairedNode,
   listNodePairing,
@@ -188,23 +189,13 @@ export async function startNodeBridgeServer(
       ? opts.serverName.trim()
       : os.hostname();
 
-  const isLoopbackHost = (host: string) => {
-    const normalized = host.trim().toLowerCase();
-    if (normalized === "localhost") return true;
-    if (normalized === "::1") return true;
-    if (normalized === "0.0.0.0" || normalized === "::") return true;
-    return normalized.startsWith("127.");
-  };
-
   const buildCanvasHostUrl = (socket: net.Socket) => {
-    const port = opts.canvasHostPort;
-    if (!port) return undefined;
-    const localHost = socket.localAddress?.trim() ?? "";
-    const override = opts.canvasHostHost?.trim() ?? "";
-    const host = !localHost || isLoopbackHost(localHost) ? override : localHost;
-    if (!host) return undefined;
-    const formatted = host.includes(":") ? `[${host}]` : host;
-    return `http://${formatted}:${port}`;
+    return resolveCanvasHostUrl({
+      canvasPort: opts.canvasHostPort,
+      hostOverride: opts.canvasHostHost,
+      localAddress: socket.localAddress,
+      scheme: "http",
+    });
   };
 
   type ConnectionState = {

@@ -48,11 +48,15 @@ actor MacNodeBridgeSession {
 
         try await Self.waitForReady(stateStream, timeoutSeconds: 6)
 
-        try await Self.withTimeout(seconds: 6) {
+        try await AsyncTimeout.withTimeout(seconds: 6, onTimeout: {
+            TimeoutError(message: "operation timed out")
+        }) {
             try await self.send(hello)
         }
 
-        guard let line = try await Self.withTimeout(seconds: 6, operation: {
+        guard let line = try await AsyncTimeout.withTimeout(seconds: 6, onTimeout: {
+            TimeoutError(message: "operation timed out")
+        }, operation: {
             try await self.receiveLine()
         }),
             let data = line.data(using: .utf8),
@@ -290,7 +294,9 @@ actor MacNodeBridgeSession {
         _ stream: AsyncStream<NWConnection.State>,
         timeoutSeconds: Double) async throws
     {
-        try await self.withTimeout(seconds: timeoutSeconds) {
+        try await AsyncTimeout.withTimeout(seconds: timeoutSeconds, onTimeout: {
+            TimeoutError(message: "operation timed out")
+        }) {
             for await state in stream {
                 switch state {
                 case .ready:
@@ -311,22 +317,5 @@ actor MacNodeBridgeSession {
         }
     }
 
-    private static func withTimeout<T: Sendable>(
-        seconds: Double,
-        operation: @escaping @Sendable () async throws -> T) async throws -> T
-    {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw TimeoutError(message: "operation timed out")
-            }
-            let result = try await group.next()
-            group.cancelAll()
-            if let result { return result }
-            throw TimeoutError(message: "operation timed out")
-        }
-    }
+    
 }

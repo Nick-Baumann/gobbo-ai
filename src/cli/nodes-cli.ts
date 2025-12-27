@@ -38,6 +38,7 @@ type NodesRpcOpts = {
   sound?: string;
   priority?: string;
   delivery?: string;
+  name?: string;
   facing?: string;
   format?: string;
   maxWidth?: string;
@@ -473,6 +474,37 @@ export function registerNodesCli(program: Command) {
           defaultRuntime.log(JSON.stringify(result, null, 2));
         } catch (err) {
           defaultRuntime.error(`nodes reject failed: ${String(err)}`);
+          defaultRuntime.exit(1);
+        }
+      }),
+  );
+
+  nodesCallOpts(
+    nodes
+      .command("rename")
+      .description("Rename a paired node (display name override)")
+      .requiredOption("--node <idOrNameOrIp>", "Node id, name, or IP")
+      .requiredOption("--name <displayName>", "New display name")
+      .action(async (opts: NodesRpcOpts) => {
+        try {
+          const nodeId = await resolveNodeId(opts, String(opts.node ?? ""));
+          const name = String(opts.name ?? "").trim();
+          if (!nodeId || !name) {
+            defaultRuntime.error("--node and --name required");
+            defaultRuntime.exit(1);
+            return;
+          }
+          const result = await callGatewayCli("node.rename", opts, {
+            nodeId,
+            displayName: name,
+          });
+          if (opts.json) {
+            defaultRuntime.log(JSON.stringify(result, null, 2));
+            return;
+          }
+          defaultRuntime.log(`node rename ok: ${nodeId} -> ${name}`);
+        } catch (err) {
+          defaultRuntime.error(`nodes rename failed: ${String(err)}`);
           defaultRuntime.exit(1);
         }
       }),

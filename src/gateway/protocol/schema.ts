@@ -254,6 +254,11 @@ export const NodePairVerifyParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const NodeRenameParamsSchema = Type.Object(
+  { nodeId: NonEmptyString, displayName: NonEmptyString },
+  { additionalProperties: false },
+);
+
 export const NodeListParamsSchema = Type.Object(
   {},
   { additionalProperties: false },
@@ -652,6 +657,7 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   NodePairApproveParams: NodePairApproveParamsSchema,
   NodePairRejectParams: NodePairRejectParamsSchema,
   NodePairVerifyParams: NodePairVerifyParamsSchema,
+  NodeRenameParams: NodeRenameParamsSchema,
   NodeListParams: NodeListParamsSchema,
   NodeDescribeParams: NodeDescribeParamsSchema,
   NodeInvokeParams: NodeInvokeParamsSchema,
@@ -707,6 +713,7 @@ export type NodePairListParams = Static<typeof NodePairListParamsSchema>;
 export type NodePairApproveParams = Static<typeof NodePairApproveParamsSchema>;
 export type NodePairRejectParams = Static<typeof NodePairRejectParamsSchema>;
 export type NodePairVerifyParams = Static<typeof NodePairVerifyParamsSchema>;
+export type NodeRenameParams = Static<typeof NodeRenameParamsSchema>;
 export type NodeListParams = Static<typeof NodeListParamsSchema>;
 export type NodeDescribeParams = Static<typeof NodeDescribeParamsSchema>;
 export type NodeInvokeParams = Static<typeof NodeInvokeParamsSchema>;

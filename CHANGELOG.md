@@ -73,9 +73,13 @@
 - Menu bar session/node sections no longer reflow while open, keeping hover highlights aligned.
 - Menu hover highlights now span the full width (including submenu arrows).
 - Menu session rows now refresh while open without width changes (no more stuck “Loading sessions…”).
+- macOS node timeouts now share a single async timeout helper for consistent behavior.
 
 ### Nodes & Canvas
 - Debug status overlay gated and toggleable on macOS/iOS/Android nodes.
+- Gateway now derives the canvas host URL via a shared helper for bridge + WS handshakes (avoids loopback pitfalls).
+- `canvas a2ui push` validates JSONL with line errors, rejects v0.9 payloads, and supports `--text` quick renders.
+- `nodes rename` lets you override paired node display names without editing JSON.
 - Android scaffold asset cleanup; iOS canvas/voice wake adjustments.
 
 ### Logging & Observability
@@ -87,6 +91,7 @@
 
 ### Build, Dev, Docs
 - Notarization flow added for macOS release artifacts; packaging scripts updated.
+- macOS signing auto-selects Developer ID → Apple Distribution → Apple Development; no ad-hoc fallback.
 - Added type-aware oxlint; docs list resolves from cwd; formatting/lint cleanup and dependency bumps (Peekaboo).
 - Docs refreshed for tools, custom model providers, Discord, queue/routing, group activation commands, logging, restart semantics, release notes, GitHub pages CTAs, and npm pitfalls.
 - `pnpm build` now skips A2UI bundling for faster builds (run `pnpm canvas:a2ui:bundle` when needed).

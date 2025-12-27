@@ -26,6 +26,22 @@ select_identity() {
     return
   fi
 
+  # Next, try Apple Distribution.
+  preferred="$(security find-identity -p codesigning -v 2>/dev/null \
+    | awk -F'\"' '/Apple Distribution/ { print $2; exit }')"
+  if [ -n "$preferred" ]; then
+    echo "$preferred"
+    return
+  fi
+
+  # Then, try Apple Development.
+  preferred="$(security find-identity -p codesigning -v 2>/dev/null \
+    | awk -F'\"' '/Apple Development/ { print $2; exit }')"
+  if [ -n "$preferred" ]; then
+    echo "$preferred"
+    return
+  fi
+
   # Fallback to the first valid signing identity.
   available="$(security find-identity -p codesigning -v 2>/dev/null \
     | sed -n 's/.*\"\\(.*\\)\"/\\1/p')"
@@ -66,6 +82,9 @@ case "$TIMESTAMP_MODE" in
     exit 1
     ;;
 esac
+
+options_args=("--options" "runtime")
+timestamp_args=("$timestamp_arg")
 
 cat > "$ENT_TMP_BASE" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -138,12 +157,12 @@ xattr -cr "$APP_BUNDLE" 2>/dev/null || true
 sign_item() {
   local target="$1"
   local entitlements="$2"
-  codesign --force --options runtime "$timestamp_arg" --entitlements "$entitlements" --sign "$IDENTITY" "$target"
+  codesign --force "${options_args[@]}" "${timestamp_args[@]}" --entitlements "$entitlements" --sign "$IDENTITY" "$target"
 }
 
 sign_plain_item() {
   local target="$1"
-  codesign --force --options runtime "$timestamp_arg" --sign "$IDENTITY" "$target"
+  codesign --force "${options_args[@]}" "${timestamp_args[@]}" --sign "$IDENTITY" "$target"
 }
 
 # Sign main binary

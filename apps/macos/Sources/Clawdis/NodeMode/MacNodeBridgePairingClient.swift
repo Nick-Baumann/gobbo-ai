@@ -17,14 +17,22 @@ actor MacNodeBridgePairingClient {
         let connection = NWConnection(to: endpoint, using: .tcp)
         let queue = DispatchQueue(label: "com.steipete.clawdis.macos.bridge-client")
         defer { connection.cancel() }
-        try await self.withTimeout(seconds: 8, purpose: "connect") {
+        try await AsyncTimeout.withTimeout(seconds: 8, onTimeout: {
+            NSError(domain: "Bridge", code: 0, userInfo: [
+                NSLocalizedDescriptionKey: "connect timed out",
+            ])
+        }) {
             try await self.startAndWaitForReady(connection, queue: queue)
         }
 
         onStatus?("Authenticating…")
         try await self.send(hello, over: connection)
 
-        let first = try await self.withTimeout(seconds: 10, purpose: "hello") { () -> ReceivedFrame in
+        let first = try await AsyncTimeout.withTimeout(seconds: 10, onTimeout: {
+            NSError(domain: "Bridge", code: 0, userInfo: [
+                NSLocalizedDescriptionKey: "hello timed out",
+            ])
+        }) { () -> ReceivedFrame in
             guard let frame = try await self.receiveFrame(over: connection) else {
                 throw NSError(domain: "Bridge", code: 0, userInfo: [
                     NSLocalizedDescriptionKey: "Bridge closed connection during hello",
@@ -60,7 +68,11 @@ actor MacNodeBridgePairingClient {
                 over: connection)
 
             onStatus?("Waiting for approval…")
-            let ok = try await self.withTimeout(seconds: 60, purpose: "pairing approval") {
+            let ok = try await AsyncTimeout.withTimeout(seconds: 60, onTimeout: {
+                NSError(domain: "Bridge", code: 0, userInfo: [
+                    NSLocalizedDescriptionKey: "pairing approval timed out",
+                ])
+            }) {
                 while let next = try await self.receiveFrame(over: connection) {
                     switch next.base.type {
                     case "pair-ok":
@@ -172,25 +184,5 @@ actor MacNodeBridgePairingClient {
         }
     }
 
-    private func withTimeout<T: Sendable>(
-        seconds: Double,
-        purpose: String,
-        operation: @escaping @Sendable () async throws -> T) async throws -> T
-    {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw NSError(domain: "Bridge", code: 0, userInfo: [
-                    NSLocalizedDescriptionKey: "\(purpose) timed out",
-                ])
-            }
-            let result = try await group.next()
-            group.cancelAll()
-            if let result { return result }
-            throw NSError(domain: "Bridge", code: 0, userInfo: [
-                NSLocalizedDescriptionKey: "\(purpose) timed out",
-            ])
-        }
-    }
+    
 }

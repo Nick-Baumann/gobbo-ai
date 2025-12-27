@@ -228,7 +228,11 @@ final class MacNodeModeCoordinator {
         _ stream: AsyncStream<NWConnection.State>,
         timeoutSeconds: Double) async throws
     {
-        try await self.withTimeout(seconds: timeoutSeconds) {
+        try await AsyncTimeout.withTimeout(seconds: timeoutSeconds, onTimeout: {
+            NSError(domain: "Bridge", code: 22, userInfo: [
+                NSLocalizedDescriptionKey: "operation timed out",
+            ])
+        }) {
             for await state in stream {
                 switch state {
                 case .ready:
@@ -245,27 +249,6 @@ final class MacNodeModeCoordinator {
             }
             throw NSError(domain: "Bridge", code: 21, userInfo: [
                 NSLocalizedDescriptionKey: "Connection closed",
-            ])
-        }
-    }
-
-    private static func withTimeout<T: Sendable>(
-        seconds: Double,
-        operation: @escaping @Sendable () async throws -> T) async throws -> T
-    {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw NSError(domain: "Bridge", code: 22, userInfo: [
-                    NSLocalizedDescriptionKey: "operation timed out",
-                ])
-            }
-            let result = try await group.next()
-            group.cancelAll()
-            if let result { return result }
-            throw NSError(domain: "Bridge", code: 22, userInfo: [
-                NSLocalizedDescriptionKey: "operation timed out",
             ])
         }
     }

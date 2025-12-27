@@ -63,7 +63,8 @@ Core actions:
 Notes:
 - Uses gateway `node.invoke` under the hood.
 - If no `node` is provided, the tool picks a default (single connected node or local mac node).
-- A2UI is v0.8 only (no `createSurface`).
+- A2UI is v0.8 only (no `createSurface`); the CLI rejects v0.9 JSONL with line errors.
+- Quick smoke: `clawdis canvas a2ui push --text "Hello from A2UI"`.
 
 ### `clawdis_nodes`
 Discover and target paired nodes; send notifications; capture camera/screen.

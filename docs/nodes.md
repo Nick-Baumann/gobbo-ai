@@ -24,7 +24,11 @@ clawdis nodes approve <requestId>
 clawdis nodes reject <requestId>
 clawdis nodes status
 clawdis nodes describe --node <idOrNameOrIp>
+clawdis nodes rename --node <idOrNameOrIp> --name "Kitchen iPad"
 ```
+
+Notes:
+- `nodes rename` stores a display name override in the gateway pairing store.
 
 ## Invoking commands
 

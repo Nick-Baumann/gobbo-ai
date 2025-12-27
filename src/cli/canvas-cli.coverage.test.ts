@@ -107,4 +107,52 @@ describe("canvas-cli coverage", () => {
     expect(runtimeErrors).toHaveLength(0);
     expect(runtimeLogs.join("\n")).toContain("ok");
   });
+
+  it("pushes A2UI text payload", async () => {
+    runtimeLogs.length = 0;
+    runtimeErrors.length = 0;
+    callGateway.mockClear();
+
+    const { registerCanvasCli } = await import("./canvas-cli.js");
+    const program = new Command();
+    program.exitOverride();
+    registerCanvasCli(program);
+
+    await program.parseAsync(
+      ["canvas", "a2ui", "push", "--node", "mac-1", "--text", "Hello A2UI"],
+      { from: "user" },
+    );
+
+    const invoke = callGateway.mock.calls.find(
+      (call) => call[0]?.method === "node.invoke",
+    )?.[0];
+
+    expect(invoke?.params?.command).toBe("canvas.a2ui.pushJSONL");
+    expect(invoke?.params?.params?.jsonl).toContain("Hello A2UI");
+  });
+
+  it("rejects invalid A2UI JSONL", async () => {
+    runtimeLogs.length = 0;
+    runtimeErrors.length = 0;
+    callGateway.mockClear();
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", () => ({
+      default: { readFile: vi.fn(async () => "{broken") },
+    }));
+
+    const { registerCanvasCli } = await import("./canvas-cli.js");
+    const program = new Command();
+    program.exitOverride();
+    registerCanvasCli(program);
+
+    await expect(
+      program.parseAsync(
+        ["canvas", "a2ui", "push", "--node", "mac-1", "--jsonl", "/tmp/a2ui.jsonl"],
+        { from: "user" },
+      ),
+    ).rejects.toThrow("__exit__:1");
+
+    expect(runtimeErrors.join("\n")).toContain("Invalid A2UI JSONL");
+  });
 });

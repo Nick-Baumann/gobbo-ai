@@ -292,3 +292,22 @@ export async function updatePairedNodeMetadata(
     await persistState(state, baseDir);
   });
 }
+
+export async function renamePairedNode(
+  nodeId: string,
+  displayName: string,
+  baseDir?: string,
+): Promise<NodePairingPairedNode | null> {
+  return await withLock(async () => {
+    const state = await loadState(baseDir);
+    const normalized = normalizeNodeId(nodeId);
+    const existing = state.pairedByNodeId[normalized];
+    if (!existing) return null;
+    const trimmed = displayName.trim();
+    if (!trimmed) throw new Error("displayName required");
+    const next: NodePairingPairedNode = { ...existing, displayName: trimmed };
+    state.pairedByNodeId[normalized] = next;
+    await persistState(state, baseDir);
+    return next;
+  });
+}
