@@ -56,9 +56,10 @@ final class MenuSessionsInjector: NSObject, NSMenuDelegate {
 
         // Refresh in background for the next open; keep width stable while open.
         self.loadTask?.cancel()
+        let forceRefresh = self.cachedSnapshot == nil || self.cachedErrorText != nil
         self.loadTask = Task { [weak self] in
             guard let self else { return }
-            await self.refreshCache(force: false)
+            await self.refreshCache(force: forceRefresh)
             await MainActor.run {
                 guard self.isMenuOpen else { return }
                 self.inject(into: menu)
