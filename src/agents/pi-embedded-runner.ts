@@ -417,8 +417,7 @@ export async function runEmbeddedPiAgent(params: {
           node: process.version,
           model: `${provider}/${modelId}`,
         };
-        const reasoningTagHint =
-          provider === "lmstudio" || provider === "ollama";
+        const reasoningTagHint = provider === "ollama";
         const systemPrompt = buildSystemPrompt({
           appendPrompt: buildAgentSystemPromptAppend({
             workspaceDir: resolvedWorkspace,
