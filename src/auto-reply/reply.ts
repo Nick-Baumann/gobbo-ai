@@ -39,8 +39,10 @@ import {
 import { logVerbose } from "../globals.js";
 import { buildProviderSummary } from "../infra/provider-summary.js";
 import { triggerClawdisRestart } from "../infra/restart.js";
-import { enqueueSystemEvent } from "../infra/system-events.js";
-import { drainSystemEvents } from "../infra/system-events.js";
+import {
+  drainSystemEvents,
+  enqueueSystemEvent,
+} from "../infra/system-events.js";
 import { clearCommandLane, getQueueSize } from "../process/command-queue.js";
 import { defaultRuntime } from "../runtime.js";
 import { normalizeE164 } from "../utils.js";
@@ -549,7 +551,9 @@ export async function getReplyFromConfig(
 
   const initialModelLabel = `${provider}/${model}`;
   const formatModelSwitchEvent = (label: string, alias?: string) =>
-    alias ? `Model switched to ${alias} (${label}).` : `Model switched to ${label}.`;
+    alias
+      ? `Model switched to ${alias} (${label}).`
+      : `Model switched to ${label}.`;
 
   const directiveOnly = (() => {
     if (
@@ -646,9 +650,12 @@ export async function getReplyFromConfig(
       };
       const nextLabel = `${modelSelection.provider}/${modelSelection.model}`;
       if (nextLabel !== initialModelLabel) {
-        enqueueSystemEvent(formatModelSwitchEvent(nextLabel, modelSelection.alias), {
-          contextKey: `model:${nextLabel}`,
-        });
+        enqueueSystemEvent(
+          formatModelSwitchEvent(nextLabel, modelSelection.alias),
+          {
+            contextKey: `model:${nextLabel}`,
+          },
+        );
       }
     }
 

@@ -4,6 +4,21 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { loadModelCatalog } from "../agents/model-catalog.js";
+import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
+import {
+  loadSessionStore,
+  resolveSessionKey,
+  saveSessionStore,
+} from "../config/sessions.js";
+import { drainSystemEvents } from "../infra/system-events.js";
+import {
+  extractQueueDirective,
+  extractThinkDirective,
+  extractVerboseDirective,
+  getReplyFromConfig,
+} from "./reply.js";
+
 vi.mock("../agents/pi-embedded.js", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
   runEmbeddedPiAgent: vi.fn(),
@@ -14,21 +29,6 @@ vi.mock("../agents/pi-embedded.js", () => ({
 vi.mock("../agents/model-catalog.js", () => ({
   loadModelCatalog: vi.fn(),
 }));
-
-import { loadModelCatalog } from "../agents/model-catalog.js";
-import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
-import {
-  loadSessionStore,
-  resolveSessionKey,
-  saveSessionStore,
-} from "../config/sessions.js";
-import {
-  extractQueueDirective,
-  extractThinkDirective,
-  extractVerboseDirective,
-  getReplyFromConfig,
-} from "./reply.js";
-import { drainSystemEvents } from "../infra/system-events.js";
 
 async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "clawdis-reply-"));
