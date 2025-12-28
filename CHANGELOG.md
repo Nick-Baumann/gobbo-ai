@@ -13,6 +13,7 @@
 - macOS menu now refreshes the control channel after the gateway starts and shows “Connecting to gateway…” while the gateway is coming up.
 - macOS local mode now waits for the gateway to be ready before configuring the control channel, avoiding false “no connection” flashes.
 - WhatsApp watchdog now forces a reconnect even if the socket close event stalls (force-close to unblock reconnect loop).
+- Gateway presence now reports macOS product version (via `sw_vers`) instead of Darwin kernel version.
 
 ## 2.0.0-beta3 — 2025-12-27
 
