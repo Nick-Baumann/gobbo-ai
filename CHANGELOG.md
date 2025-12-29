@@ -8,6 +8,7 @@
 ### Fixes
 - macOS: Voice Wake now fully tears down the Speech pipeline when disabled (cancel pending restarts, drop stale callbacks) to avoid high CPU in the background.
 - macOS menu: add a Talk Mode action alongside the Open Dashboard/Chat/Canvas entries.
+- macOS Talk Mode: orb overlay refresh, ElevenLabs request logging, API key status in settings, and auto-select first voice when none is configured.
 - iOS/Android nodes: enable scrolling for loaded web pages in the Canvas WebView (default scaffold stays touch-first).
 - macOS menu: device list now uses `node.list` (devices only; no agent/tool presence entries).
 - macOS menu: device list now shows connected nodes only.
