@@ -93,4 +93,11 @@ dependencies {
 
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+  testImplementation("io.kotest:kotest-runner-junit5-jvm:6.0.7")
+  testImplementation("io.kotest:kotest-assertions-core-jvm:6.0.7")
+  testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.13.3")
+}
+
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform()
 }

@@ -9,6 +9,7 @@
 - macOS menu: device list now shows connected nodes only.
 - iOS node: fix ReplayKit screen recording crash caused by queue isolation assertions during capture.
 - CLI: avoid spurious gateway close errors after successful request/response cycles.
+- Tests: add Swift Testing coverage for camera errors and Kotest coverage for Android bridge endpoints.
 
 ## 2.0.0-beta4 — 2025-12-27
 
