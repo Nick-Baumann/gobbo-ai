@@ -9,6 +9,8 @@
 - macOS menu: device list now shows connected nodes only.
 - iOS node: fix ReplayKit screen recording crash caused by queue isolation assertions during capture.
 - iOS/Android nodes: bridge auto-connect refreshes stale tokens and settings now show richer bridge/device details.
+- iOS/Android nodes: status pill now surfaces camera activity instead of overlay toasts.
+- iOS/Android nodes: camera snaps recompress to keep base64 payloads under 5 MB.
 - CLI: avoid spurious gateway close errors after successful request/response cycles.
 - Tests: add Swift Testing coverage for camera errors and Kotest coverage for Android bridge endpoints.
 
