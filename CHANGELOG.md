@@ -8,6 +8,7 @@
 - macOS menu: device list now uses `node.list` (devices only; no agent/tool presence entries).
 - macOS menu: device list now shows connected nodes only.
 - iOS node: fix ReplayKit screen recording crash caused by queue isolation assertions during capture.
+- CLI: avoid spurious gateway close errors after successful request/response cycles.
 
 ## 2.0.0-beta4 — 2025-12-27
 
