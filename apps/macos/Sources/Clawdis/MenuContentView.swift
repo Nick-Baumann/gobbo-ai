@@ -113,7 +113,7 @@ struct MenuContent: View {
             Button {
                 Task { await self.state.setTalkEnabled(!self.state.talkEnabled) }
             } label: {
-                Label(self.state.talkEnabled ? "Stop Talk Mode" : "Talk Mode", systemImage: "bubble.left.and.waveform")
+                Label(self.state.talkEnabled ? "Stop Talk Mode" : "Talk Mode", systemImage: "waveform.circle.fill")
             }
             .disabled(!voiceWakeSupported)
             .opacity(voiceWakeSupported ? 1 : 0.5)

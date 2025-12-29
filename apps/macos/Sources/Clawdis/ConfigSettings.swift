@@ -33,6 +33,7 @@ struct ConfigSettings: View {
     // Talk mode settings (stored in ~/.clawdis/clawdis.json under "talk")
     @State private var talkVoiceId: String = ""
     @State private var talkInterruptOnSpeech: Bool = true
+    @State private var talkApiKey: String = ""
 
     var body: some View {
         ScrollView { self.content }
@@ -302,6 +303,30 @@ struct ConfigSettings: View {
                     }
                 }
                 GridRow {
+                    self.gridLabel("API key")
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            SecureField("ELEVENLABS_API_KEY", text: self.$talkApiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .disabled(self.hasEnvApiKey)
+                                .onChange(of: self.talkApiKey) { _, _ in self.autosaveConfig() }
+                            if !self.hasEnvApiKey && !self.talkApiKey.isEmpty {
+                                Button("Clear") {
+                                    self.talkApiKey = ""
+                                    self.autosaveConfig()
+                                }
+                            }
+                        }
+                        self.statusLine(label: self.apiKeyStatusLabel, color: self.apiKeyStatusColor)
+                        if self.hasEnvApiKey {
+                            Text("Using ELEVENLABS_API_KEY from the environment.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                GridRow {
                     self.gridLabel("Interrupt")
                     Toggle("Stop speaking when you start talking", isOn: self.$talkInterruptOnSpeech)
                         .labelsHidden()
@@ -317,6 +342,18 @@ struct ConfigSettings: View {
         Text(text)
             .foregroundStyle(.secondary)
             .frame(width: self.labelColumnWidth, alignment: .leading)
+    }
+
+    private func statusLine(label: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 2)
     }
 
     private func loadConfig() {
@@ -348,6 +385,7 @@ struct ConfigSettings: View {
 
         if let talk {
             if let voice = talk["voiceId"] as? String { self.talkVoiceId = voice }
+            if let apiKey = talk["apiKey"] as? String { self.talkApiKey = apiKey }
             if let interrupt = talk["interruptOnSpeech"] as? Bool {
                 self.talkInterruptOnSpeech = interrupt
             }
@@ -399,6 +437,12 @@ struct ConfigSettings: View {
         } else {
             talk["voiceId"] = trimmedVoice
         }
+        let trimmedApiKey = self.talkApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedApiKey.isEmpty {
+            talk.removeValue(forKey: "apiKey")
+        } else {
+            talk["apiKey"] = trimmedApiKey
+        }
         talk["interruptOnSpeech"] = self.talkInterruptOnSpeech
         root["talk"] = talk
 
@@ -431,6 +475,25 @@ struct ConfigSettings: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
+    }
+
+    private var hasEnvApiKey: Bool {
+        let raw = ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"] ?? ""
+        return !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var apiKeyStatusLabel: String {
+        if self.hasEnvApiKey { return "ElevenLabs API key: found (environment)" }
+        if !self.talkApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "ElevenLabs API key: stored in config"
+        }
+        return "ElevenLabs API key: missing"
+    }
+
+    private var apiKeyStatusColor: Color {
+        if self.hasEnvApiKey { return .green }
+        if !self.talkApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .green }
+        return .red
     }
 
     private var browserPathLabel: String? {
