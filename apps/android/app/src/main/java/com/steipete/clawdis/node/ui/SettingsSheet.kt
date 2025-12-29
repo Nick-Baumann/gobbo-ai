@@ -62,8 +62,6 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val wakeWords by viewModel.wakeWords.collectAsState()
   val voiceWakeMode by viewModel.voiceWakeMode.collectAsState()
   val voiceWakeStatusText by viewModel.voiceWakeStatusText.collectAsState()
-  val talkEnabled by viewModel.talkEnabled.collectAsState()
-  val talkStatusText by viewModel.talkStatusText.collectAsState()
   val isConnected by viewModel.isConnected.collectAsState()
   val manualEnabled by viewModel.manualEnabled.collectAsState()
   val manualHost by viewModel.manualHost.collectAsState()
@@ -309,28 +307,6 @@ fun SettingsSheet(viewModel: MainViewModel) {
 
     // Voice
     item { Text("Voice", style = MaterialTheme.typography.titleSmall) }
-    item {
-      ListItem(
-        headlineContent = { Text("Talk Mode") },
-        supportingContent = { Text(talkStatusText) },
-        trailingContent = {
-          Switch(
-            checked = talkEnabled,
-            onCheckedChange = { on ->
-              if (on) {
-                val micOk =
-                  ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                    PackageManager.PERMISSION_GRANTED
-                if (!micOk) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                viewModel.setTalkEnabled(true)
-              } else {
-                viewModel.setTalkEnabled(false)
-              }
-            },
-          )
-        },
-      )
-    }
     item {
       val enabled = voiceWakeMode != VoiceWakeMode.Off
       ListItem(

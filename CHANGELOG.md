@@ -7,6 +7,7 @@
 
 ### Fixes
 - macOS: Voice Wake now fully tears down the Speech pipeline when disabled (cancel pending restarts, drop stale callbacks) to avoid high CPU in the background.
+- macOS menu: add a Talk Mode action alongside the Open Dashboard/Chat/Canvas entries.
 - iOS/Android nodes: enable scrolling for loaded web pages in the Canvas WebView (default scaffold stays touch-first).
 - macOS menu: device list now uses `node.list` (devices only; no agent/tool presence entries).
 - macOS menu: device list now shows connected nodes only.
@@ -15,6 +16,7 @@
 - iOS/Android nodes: status pill now surfaces camera activity instead of overlay toasts.
 - iOS/Android/macOS nodes: camera snaps recompress to keep base64 payloads under 5 MB.
 - iOS/Android nodes: status pill now surfaces pairing, screen recording, voice wake, and foreground-required states.
+- iOS/Android nodes: Talk Mode now lives on a side bubble (with an iOS toggle to hide it), and Android settings no longer show the Talk Mode switch.
 - macOS menu: top status line now shows pending node pairing approvals (incl. repairs).
 - CLI: avoid spurious gateway close errors after successful request/response cycles.
 - Agent runtime: clamp tool-result images to the 5MB Anthropic limit to avoid hard request rejections.

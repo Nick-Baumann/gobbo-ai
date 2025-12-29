@@ -13,6 +13,8 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
@@ -72,6 +76,11 @@ fun RootScreen(viewModel: MainViewModel) {
   val screenRecordActive by viewModel.screenRecordActive.collectAsState()
   val isForeground by viewModel.isForeground.collectAsState()
   val voiceWakeStatusText by viewModel.voiceWakeStatusText.collectAsState()
+  val talkEnabled by viewModel.talkEnabled.collectAsState()
+  val audioPermissionLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      if (granted) viewModel.setTalkEnabled(true)
+    }
   val activity =
     remember(cameraHud, screenRecordActive, isForeground, statusText, voiceWakeStatusText) {
       // Status pill owns transient activity state so it doesn't overlap the connection indicator.
@@ -209,6 +218,30 @@ fun RootScreen(viewModel: MainViewModel) {
       OverlayIconButton(
         onClick = { sheet = Sheet.Chat },
         icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chat") },
+      )
+
+      // Talk mode gets a dedicated side bubble instead of burying it in settings.
+      OverlayIconButton(
+        onClick = {
+          val next = !talkEnabled
+          if (next) {
+            val micOk =
+              ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+            if (!micOk) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            viewModel.setTalkEnabled(true)
+          } else {
+            viewModel.setTalkEnabled(false)
+          }
+        },
+        icon = {
+          val tint = if (talkEnabled) MaterialTheme.colorScheme.primary else LocalContentColor.current
+          Icon(
+            Icons.Default.RecordVoiceOver,
+            contentDescription = "Talk Mode",
+            tint = tint,
+          )
+        },
       )
 
       OverlayIconButton(

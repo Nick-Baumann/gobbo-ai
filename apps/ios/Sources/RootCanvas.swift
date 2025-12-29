@@ -120,6 +120,8 @@ struct RootCanvas: View {
 
 private struct CanvasContent: View {
     @Environment(NodeAppModel.self) private var appModel
+    @AppStorage("talk.enabled") private var talkEnabled: Bool = false
+    @AppStorage("talk.button.enabled") private var talkButtonEnabled: Bool = true
     var systemColorScheme: ColorScheme
     var bridgeStatus: StatusPill.BridgeState
     var voiceWakeEnabled: Bool
@@ -140,6 +142,19 @@ private struct CanvasContent: View {
                     self.openChat()
                 }
                 .accessibilityLabel("Chat")
+
+                if self.talkButtonEnabled {
+                    // Talk mode lives on a side bubble so it doesn't get buried in settings.
+                    OverlayButton(
+                        systemImage: self.appModel.talkMode.isEnabled ? "waveform.circle.fill" : "waveform.circle",
+                        brighten: self.brightenButtons)
+                    {
+                        let next = !self.appModel.talkMode.isEnabled
+                        self.talkEnabled = next
+                        self.appModel.setTalkEnabled(next)
+                    }
+                    .accessibilityLabel("Talk Mode")
+                }
 
                 OverlayButton(systemImage: "gearshape.fill", brighten: self.brightenButtons) {
                     self.openSettings()
