@@ -35,10 +35,10 @@
       }
       :root[data-platform="android"] body {
         background:
-          radial-gradient(1200px 900px at 15% 20%, rgba(42, 113, 255, 0.38), rgba(0,0,0,0) 55%),
-          radial-gradient(900px 700px at 85% 30%, rgba(255, 0, 138, 0.30), rgba(0,0,0,0) 60%),
-          radial-gradient(1000px 900px at 60% 90%, rgba(0, 209, 255, 0.28), rgba(0,0,0,0) 60%),
-          #07090f;
+          radial-gradient(1200px 900px at 15% 20%, rgba(42, 113, 255, 0.62), rgba(0,0,0,0) 55%),
+          radial-gradient(900px 700px at 85% 30%, rgba(255, 0, 138, 0.52), rgba(0,0,0,0) 60%),
+          radial-gradient(1000px 900px at 60% 90%, rgba(0, 209, 255, 0.48), rgba(0,0,0,0) 60%),
+          #0b1328;
       }
       body::before {
         content:"";
@@ -57,7 +57,7 @@
         pointer-events: none;
         animation: clawdis-grid-drift 140s ease-in-out infinite alternate;
       }
-      :root[data-platform="android"] body::before { opacity: 0.60; }
+      :root[data-platform="android"] body::before { opacity: 0.80; }
       body::after {
         content:"";
         position: fixed;
@@ -75,7 +75,7 @@
         pointer-events: none;
         animation: clawdis-glow-drift 110s ease-in-out infinite alternate;
       }
-      :root[data-platform="android"] body::after { opacity: 0.70; }
+      :root[data-platform="android"] body::after { opacity: 0.85; }
       @supports (mix-blend-mode: screen) {
         body::after { mix-blend-mode: screen; }
       }
