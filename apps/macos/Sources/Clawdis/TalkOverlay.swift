@@ -7,7 +7,8 @@ import SwiftUI
 @Observable
 final class TalkOverlayController {
     static let shared = TalkOverlayController()
-    static let overlaySize: CGFloat = 320
+    static let overlaySize: CGFloat = 360
+    static let windowInset: CGFloat = 88
 
     private let logger = Logger(subsystem: "com.steipete.clawdis", category: "talk.overlay")
 
@@ -110,8 +111,8 @@ final class TalkOverlayController {
         let size = NSSize(width: Self.overlaySize, height: Self.overlaySize)
         let visible = screen.visibleFrame
         let origin = CGPoint(
-            x: visible.maxX - size.width - self.padding,
-            y: visible.maxY - size.height - self.padding)
+            x: visible.maxX - size.width - self.padding + Self.windowInset,
+            y: visible.maxY - size.height - self.padding + Self.windowInset)
         return NSRect(origin: origin, size: size)
     }
 }

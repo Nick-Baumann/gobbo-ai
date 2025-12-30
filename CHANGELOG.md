@@ -16,6 +16,10 @@
 - macOS Talk Mode: fix audio stop ordering so disabling Talk Mode always stops in-flight playback.
 - macOS Talk Mode: throttle audio-level updates (avoid per-buffer task creation) to reduce CPU/task churn.
 - macOS Talk Mode: increase overlay window size so wave rings don’t clip; close button is hover-only and closer to the orb.
+- Talk Mode: align to the gateway’s main session key and fall back to history polling when chat events drop (prevents stuck “thinking” / missing messages).
+- Talk Mode: treat history timestamps as seconds or milliseconds to avoid stale assistant picks (macOS/iOS/Android).
+- Chat UI: dedupe identical history messages to avoid duplicate bubbles.
+- Chat UI: user bubbles use `ui.seamColor` (fallback to a calmer default blue).
 - Talk Mode: wait for chat history to surface the assistant reply before starting TTS (macOS/iOS/Android).
 - iOS Talk Mode: fix chat completion wait to time out even if no events arrive (prevents “Thinking…” hangs).
 - iOS Talk Mode: keep recognition running during playback to support interrupt-on-speech.

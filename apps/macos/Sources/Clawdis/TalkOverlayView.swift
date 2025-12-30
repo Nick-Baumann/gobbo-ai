@@ -12,8 +12,8 @@ struct TalkOverlayView: View {
                 level: self.controller.model.level,
                 accent: self.seamColor)
                 .frame(width: 96, height: 96)
-                .padding(.top, 6)
-                .padding(.trailing, 6)
+                .padding(.top, 6 + TalkOverlayController.windowInset)
+                .padding(.trailing, 6 + TalkOverlayController.windowInset)
                 .contentShape(Circle())
                 .onTapGesture {
                     TalkModeController.shared.stopSpeaking(reason: .userTap)
@@ -31,7 +31,7 @@ struct TalkOverlayView: View {
                 }
                 .buttonStyle(.plain)
                 .contentShape(Circle())
-                .offset(x: -7, y: -7)
+                .offset(x: -5, y: -5)
                 .opacity(self.hoveringWindow ? 1 : 0)
                 .animation(.easeOut(duration: 0.12), value: self.hoveringWindow)
                 .allowsHitTesting(self.hoveringWindow)

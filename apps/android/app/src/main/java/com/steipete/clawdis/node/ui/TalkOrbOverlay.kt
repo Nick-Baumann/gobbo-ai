@@ -62,7 +62,7 @@ fun TalkOrbOverlay(
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Box(contentAlignment = Alignment.Center) {
-      Canvas(modifier = Modifier.size(240.dp)) {
+      Canvas(modifier = Modifier.size(300.dp)) {
         val center = this.center
         val baseRadius = size.minDimension * 0.27f
 
