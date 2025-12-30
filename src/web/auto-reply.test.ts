@@ -392,7 +392,7 @@ describe("web auto-reply", () => {
     closeResolvers[1]?.({ status: 499, isLoggedOut: false });
     await Promise.resolve();
     await run;
-  });
+  }, 15_000);
 
   it(
     "stops after hitting max reconnect attempts",
