@@ -118,13 +118,7 @@ fun RootScreen(viewModel: MainViewModel) {
           contentDescription = "Approval pending",
         )
       }
-      if (lowerStatus.contains("reconnecting") || lowerStatus.contains("connecting")) {
-        return@remember StatusActivity(
-          title = "Gateway reconnecting…",
-          icon = Icons.Default.Refresh,
-          contentDescription = "Gateway reconnecting",
-        )
-      }
+      // Avoid duplicating the primary bridge status ("Connecting…") in the activity slot.
 
       if (screenRecordActive) {
         return@remember StatusActivity(
