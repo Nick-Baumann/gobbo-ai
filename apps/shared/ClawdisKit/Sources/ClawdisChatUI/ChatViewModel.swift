@@ -176,7 +176,7 @@ public final class ClawdisChatViewModel {
 
     private static func dedupeKey(for message: ClawdisChatMessage) -> String? {
         guard let timestamp = message.timestamp else { return nil }
-        let text = message.content.compactMap { $0.text }.joined(separator: "\n")
+        let text = message.content.compactMap(\.text).joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         return "\(message.role)|\(timestamp)|\(text)"

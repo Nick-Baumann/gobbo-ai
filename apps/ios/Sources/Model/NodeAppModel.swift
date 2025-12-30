@@ -43,7 +43,7 @@ final class NodeAppModel {
     init() {
         self.voiceWake.configure { [weak self] cmd in
             guard let self else { return }
-            let sessionKey = self.mainSessionKey
+            let sessionKey = await MainActor.run { self.mainSessionKey }
             do {
                 try await self.sendVoiceTranscript(text: cmd, sessionKey: sessionKey)
             } catch {

@@ -231,12 +231,14 @@ final class TalkModeManager: NSObject {
             let startedAt = Date().timeIntervalSince1970
             let sessionKey = self.mainSessionKey
             await self.subscribeChatIfNeeded(sessionKey: sessionKey)
-            self.logger.info("chat.send start sessionKey=\(sessionKey, privacy: .public) chars=\(prompt.count, privacy: .public)")
+            self.logger.info(
+                "chat.send start sessionKey=\(sessionKey, privacy: .public) chars=\(prompt.count, privacy: .public)")
             let runId = try await self.sendChat(prompt, bridge: bridge)
             self.logger.info("chat.send ok runId=\(runId, privacy: .public)")
             let completion = await self.waitForChatCompletion(runId: runId, bridge: bridge, timeoutSeconds: 120)
             if completion == .timeout {
-                self.logger.warning("chat completion timeout runId=\(runId, privacy: .public); attempting history fallback")
+                self.logger.warning(
+                    "chat completion timeout runId=\(runId, privacy: .public); attempting history fallback")
             } else if completion == .aborted {
                 self.statusText = "Aborted"
                 self.logger.warning("chat completion aborted runId=\(runId, privacy: .public)")
@@ -450,7 +452,8 @@ final class TalkModeManager: NSObject {
                 let desiredOutputFormat = directive?.outputFormat ?? self.defaultOutputFormat
                 let outputFormat = ElevenLabsTTSClient.validatedOutputFormat(desiredOutputFormat)
                 if outputFormat == nil, let desiredOutputFormat, !desiredOutputFormat.isEmpty {
-                    self.logger.warning("talk output_format unsupported for local playback: \(desiredOutputFormat, privacy: .public)")
+                    self.logger.warning(
+                        "talk output_format unsupported for local playback: \(desiredOutputFormat, privacy: .public)")
                 }
 
                 let request = ElevenLabsTTSRequest(
@@ -480,7 +483,8 @@ final class TalkModeManager: NSObject {
                     do {
                         try self.startRecognition()
                     } catch {
-                        self.logger.warning("startRecognition during speak failed: \(error.localizedDescription, privacy: .public)")
+                        self.logger.warning(
+                            "startRecognition during speak failed: \(error.localizedDescription, privacy: .public)")
                     }
                 }
 
@@ -492,20 +496,23 @@ final class TalkModeManager: NSObject {
                     do {
                         try self.startRecognition()
                     } catch {
-                        self.logger.warning("startRecognition during speak failed: \(error.localizedDescription, privacy: .public)")
+                        self.logger.warning(
+                            "startRecognition during speak failed: \(error.localizedDescription, privacy: .public)")
                     }
                 }
                 self.statusText = "Speaking (System)…"
                 try await TalkSystemSpeechSynthesizer.shared.speak(text: cleaned, language: language)
             }
         } catch {
-            self.logger.error("tts failed: \(error.localizedDescription, privacy: .public); falling back to system voice")
+            self.logger.error(
+                "tts failed: \(error.localizedDescription, privacy: .public); falling back to system voice")
             do {
                 if self.interruptOnSpeech {
                     do {
                         try self.startRecognition()
                     } catch {
-                        self.logger.warning("startRecognition during speak failed: \(error.localizedDescription, privacy: .public)")
+                        self.logger.warning(
+                            "startRecognition during speak failed: \(error.localizedDescription, privacy: .public)")
                     }
                 }
                 self.statusText = "Speaking (System)…"
