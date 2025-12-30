@@ -293,8 +293,15 @@ public final class ClawdisChatViewModel {
             return
         }
 
-        if let runId = chat.runId, !self.pendingRuns.contains(runId) {
-            // Ignore events for other runs.
+        let isOurRun = chat.runId.flatMap { self.pendingRuns.contains($0) } ?? false
+        if !isOurRun {
+            // Keep multiple clients in sync: if another client finishes a run for our session, refresh history.
+            switch chat.state {
+            case "final", "aborted", "error":
+                Task { await self.refreshHistoryAfterRun() }
+            default:
+                break
+            }
             return
         }
 

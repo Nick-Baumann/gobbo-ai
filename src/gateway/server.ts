@@ -3064,6 +3064,13 @@ export async function startGatewayServer(
           await saveSessionStore(storePath, store);
         }
 
+        // Ensure chat UI clients refresh when this run completes (even though it wasn't started via chat.send).
+        // This maps agent bus events (keyed by sessionId) to chat events (keyed by clientRunId).
+        chatRunSessions.set(sessionId, {
+          sessionKey,
+          clientRunId: `voice-${randomUUID()}`,
+        });
+
         void agentCommand(
           {
             message: text,

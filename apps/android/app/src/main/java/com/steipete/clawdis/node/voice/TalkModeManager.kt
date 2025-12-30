@@ -84,20 +84,24 @@ class TalkModeManager(
   private var session: BridgeSession? = null
   private var pendingRunId: String? = null
   private var pendingFinal: CompletableDeferred<Boolean>? = null
+  private var chatSubscribed = false
 
   private var player: MediaPlayer? = null
   private var currentAudioFile: File? = null
 
   fun attachSession(session: BridgeSession) {
     this.session = session
+    chatSubscribed = false
   }
 
   fun setEnabled(enabled: Boolean) {
     if (_isEnabled.value == enabled) return
     _isEnabled.value = enabled
     if (enabled) {
+      Log.d(tag, "enabled")
       start()
     } else {
+      Log.d(tag, "disabled")
       stop()
     }
   }
@@ -127,9 +131,11 @@ class TalkModeManager(
       if (_isListening.value) return@post
       stopRequested = false
       listeningMode = true
+      Log.d(tag, "start")
 
       if (!SpeechRecognizer.isRecognitionAvailable(context)) {
         _statusText.value = "Speech recognizer unavailable"
+        Log.w(tag, "speech recognizer unavailable")
         return@post
       }
 
@@ -138,6 +144,7 @@ class TalkModeManager(
           PackageManager.PERMISSION_GRANTED
       if (!micOk) {
         _statusText.value = "Microphone permission required"
+        Log.w(tag, "microphone permission required")
         return@post
       }
 
@@ -146,8 +153,10 @@ class TalkModeManager(
         recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { it.setRecognitionListener(listener) }
         startListeningInternal(markListening = true)
         startSilenceMonitor()
+        Log.d(tag, "listening")
       } catch (err: Throwable) {
         _statusText.value = "Start failed: ${err.message ?: err::class.simpleName}"
+        Log.w(tag, "start failed: ${err.message ?: err::class.simpleName}")
       }
     }
   }
@@ -164,6 +173,7 @@ class TalkModeManager(
     _isListening.value = false
     _statusText.value = "Off"
     stopSpeaking()
+    chatSubscribed = false
 
     mainHandler.post {
       recognizer?.cancel()
@@ -264,32 +274,53 @@ class TalkModeManager(
     val bridge = session
     if (bridge == null) {
       _statusText.value = "Bridge not connected"
+      Log.w(tag, "finalize: bridge not connected")
       start()
       return
     }
 
     try {
       val startedAt = System.currentTimeMillis().toDouble() / 1000.0
+      subscribeChatIfNeeded(bridge = bridge, sessionKey = "main")
+      Log.d(tag, "chat.send start chars=${prompt.length}")
       val runId = sendChat(prompt, bridge)
+      Log.d(tag, "chat.send ok runId=$runId")
       val ok = waitForChatFinal(runId)
       if (!ok) {
         _statusText.value = "No reply"
+        Log.w(tag, "chat final timeout runId=$runId")
         start()
         return
       }
       val assistant = waitForAssistantText(bridge, startedAt, 12_000)
       if (assistant.isNullOrBlank()) {
         _statusText.value = "No reply"
+        Log.w(tag, "assistant text timeout runId=$runId")
         start()
         return
       }
+      Log.d(tag, "assistant text ok chars=${assistant.length}")
       playAssistant(assistant)
     } catch (err: Throwable) {
       _statusText.value = "Talk failed: ${err.message ?: err::class.simpleName}"
+      Log.w(tag, "finalize failed: ${err.message ?: err::class.simpleName}")
     }
 
     if (_isEnabled.value) {
       start()
+    }
+  }
+
+  private suspend fun subscribeChatIfNeeded(bridge: BridgeSession, sessionKey: String) {
+    if (chatSubscribed) return
+    val key = sessionKey.trim()
+    if (key.isEmpty()) return
+    try {
+      bridge.sendEvent("chat.subscribe", """{"sessionKey":"$key"}""")
+      chatSubscribed = true
+      Log.d(tag, "chat.subscribe ok sessionKey=$key")
+    } catch (err: Throwable) {
+      Log.w(tag, "chat.subscribe failed sessionKey=$key err=${err.message ?: err::class.java.simpleName}")
     }
   }
 
@@ -410,6 +441,7 @@ class TalkModeManager(
     val voiceId = directive?.voiceId ?: currentVoiceId ?: defaultVoiceId
     if (voiceId.isNullOrBlank()) {
       _statusText.value = "Missing voice ID"
+      Log.w(tag, "missing voiceId")
       return
     }
 
@@ -418,6 +450,7 @@ class TalkModeManager(
         ?: System.getenv("ELEVENLABS_API_KEY")?.trim()
     if (apiKey.isNullOrEmpty()) {
       _statusText.value = "Missing ELEVENLABS_API_KEY"
+      Log.w(tag, "missing ELEVENLABS_API_KEY")
       return
     }
 
@@ -427,6 +460,7 @@ class TalkModeManager(
     ensureInterruptListener()
 
     try {
+      val ttsStarted = SystemClock.elapsedRealtime()
       val request =
         ElevenLabsRequest(
           text = cleaned,
@@ -442,9 +476,11 @@ class TalkModeManager(
           language = TalkModeRuntime.validatedLanguage(directive?.language),
         )
       val audio = synthesize(voiceId = voiceId, apiKey = apiKey, request = request)
+      Log.d(tag, "elevenlabs ok bytes=${audio.size} durMs=${SystemClock.elapsedRealtime() - ttsStarted}")
       playAudio(audio)
     } catch (err: Throwable) {
       _statusText.value = "Speak failed: ${err.message ?: err::class.simpleName}"
+      Log.w(tag, "speak failed: ${err.message ?: err::class.simpleName}")
     }
 
     _isSpeaking.value = false
@@ -480,11 +516,13 @@ class TalkModeManager(
       player.prepareAsync()
     }
 
+    Log.d(tag, "play start")
     try {
       finished.await()
     } finally {
       cleanupPlayer()
     }
+    Log.d(tag, "play done")
   }
 
   private fun stopSpeaking(resetInterrupt: Boolean = true) {

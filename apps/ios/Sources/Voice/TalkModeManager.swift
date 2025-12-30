@@ -3,6 +3,7 @@ import ClawdisKit
 import Foundation
 import Observation
 import Speech
+import OSLog
 
 @MainActor
 @Observable
@@ -36,6 +37,9 @@ final class TalkModeManager: NSObject {
     private let silenceWindow: TimeInterval = 0.7
 
     private var player: AVAudioPlayer?
+    private var chatSubscribedSessionKeys = Set<String>()
+
+    private let logger = Logger(subsystem: "com.steipete.clawdis", category: "TalkMode")
 
     func attachBridge(_ bridge: BridgeSession) {
         self.bridge = bridge
@@ -44,8 +48,10 @@ final class TalkModeManager: NSObject {
     func setEnabled(_ enabled: Bool) {
         self.isEnabled = enabled
         if enabled {
+            self.logger.info("enabled")
             Task { await self.start() }
         } else {
+            self.logger.info("disabled")
             self.stop()
         }
     }
@@ -54,14 +60,17 @@ final class TalkModeManager: NSObject {
         guard self.isEnabled else { return }
         if self.isListening { return }
 
+        self.logger.info("start")
         self.statusText = "Requesting permissions…"
         let micOk = await Self.requestMicrophonePermission()
         guard micOk else {
+            self.logger.warning("start blocked: microphone permission denied")
             self.statusText = "Microphone permission denied"
             return
         }
         let speechOk = await Self.requestSpeechPermission()
         guard speechOk else {
+            self.logger.warning("start blocked: speech permission denied")
             self.statusText = "Speech recognition permission denied"
             return
         }
@@ -73,9 +82,12 @@ final class TalkModeManager: NSObject {
             self.isListening = true
             self.statusText = "Listening"
             self.startSilenceMonitor()
+            await self.subscribeChatIfNeeded(sessionKey: "main")
+            self.logger.info("listening")
         } catch {
             self.isListening = false
             self.statusText = "Start failed: \(error.localizedDescription)"
+            self.logger.error("start failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -88,6 +100,11 @@ final class TalkModeManager: NSObject {
         self.silenceTask?.cancel()
         self.silenceTask = nil
         self.stopRecognition()
+        self.stopSpeaking()
+        Task { await self.unsubscribeAllChats() }
+    }
+
+    func userTappedOrb() {
         self.stopSpeaking()
     }
 
@@ -191,16 +208,21 @@ final class TalkModeManager: NSObject {
         let prompt = self.buildPrompt(transcript: transcript)
         guard let bridge else {
             self.statusText = "Bridge not connected"
+            self.logger.warning("finalize: bridge not connected")
             await self.start()
             return
         }
 
         do {
             let startedAt = Date().timeIntervalSince1970
+            await self.subscribeChatIfNeeded(sessionKey: "main")
+            self.logger.info("chat.send start chars=\(prompt.count, privacy: .public)")
             let runId = try await self.sendChat(prompt, bridge: bridge)
+            self.logger.info("chat.send ok runId=\(runId, privacy: .public)")
             let ok = await self.waitForChatFinal(runId: runId, bridge: bridge)
             if !ok {
                 self.statusText = "No reply"
+                self.logger.warning("chat final timeout runId=\(runId, privacy: .public)")
                 await self.start()
                 return
             }
@@ -211,15 +233,48 @@ final class TalkModeManager: NSObject {
                 timeoutSeconds: 12)
             else {
                 self.statusText = "No reply"
+                self.logger.warning("assistant text timeout runId=\(runId, privacy: .public)")
                 await self.start()
                 return
             }
+            self.logger.info("assistant text ok chars=\(assistantText.count, privacy: .public)")
             await self.playAssistant(text: assistantText)
         } catch {
             self.statusText = "Talk failed: \(error.localizedDescription)"
+            self.logger.error("finalize failed: \(error.localizedDescription, privacy: .public)")
         }
 
         await self.start()
+    }
+
+    private func subscribeChatIfNeeded(sessionKey: String) async {
+        let key = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        guard let bridge else { return }
+        guard !self.chatSubscribedSessionKeys.contains(key) else { return }
+
+        do {
+            let payload = "{\"sessionKey\":\"\(key)\"}"
+            try await bridge.sendEvent(event: "chat.subscribe", payloadJSON: payload)
+            self.chatSubscribedSessionKeys.insert(key)
+            self.logger.info("chat.subscribe ok sessionKey=\(key, privacy: .public)")
+        } catch {
+            self.logger.warning("chat.subscribe failed sessionKey=\(key, privacy: .public) err=\(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func unsubscribeAllChats() async {
+        guard let bridge else { return }
+        let keys = self.chatSubscribedSessionKeys
+        self.chatSubscribedSessionKeys.removeAll()
+        for key in keys {
+            do {
+                let payload = "{\"sessionKey\":\"\(key)\"}"
+                try await bridge.sendEvent(event: "chat.unsubscribe", payloadJSON: payload)
+            } catch {
+                // ignore
+            }
+        }
     }
 
     private func buildPrompt(transcript: String) -> String {
@@ -326,6 +381,7 @@ final class TalkModeManager: NSObject {
         let voiceId = directive?.voiceId ?? self.currentVoiceId ?? self.defaultVoiceId
         guard let voiceId, !voiceId.isEmpty else {
             self.statusText = "Missing voice ID"
+            self.logger.error("missing voiceId")
             return
         }
 
@@ -334,6 +390,7 @@ final class TalkModeManager: NSObject {
             ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"]
         guard let apiKey = resolvedKey, !apiKey.isEmpty else {
             self.statusText = "Missing ELEVENLABS_API_KEY"
+            self.logger.error("missing ELEVENLABS_API_KEY")
             return
         }
 
@@ -342,6 +399,7 @@ final class TalkModeManager: NSObject {
         self.lastSpokenText = cleaned
 
         do {
+            let started = Date()
             let request = ElevenLabsRequest(
                 text: cleaned,
                 modelId: directive?.modelId ?? self.currentModelId ?? self.defaultModelId,
@@ -359,9 +417,11 @@ final class TalkModeManager: NSObject {
             let audio = try await ElevenLabsClient(apiKey: apiKey).synthesize(
                 voiceId: voiceId,
                 request: request)
+            self.logger.info("elevenlabs ok bytes=\(audio.count, privacy: .public) dur=\(Date().timeIntervalSince(started), privacy: .public)s")
             try await self.playAudio(data: audio)
         } catch {
             self.statusText = "Speak failed: \(error.localizedDescription)"
+            self.logger.error("speak failed: \(error.localizedDescription, privacy: .public)")
         }
 
         self.isSpeaking = false
@@ -372,10 +432,12 @@ final class TalkModeManager: NSObject {
         let player = try AVAudioPlayer(data: data)
         self.player = player
         player.prepareToPlay()
+        self.logger.info("play start")
         player.play()
         while player.isPlaying {
             try? await Task.sleep(nanoseconds: 120_000_000)
         }
+        self.logger.info("play done")
     }
 
     private func stopSpeaking() {

@@ -473,7 +473,10 @@ extension GatewayConnection {
             params["attachments"] = AnyCodable(encoded)
         }
 
-        return try await self.requestDecoded(method: .chatSend, params: params)
+        return try await self.requestDecoded(
+            method: .chatSend,
+            params: params,
+            timeoutMs: Double(timeoutMs))
     }
 
     func chatAbort(sessionKey: String, runId: String) async throws -> Bool {
