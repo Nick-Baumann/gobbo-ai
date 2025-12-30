@@ -98,9 +98,7 @@ struct RootTabs: View {
         if bridgeLower.contains("approval") || bridgeLower.contains("pairing") {
             return StatusPill.Activity(title: "Approval pending", systemImage: "person.crop.circle.badge.clock")
         }
-        if bridgeLower.contains("reconnecting") || bridgeLower.contains("connecting") {
-            return StatusPill.Activity(title: "Gateway reconnecting…", systemImage: "arrow.triangle.2.circlepath")
-        }
+        // Avoid duplicating the primary bridge status ("Connecting…") in the activity slot.
 
         if self.appModel.screenRecordActive {
             return StatusPill.Activity(title: "Recording screen…", systemImage: "record.circle.fill", tint: .red)
