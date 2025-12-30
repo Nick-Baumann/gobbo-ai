@@ -253,7 +253,7 @@ private struct CanvasContent: View {
 private struct OverlayButton: View {
     let systemImage: String
     let brighten: Bool
-    var tint: Color? = nil
+    var tint: Color?
     var isActive: Bool = false
     let action: () -> Void
 

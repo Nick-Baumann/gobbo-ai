@@ -7,6 +7,7 @@ import Speech
 @MainActor
 @Observable
 final class TalkModeManager: NSObject {
+    private typealias SpeechRequest = SFSpeechAudioBufferRecognitionRequest
     var isEnabled: Bool = false
     var isListening: Bool = false
     var isSpeaking: Bool = false
@@ -105,9 +106,8 @@ final class TalkModeManager: NSObject {
         let input = self.audioEngine.inputNode
         let format = input.outputFormat(forBus: 0)
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak request] buffer, _ in
-            request?.append(buffer)
-        }
+        let tapBlock = Self.makeAudioTapAppendCallback(request: request)
+        input.installTap(onBus: 0, bufferSize: 2048, format: format, block: tapBlock)
 
         self.audioEngine.prepare()
         try self.audioEngine.start()
@@ -133,6 +133,12 @@ final class TalkModeManager: NSObject {
         self.audioEngine.inputNode.removeTap(onBus: 0)
         self.audioEngine.stop()
         self.speechRecognizer = nil
+    }
+
+    private nonisolated static func makeAudioTapAppendCallback(request: SpeechRequest) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            request.append(buffer)
+        }
     }
 
     private func handleTranscript(transcript: String, isFinal: Bool) async {
