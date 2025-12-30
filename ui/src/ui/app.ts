@@ -168,6 +168,7 @@ export class ClawdisApp extends LitElement {
 
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;
+  private nodesPollInterval: number | null = null;
   basePath = "";
   private popStateHandler = () => this.onPopState();
   private themeMedia: MediaQueryList | null = null;
@@ -185,10 +186,12 @@ export class ClawdisApp extends LitElement {
     this.attachThemeListener();
     window.addEventListener("popstate", this.popStateHandler);
     this.connect();
+    this.startNodesPolling();
   }
 
   disconnectedCallback() {
     window.removeEventListener("popstate", this.popStateHandler);
+    this.stopNodesPolling();
     this.detachThemeListener();
     super.disconnectedCallback();
   }
@@ -221,6 +224,7 @@ export class ClawdisApp extends LitElement {
         this.connected = true;
         this.hello = hello;
         this.applySnapshot(hello);
+        void loadNodes(this, { quiet: true });
         void this.refreshActiveTab();
       },
       onClose: ({ code, reason }) => {
@@ -239,9 +243,34 @@ export class ClawdisApp extends LitElement {
     if (this.chatScrollFrame) cancelAnimationFrame(this.chatScrollFrame);
     this.chatScrollFrame = requestAnimationFrame(() => {
       this.chatScrollFrame = null;
-      const container = this.querySelector(".messages") as HTMLElement | null;
+      const container = this.querySelector(".chat-thread") as HTMLElement | null;
       if (!container) return;
       container.scrollTop = container.scrollHeight;
+    });
+  }
+
+  private startNodesPolling() {
+    if (this.nodesPollInterval != null) return;
+    this.nodesPollInterval = window.setInterval(
+      () => void loadNodes(this, { quiet: true }),
+      5000,
+    );
+  }
+
+  private stopNodesPolling() {
+    if (this.nodesPollInterval == null) return;
+    clearInterval(this.nodesPollInterval);
+    this.nodesPollInterval = null;
+  }
+
+  private hasConnectedMobileNode() {
+    return this.nodes.some((n) => {
+      if (!Boolean(n.connected)) return false;
+      const p =
+        typeof n.platform === "string" ? n.platform.trim().toLowerCase() : "";
+      return (
+        p.startsWith("ios") || p.startsWith("ipados") || p.startsWith("android")
+      );
     });
   }
 
@@ -427,6 +456,7 @@ export class ClawdisApp extends LitElement {
   }
 
   async handleSendChat() {
+    if (!this.connected || !this.hasConnectedMobileNode()) return;
     await sendChat(this);
     void loadChatHistory(this);
   }

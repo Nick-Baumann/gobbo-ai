@@ -68,7 +68,7 @@ describe("control UI routing", () => {
     const app = mountApp("/chat");
     await app.updateComplete;
 
-    const initialContainer = app.querySelector(".messages") as HTMLElement | null;
+    const initialContainer = app.querySelector(".chat-thread") as HTMLElement | null;
     expect(initialContainer).not.toBeNull();
     if (!initialContainer) return;
     initialContainer.style.maxHeight = "180px";
@@ -83,7 +83,7 @@ describe("control UI routing", () => {
     await app.updateComplete;
     await nextFrame();
 
-    const container = app.querySelector(".messages") as HTMLElement | null;
+    const container = app.querySelector(".chat-thread") as HTMLElement | null;
     expect(container).not.toBeNull();
     if (!container) return;
     const maxScroll = container.scrollHeight - container.clientHeight;

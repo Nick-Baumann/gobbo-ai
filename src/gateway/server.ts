@@ -1648,6 +1648,19 @@ export async function startGatewayServer(
   let bridge: Awaited<ReturnType<typeof startNodeBridgeServer>> | null = null;
   const bridgeNodeSubscriptions = new Map<string, Set<string>>();
   const bridgeSessionSubscribers = new Map<string, Set<string>>();
+
+  const isMobilePlatform = (platform: unknown): boolean => {
+    const p = typeof platform === "string" ? platform.trim().toLowerCase() : "";
+    if (!p) return false;
+    return (
+      p.startsWith("ios") || p.startsWith("ipados") || p.startsWith("android")
+    );
+  };
+
+  const hasConnectedMobileNode = (): boolean => {
+    const connected = bridge?.listConnected?.() ?? [];
+    return connected.some((n) => isMobilePlatform(n.platform));
+  };
   try {
     await new Promise<void>((resolve, reject) => {
       const onError = (err: NodeJS.ErrnoException) => {
@@ -4094,6 +4107,21 @@ export async function startGatewayServer(
               break;
             }
             case "chat.send": {
+              if (
+                client &&
+                isWebchatConnect(client.connect) &&
+                !hasConnectedMobileNode()
+              ) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.UNAVAILABLE,
+                    "web chat disabled: no connected iOS/Android nodes",
+                  ),
+                );
+                break;
+              }
               const params = (req.params ?? {}) as Record<string, unknown>;
               if (!validateChatSendParams(params)) {
                 respond(
@@ -4645,6 +4673,21 @@ export async function startGatewayServer(
               break;
             }
             case "talk.mode": {
+              if (
+                client &&
+                isWebchatConnect(client.connect) &&
+                !hasConnectedMobileNode()
+              ) {
+                respond(
+                  false,
+                  undefined,
+                  errorShape(
+                    ErrorCodes.UNAVAILABLE,
+                    "talk disabled: no connected iOS/Android nodes",
+                  ),
+                );
+                break;
+              }
               const params = (req.params ?? {}) as Record<string, unknown>;
               if (!validateTalkModeParams(params)) {
                 respond(

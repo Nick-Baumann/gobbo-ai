@@ -147,6 +147,16 @@ export function renderApp(state: AppViewState) {
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
+  const hasConnectedMobileNode = state.nodes.some((n) => {
+    if (!Boolean(n.connected)) return false;
+    const p = typeof n.platform === "string" ? n.platform.trim().toLowerCase() : "";
+    return p.startsWith("ios") || p.startsWith("ipados") || p.startsWith("android");
+  });
+  const chatDisabledReason = !state.connected
+    ? "Disconnected from gateway."
+    : hasConnectedMobileNode
+      ? null
+      : "No connected iOS/Android node — Web Chat + Talk are disabled.";
 
   return html`
     <div class="shell">
@@ -322,6 +332,8 @@ export function renderApp(state: AppViewState) {
               stream: state.chatStream,
               draft: state.chatMessage,
               connected: state.connected,
+              canSend: state.connected && hasConnectedMobileNode,
+              disabledReason: chatDisabledReason,
               onRefresh: () => loadChatHistory(state),
               onDraftChange: (next) => (state.chatMessage = next),
               onSend: () => state.handleSendChat(),
