@@ -539,7 +539,7 @@ actor TalkModeRuntime {
                 self.phase = .speaking
 
                 let sampleRate = TalkTTSValidation.pcmSampleRate(from: outputFormat)
-                let result: StreamingPlaybackResult
+                var result: StreamingPlaybackResult
                 if let sampleRate {
                     self.lastPlaybackWasPCM = true
                     result = await self.playPCM(stream: stream, sampleRate: sampleRate)
