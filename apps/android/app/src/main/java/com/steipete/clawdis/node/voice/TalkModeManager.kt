@@ -731,6 +731,11 @@ private fun JsonElement?.asObjectOrNull(): JsonObject? = this as? JsonObject
 private fun JsonElement?.asStringOrNull(): String? =
   (this as? JsonPrimitive)?.takeIf { it.isString }?.content
 
+private fun JsonElement?.asDoubleOrNull(): Double? {
+  val primitive = this as? JsonPrimitive ?: return null
+  return primitive.content.toDoubleOrNull()
+}
+
 private fun JsonElement?.asBooleanOrNull(): Boolean? {
   val primitive = this as? JsonPrimitive ?: return null
   val content = primitive.content.trim().lowercase()
