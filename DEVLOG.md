@@ -209,3 +209,4 @@ A running notebook of changes, observations, and small experiments.
 - 2025-12-30: dropped a buggy feature flag
 - 2025-12-31: smaller checkpoints on disk now
 - 2026-01-02: wrote a quick repro
+- 2026-01-02: removed dead code path
