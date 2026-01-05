@@ -216,3 +216,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-04: added a quick benchmark
 - 2026-01-04: loss curve smoother now
 - 2026-01-05: fixed a flaky test
+- 2026-01-05: small win in arena
