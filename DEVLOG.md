@@ -218,3 +218,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-05: fixed a flaky test
 - 2026-01-05: small win in arena
 - 2026-01-06: found a bug in resign logic
+- 2026-01-07: candidate passed at 56%
