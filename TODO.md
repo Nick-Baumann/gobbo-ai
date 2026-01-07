@@ -16,3 +16,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] wrote a quick repro
 - [ ] candidate passed at 56%
 - [ ] found a bug in resign logic
+- [ ] swapped to a faster hashmap
