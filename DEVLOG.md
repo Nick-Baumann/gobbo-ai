@@ -223,3 +223,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-09: fewer allocations in the hot loop
 - 2026-01-09: promoted
 - 2026-01-09: added a circuit breaker on coach calls
+- 2026-01-09: no regression in selfplay time
