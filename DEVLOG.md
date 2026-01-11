@@ -226,3 +226,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-09: no regression in selfplay time
 - 2026-01-10: loss curve smoother now
 - 2026-01-10: lowered batch size for stability
+- 2026-01-11: renamed a confusing field
