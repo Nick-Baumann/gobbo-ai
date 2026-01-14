@@ -231,3 +231,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-12: 1.4x throughput on inference
 - 2026-01-12: fixed an off-by-one in the buffer iter
 - 2026-01-14: dropped a buggy feature flag
+- 2026-01-14: candidate passed at 58%
