@@ -235,3 +235,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-15: tightened the coach prompt
 - 2026-01-15: lowered batch size for stability
 - 2026-01-16: renamed a confusing field
+- 2026-01-16: raised batch size now that it's stable
