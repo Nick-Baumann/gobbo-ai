@@ -247,3 +247,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-27: fewer allocations in the hot loop
 - 2026-01-28: clarified a comment
 - 2026-01-29: dropped a buggy feature flag
+- 2026-01-29: removed dead code path
