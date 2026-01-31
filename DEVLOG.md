@@ -250,3 +250,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-01-29: removed dead code path
 - 2026-01-29: removed dead code path
 - 2026-01-30: added one more validation check
+- 2026-01-31: added a regression test
