@@ -20,3 +20,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] 1.4x throughput on inference
 - [ ] split a long function
 - [ ] trained for 6 epochs instead of 8
+- [ ] fewer allocations in the hot loop
