@@ -263,3 +263,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-02-05: fewer allocations in the hot loop
 - 2026-02-05: added one more validation check
 - 2026-02-05: tightened type signatures
+- 2026-02-06: clarified a comment
