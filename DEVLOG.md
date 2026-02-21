@@ -286,3 +286,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-02-20: tightened type signatures
 - 2026-02-20: kept Adam, AdamW was worse here
 - 2026-02-20: loss curve smoother now
+- 2026-02-21: clarified a comment
