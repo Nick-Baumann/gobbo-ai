@@ -21,3 +21,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] split a long function
 - [ ] trained for 6 epochs instead of 8
 - [ ] fewer allocations in the hot loop
+- [ ] added more telemetry
