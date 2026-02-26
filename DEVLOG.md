@@ -290,3 +290,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-02-22: 1.4x throughput on inference
 - 2026-02-25: moved a cargo dep to workspace
 - 2026-02-25: switched to AdamW
+- 2026-02-26: moved a cargo dep to workspace
