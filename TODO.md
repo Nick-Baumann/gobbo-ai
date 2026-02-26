@@ -22,3 +22,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] trained for 6 epochs instead of 8
 - [ ] fewer allocations in the hot loop
 - [ ] added more telemetry
+- [ ] tightened the coach prompt
