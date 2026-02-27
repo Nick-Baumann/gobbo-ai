@@ -292,3 +292,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-02-25: switched to AdamW
 - 2026-02-26: moved a cargo dep to workspace
 - 2026-02-27: coach output is now strict JSON
+- 2026-02-27: candidate passed at 58%
