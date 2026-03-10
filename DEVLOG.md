@@ -301,3 +301,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-07: 1.4x throughput on inference
 - 2026-03-07: added more telemetry
 - 2026-03-08: kept Adam, AdamW was worse here
+- 2026-03-10: tightened the coach prompt
