@@ -307,3 +307,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-11: removed dead code path
 - 2026-03-11: removed noisy log line
 - 2026-03-13: promoted
+- 2026-03-13: fixed a flaky test
