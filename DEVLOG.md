@@ -309,3 +309,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-13: promoted
 - 2026-03-13: fixed a flaky test
 - 2026-03-14: fixed a flaky test
+- 2026-03-15: clarified a comment
