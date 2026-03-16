@@ -1,72 +1,361 @@
-# 🦞 CLAWDIS — Personal AI Assistant
+<p align="center">
+  <img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/69b88b355cf35e13745104a0_Mar%2016%2C%202026%2C%2010_58_53%20PM.png" alt="CLAWDIS" width="140" />
+</p>
+
+<h1 align="center">CLAWDIS</h1>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/steipete/clawdis/main/docs/whatsapp-clawd.jpg" alt="CLAWDIS" width="400">
+  <strong>Multi-Surface Autonomous AI Assistant -- Always On, Always Local, Always Listening.</strong>
+  <br/>
+  <em>stay connected.</em>
 </p>
 
 <p align="center">
-  <strong>EXFOLIATE! EXFOLIATE!</strong>
+  <a href="https://x.com/clawdisAI"><img src="https://img.shields.io/badge/Twitter-@clawdisAI-1DA1F2?style=flat-square&logo=x&logoColor=white" alt="Twitter" /></a>
+  <a href="https://x.com/belimad"><img src="https://img.shields.io/badge/Creator-@belimad-1DA1F2?style=flat-square&logo=x&logoColor=white" alt="Creator" /></a>
+  <a href="https://github.com/mbelinky"><img src="https://img.shields.io/badge/GitHub-mbelinky-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub" /></a>
+  <img src="https://img.shields.io/badge/Node-%E2%89%A522-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 22+" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20iOS%20%7C%20Android-999?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/steipete/clawdis/actions/workflows/ci.yml?branch=main"><img src="https://img.shields.io/github/actions/workflow/status/steipete/clawdis/ci.yml?branch=main&style=for-the-badge" alt="CI status"></a>
-  <a href="https://github.com/steipete/clawdis/releases"><img src="https://img.shields.io/github/v/release/steipete/clawdis?include_prereleases&style=for-the-badge" alt="GitHub release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+  <code>Contract Address: 2yDL2okKMtkxtSomVWVfr6Y8JDBuidRX3e4Qx8hBBAGS</code>
 </p>
 
-**Clawdis** is a *personal AI assistant* you run on your own devices.
-It answers you on the surfaces you already use (WhatsApp, Telegram, Discord, WebChat), can speak and listen on macOS/iOS, and can render a live Canvas you control. The Gateway is just the control plane — the product is the assistant.
+---
 
-If you want a private, single-user assistant that feels local, fast, and always-on, this is it.
+## Abstract
 
-Using Claude Pro/Max subscription? See `docs/onboarding.md` for the Anthropic OAuth setup.
+Clawdis is a single-user, multi-surface AI assistant runtime designed to operate as a persistent control plane across every device you own. Unlike cloud-hosted assistants that route your data through third-party servers, Clawdis runs locally on your hardware -- your Mac Mini, your iPhone, your Android device -- and connects to you through the messaging surfaces you already use: WhatsApp, Telegram, Discord, and native apps.
+
+The architecture is built around a central Gateway that owns all state, sessions, and provider routing. Every other component -- iOS nodes, Android nodes, CLI tools, WebChat, voice pipelines -- connects as a thin client over WebSocket or TCP Bridge. The result is an assistant that feels like a single entity across every surface, with shared memory, shared context, and zero cloud dependency for the control plane.
+
+---
+
+## Architecture
 
 ```
-Your surfaces
-   │
-   ▼
-┌───────────────────────────────┐
-│            Gateway            │  ws://127.0.0.1:18789
-│       (control plane)         │  tcp://0.0.0.0:18790 (optional Bridge)
-└──────────────┬────────────────┘
-               │
-               ├─ Pi agent (RPC)
-               ├─ CLI (clawdis …)
-               ├─ WebChat (browser)
-               ├─ macOS app (Clawdis.app)
-               └─ iOS node (Canvas + voice)
+                        Messaging Surfaces
+                    (WhatsApp / Telegram / Discord)
+                               |
+                               v
+        +----------------------------------------------+
+        |              GATEWAY (Control Plane)         |
+        |          ws://127.0.0.1:18789                |
+        |                                              |
+        |  +----------+  +----------+  +------------+ |
+        |  | Session  |  | Provider |  | Cron        | |
+        |  | Manager  |  | Router   |  | Scheduler   | |
+        |  +----------+  +----------+  +------------+ |
+        |  +----------+  +----------+  +------------+ |
+        |  | Presence |  | Voice    |  | Idempotency | |
+        |  | Engine   |  | Wake     |  | Cache       | |
+        |  +----------+  +----------+  +------------+ |
+        +------------------+---------------------------+
+                           |
+              +------------+------------+
+              |            |            |
+              v            v            v
+        +---------+  +---------+  +-----------+
+        | macOS   |  |  iOS    |  | Android   |
+        | Menu Bar|  |  Node   |  | Node      |
+        | + Voice |  | +Canvas |  | +Camera   |
+        | + Web   |  | +Voice  |  | +Screen   |
+        +---------+  +---------+  +-----------+
+              |            |            |
+              v            v            v
+        +----------------------------------------------+
+        |           TCP BRIDGE (Optional)              |
+        |     Newline-delimited JSON / RPC frames      |
+        |     tcp://0.0.0.0:18790                      |
+        +----------------------------------------------+
 ```
 
-## What Clawdis does
+---
 
-- **Personal assistant** — one user, one identity, one memory surface.
-- **Multi-surface inbox** — WhatsApp, Telegram, Discord, WebChat, macOS, iOS.
-- **Voice wake + push-to-talk** — local speech recognition on macOS/iOS.
-- **Canvas** — a live visual workspace you can drive from the agent.
-- **Automation-ready** — browser control, media handling, and tool streaming.
-- **Local-first control plane** — the Gateway owns state, everything else connects.
-- **Group chats** — mention-based by default, `/activation always|mention` per group (owner-only).
+## Gateway Internals
 
-## How it works (short)
+The Gateway is the single source of truth. Every session, every provider binding, every cron job, every voice wake event flows through it. Nothing else owns state.
 
-- **Gateway** is the single source of truth for sessions/providers.
-- **Loopback-first**: `ws://127.0.0.1:18789` by default.
-- **Bridge** (optional) exposes a paired-node port for iOS/Android.
-- **Agent runtime** is **Pi** in RPC mode.
+### Frame Validation Pipeline
 
-## Quick start (from source)
+All WebSocket frames are validated at ingress against TypeBox schemas via AJV. The first frame on any connection must be `connect`. Malformed frames are rejected before they reach the handler layer.
 
-Runtime: **Node ≥22** + **pnpm**.
+```typescript
+// src/gateway/protocol/validate.ts
+import { Type, Static } from '@sinclair/typebox';
+import Ajv from 'ajv';
+
+const ConnectFrame = Type.Object({
+  type: Type.Literal('connect'),
+  clientId: Type.String({ minLength: 1 }),
+  capabilities: Type.Array(Type.String()),
+  version: Type.String({ pattern: '^\\d+\\.\\d+\\.\\d+$' }),
+});
+
+const SendFrame = Type.Object({
+  type: Type.Literal('send'),
+  to: Type.String(),
+  message: Type.String({ maxLength: 16384 }),
+  idempotencyKey: Type.String({ format: 'uuid' }),
+});
+
+type ConnectPayload = Static<typeof ConnectFrame>;
+type SendPayload = Static<typeof SendFrame>;
+
+const ajv = new Ajv({ allErrors: true, coerceTypes: false });
+const validators = {
+  connect: ajv.compile(ConnectFrame),
+  send: ajv.compile(SendFrame),
+} as const;
+
+export function validateFrame(raw: unknown): { valid: boolean; errors?: string[] } {
+  const type = (raw as any)?.type;
+  const validator = validators[type as keyof typeof validators];
+  if (!validator) return { valid: false, errors: ['Unknown frame type: ' + type] };
+  const valid = validator(raw);
+  return valid ? { valid: true } : { valid: false, errors: validator.errors?.map(e => e.message!) };
+}
+```
+
+### Idempotency Layer
+
+Every mutation (`send`, `agent`, `chat.send`) requires an idempotency key. The Gateway maintains a TTL cache (5 min, cap 1000) to prevent double-sends on reconnects or retries. Duplicate keys return the cached response without re-execution.
+
+```typescript
+// src/gateway/idempotency.ts
+interface CacheEntry {
+  result: unknown;
+  timestamp: number;
+}
+
+const cache = new Map<string, CacheEntry>();
+const TTL_MS = 5 * 60 * 1000;
+const MAX_ENTRIES = 1000;
+
+export function checkIdempotency(key: string): CacheEntry | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+export function recordIdempotency(key: string, result: unknown): void {
+  if (cache.size >= MAX_ENTRIES) {
+    const oldest = [...cache.entries()]
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+    if (oldest) cache.delete(oldest[0]);
+  }
+  cache.set(key, { result, timestamp: Date.now() });
+}
+```
+
+### Event System
+
+The Gateway emits structured events over WebSocket to all connected surfaces. Handshake returns a full snapshot (presence map, health status, active sessions), then streams incremental events in real time.
+
+| Event Type | Payload | Trigger |
+|------------|---------|---------|
+| `agent` | Response chunks, tool calls, thinking | Agent invocation |
+| `chat` | Message delivered/received | Inbound or outbound message |
+| `presence` | Node connect/disconnect, surface status | Bridge state change |
+| `tick` | Cron execution result | Scheduled task fires |
+| `health` | CPU, memory, uptime, provider latency | Periodic (30s) |
+| `voicewake.changed` | Wake word config update | Settings mutation |
+| `node.pair.*` | Pairing request/confirm/reject | Node discovery |
+
+---
+
+## Multi-Surface Routing
+
+Clawdis treats every messaging platform as a thin transport layer. The routing engine normalizes inbound messages into a canonical format, dispatches to the agent runtime, and routes responses back through the originating surface.
+
+```typescript
+// src/gateway/router.ts
+interface CanonicalMessage {
+  surface: 'whatsapp' | 'telegram' | 'discord' | 'webchat' | 'voice';
+  senderId: string;
+  content: string;
+  mediaUrls?: string[];
+  groupId?: string;
+  timestamp: number;
+  metadata: Record<string, unknown>;
+}
+
+interface RouteDecision {
+  allow: boolean;
+  reason?: string;
+  activationMode: 'always' | 'mention';
+  sessionId: string;
+}
+
+export function routeInbound(
+  msg: CanonicalMessage, config: RoutingConfig
+): RouteDecision {
+  if (!config.allowFrom.includes(msg.senderId)) {
+    return {
+      allow: false,
+      reason: 'sender_not_allowlisted',
+      activationMode: 'mention',
+      sessionId: '',
+    };
+  }
+
+  if (msg.groupId) {
+    const groupConfig = config.groups?.[msg.groupId];
+    const mode = groupConfig?.activation ?? 'mention';
+    const mentioned = msg.content.includes('@' + config.botName);
+    if (mode === 'mention' && !mentioned) {
+      return {
+        allow: false,
+        reason: 'mention_required',
+        activationMode: mode,
+        sessionId: '',
+      };
+    }
+  }
+
+  const sessionId = resolveSession(msg.surface, msg.senderId, msg.groupId);
+  return { allow: true, activationMode: 'always', sessionId };
+}
+```
+
+---
+
+## Node Runtime (iOS / Android)
+
+Companion devices connect as nodes via the TCP Bridge. Each node advertises its capabilities on handshake and receives `invoke` commands from the Gateway.
+
+```typescript
+// Capability advertisement (node handshake)
+{
+  type: 'hello',
+  nodeId: 'iphone-14-pro',
+  platform: 'ios',
+  capabilities: ['canvas', 'screen', 'camera', 'voiceWake'],
+  version: '1.2.0',
+  pairingToken: 'keychain://clawdis.pairing.token'
+}
+```
+
+### Canvas Runtime
+
+The Canvas is a live visual workspace rendered in a WKWebView (iOS) or WebView (Android). The Gateway can push arbitrary HTML/JS/CSS to the Canvas surface via the A2UI postMessage bridge, enabling real-time data visualization, interactive controls, and agent-driven UI generation.
+
+```typescript
+// Canvas command flow
+// Gateway -> Bridge -> Node -> WKWebView
+
+// Agent pushes a live dashboard
+{
+  type: 'invoke',
+  command: 'canvas.render',
+  payload: {
+    html: '<div id="metrics">...</div>',
+    js: 'setInterval(() => fetch("/health").then(render), 5000)',
+    snapshot: true
+  }
+}
+```
+
+---
+
+## Voice Pipeline
+
+Voice wake detection runs locally on macOS and iOS. Audio is processed on-device -- no cloud STT for the wake word. Once triggered, the transcript is forwarded to the Gateway as a `voice.transcript` event, which dispatches to the agent runtime.
+
+```
+Microphone -> Local VAD -> Wake Word Detection -> On-Device STT
+                                                       |
+                                                       v
+                                              voice.transcript event
+                                                       |
+                                                       v
+                                              Gateway -> Agent Runtime
+```
+
+The voice pipeline supports both continuous wake word listening and push-to-talk overlay mode. Configuration is synced across nodes via `voicewake.get` and `voicewake.changed` events.
+
+---
+
+## Agent Runtime
+
+The agent operates within a sandboxed workspace rooted at `~/clawd`. Injected prompt files (`AGENTS.md`, `SOUL.md`, `TOOLS.md`) define the agent's identity, capabilities, and behavioral constraints. Skills are loaded from `~/clawd/skills/<skill>/SKILL.md`.
+
+```
+~/clawd/
+  AGENTS.md          # Identity and behavioral directives
+  SOUL.md            # Personality and response style
+  TOOLS.md           # Available tool definitions
+  skills/
+    browser/
+      SKILL.md       # Browser automation skill
+    media/
+      SKILL.md       # Media processing skill
+    search/
+      SKILL.md       # Search and retrieval skill
+  memory/
+    sessions.json    # Persistent session state
+    context.json     # Long-term memory store
+```
+
+---
+
+## Configuration
+
+Minimal setup -- single file at `~/.clawdis/clawdis.json`:
+
+```json5
+{
+  routing: {
+    allowFrom: ["+1234567890"],
+    botName: "clawdis"
+  },
+  agent: {
+    workspace: "~/clawd",
+    thinking: "high",
+    provider: "anthropic"
+  },
+  gateway: {
+    port: 18789,
+    bind: "loopback"    // loopback | lan | tailnet | auto
+  },
+  bridge: {
+    enabled: true,
+    port: 18790
+  },
+  telegram: {
+    botToken: "env:TELEGRAM_BOT_TOKEN"
+  },
+  discord: {
+    token: "env:DISCORD_BOT_TOKEN"
+  },
+  browser: {
+    enabled: true,
+    controlUrl: "http://127.0.0.1:18791"
+  }
+}
+```
+
+---
+
+## Quick Start
 
 ```bash
-pnpm install
-pnpm build
-pnpm ui:build
+# Clone and install
+git clone https://github.com/mbelinky/clawdis.git
+cd clawdis
+pnpm install && pnpm build && pnpm ui:build
 
 # Link WhatsApp (stores creds in ~/.clawdis/credentials)
 pnpm clawdis login
 
-# Start the gateway
+# Start the Gateway
 pnpm clawdis gateway --port 18789 --verbose
 
 # Dev loop (auto-reload on TS changes)
@@ -75,156 +364,100 @@ pnpm gateway:watch
 # Send a message
 pnpm clawdis send --to +1234567890 --message "Hello from Clawdis"
 
-# Talk to the assistant (optionally deliver back to WhatsApp/Telegram/Discord)
-pnpm clawdis agent --message "Ship checklist" --thinking high
+# Invoke the agent directly
+pnpm clawdis agent --message "Run diagnostics" --thinking high
 ```
 
-If you run from source, prefer `pnpm clawdis …` (not global `clawdis`).
+---
 
-## Chat commands
+## Chat Commands
 
-Send these in WhatsApp/Telegram/WebChat (group commands are owner-only):
+Available across all surfaces (WhatsApp, Telegram, Discord, WebChat):
 
-- `/status` — health + session info (group shows activation mode)
-- `/new` or `/reset` — reset the session
-- `/think <level>` — off|minimal|low|medium|high
-- `/verbose on|off`
-- `/restart` — restart the gateway (owner-only in groups)
-- `/activation mention|always` — group activation toggle (groups only)
+| Command | Description | Scope |
+|---------|-------------|-------|
+| `/status` | Health, session info, activation mode | All |
+| `/new` / `/reset` | Reset the current session | All |
+| `/think <level>` | Set thinking depth (off/minimal/low/medium/high) | All |
+| `/verbose on\|off` | Toggle verbose output | All |
+| `/restart` | Restart the Gateway process | Owner |
+| `/activation mention\|always` | Group activation mode | Groups |
 
-## Architecture
+---
 
-### TypeScript Gateway (src/gateway/server.ts)
-- **Single HTTP+WS server** on `ws://127.0.0.1:18789` (bind policy: loopback/lan/tailnet/auto). The first frame must be `connect`; AJV validates frames against TypeBox schemas (`src/gateway/protocol`).
-- **Single source of truth** for sessions, providers, cron, voice wake, and presence. Methods cover `send`, `agent`, `chat.*`, `sessions.*`, `config.*`, `cron.*`, `voicewake.*`, `node.*`, `system-*`, `wake`.
-- **Events + snapshot**: handshake returns a snapshot (presence/health) and declares event types; runtime events include `agent`, `chat`, `presence`, `tick`, `health`, `heartbeat`, `cron`, `node.pair.*`, `voicewake.changed`, `shutdown`.
-- **Idempotency & safety**: `send`/`agent`/`chat.send` require idempotency keys with a TTL cache (5 min, cap 1000) to avoid double‑sends on reconnects; payload sizes are capped per connection.
-- **Bridge for nodes**: optional TCP bridge (`src/infra/bridge/server.ts`) is newline‑delimited JSON frames (`hello`, pairing, RPC, `invoke`); node connect/disconnect is surfaced into presence.
-- **Control UI + Canvas Host**: HTTP serves `/ui` assets (if built) and can host a live‑reload Canvas host for nodes (`src/canvas-host/server.ts`), injecting the A2UI postMessage bridge.
-
-### iOS app (apps/ios)
-- **Discovery + pairing**: Bonjour discovery via `BridgeDiscoveryModel` (NWBrowser). `BridgeConnectionController` auto‑connects using Keychain token or allows manual host/port.
-- **Node runtime**: `BridgeSession` (actor) maintains the `NWConnection`, hello handshake, ping/pong, RPC requests, and `invoke` callbacks.
-- **Capabilities + commands**: advertises `canvas`, `screen`, `camera`, `voiceWake` (settings‑driven) and executes `canvas.*`, `canvas.a2ui.*`, `camera.*`, `screen.record` (`NodeAppModel.handleInvoke`).
-- **Canvas**: `WKWebView` with bundled Canvas scaffold + A2UI, JS eval, snapshot capture, and `clawdis://` deep‑link interception (`ScreenController`).
-- **Voice + deep links**: voice wake sends `voice.transcript` events; `clawdis://agent` links emit `agent.request`. Voice wake triggers sync via `voicewake.get` + `voicewake.changed`.
-
-## Companion apps
-
-The **macOS app is critical**: it runs the menu‑bar control plane, owns local permissions (TCC), hosts Voice Wake, exposes WebChat/debug tools, and coordinates local/remote gateway mode. Most “assistant” UX lives here.
+## Companion Apps
 
 ### macOS (Clawdis.app)
 
-- Menu bar control for the Gateway and health.
-- Voice Wake + push-to-talk overlay.
-- WebChat + debug tools.
-- Remote gateway control over SSH.
-
-Build/run: `./scripts/restart-mac.sh` (packages + launches).
-
-### iOS node (internal)
-
-- Pairs as a node via the Bridge.
-- Voice trigger forwarding + Canvas surface.
-- Controlled via `clawdis nodes …`.
-
-Runbook: `docs/ios/connect.md`.
-
-### Android node (internal)
-
-- Pairs via the same Bridge + pairing flow as iOS.
-- Exposes Canvas, Camera, and Screen capture commands.
-- Runbook: `docs/android/connect.md`.
-
-## Agent workspace + skills
-
-- Workspace root: `~/clawd` (configurable via `agent.workspace`).
-- Injected prompt files: `AGENTS.md`, `SOUL.md`, `TOOLS.md`.
-- Skills: `~/clawd/skills/<skill>/SKILL.md`.
-
-## Configuration
-
-Minimal `~/.clawdis/clawdis.json`:
-
-```json5
-{
-  routing: {
-    allowFrom: ["+1234567890"]
-  }
-}
-```
-
-### WhatsApp
-
-- Link the device: `pnpm clawdis login` (stores creds in `~/.clawdis/credentials`).
-- Allowlist who can talk to the assistant via `routing.allowFrom`.
-
-### Telegram
-
-- Set `TELEGRAM_BOT_TOKEN` or `telegram.botToken` (env wins).
-- Optional: set `telegram.requireMention`, `telegram.allowFrom`, or `telegram.webhookUrl` as needed.
-
-```json5
-{
-  telegram: {
-    botToken: "123456:ABCDEF"
-  }
-}
-```
-
-### Discord
-
-- Set `DISCORD_BOT_TOKEN` or `discord.token` (env wins).
-- Optional: set `discord.requireMention`, `discord.allowFrom`, or `discord.mediaMaxMb` as needed.
-
-```json5
-{
-  discord: {
-    token: "1234abcd"
-  }
-}
-```
-
-Browser control (optional):
-
-```json5
-{
-  browser: {
-    enabled: true,
-    controlUrl: "http://127.0.0.1:18791",
-    color: "#FF4500"
-  }
-}
-```
-
-## Docs
-
-- [`docs/index.md`](docs/index.md) (overview)
-- [`docs/configuration.md`](docs/configuration.md)
-- [`docs/group-messages.md`](docs/group-messages.md)
-- [`docs/gateway.md`](docs/gateway.md)
-- [`docs/web.md`](docs/web.md)
-- [`docs/discovery.md`](docs/discovery.md)
-- [`docs/agent.md`](docs/agent.md)
-- [`docs/discord.md`](docs/discord.md)
-- Webhooks + external triggers: [`docs/webhook.md`](docs/webhook.md)
-- Gmail hooks (email → wake): [`docs/gmail-pubsub.md`](docs/gmail-pubsub.md)
-
-## Email hooks (Gmail)
+The macOS app is the primary control surface. It runs the menu-bar control plane, owns local TCC permissions, hosts Voice Wake, exposes WebChat and debug tools, and coordinates local/remote gateway mode.
 
 ```bash
-clawdis hooks gmail setup --account you@gmail.com
-clawdis hooks gmail run
+./scripts/restart-mac.sh    # Build, package, and launch
 ```
-- [`docs/security.md`](docs/security.md)
-- [`docs/troubleshooting.md`](docs/troubleshooting.md)
-- [`docs/ios/connect.md`](docs/ios/connect.md)
-- [`docs/clawdis-mac.md`](docs/clawdis-mac.md)
 
-## Clawd
+### iOS Node
 
-Clawdis was built for **Clawd**, a space lobster AI assistant.
+Pairs as a node via the Bridge. Exposes Canvas, voice trigger forwarding, camera capture, and screen recording. Controlled via `clawdis nodes` CLI.
 
-- https://clawd.me
-- https://soul.md
-- https://steipete.me
+### Android Node
+
+Same Bridge pairing flow as iOS. Exposes Canvas, camera, and screen capture commands.
+
+---
+
+## Security Model
+
+- **Loopback-first**: Gateway binds to `127.0.0.1` by default. No public exposure.
+- **Allowlist routing**: Only explicitly allowlisted senders can interact with the agent.
+- **Pairing tokens**: Node connections require Keychain-stored pairing tokens.
+- **No cloud dependency**: The control plane never leaves your network.
+- **Frame validation**: Every WebSocket frame is schema-validated before processing.
+- **Idempotency**: Mutation operations are deduplicated to prevent double-execution.
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`docs/index.md`](docs/index.md) | Architecture overview |
+| [`docs/configuration.md`](docs/configuration.md) | Full configuration reference |
+| [`docs/gateway.md`](docs/gateway.md) | Gateway internals |
+| [`docs/agent.md`](docs/agent.md) | Agent runtime and skills |
+| [`docs/discovery.md`](docs/discovery.md) | Bonjour discovery protocol |
+| [`docs/group-messages.md`](docs/group-messages.md) | Group chat behavior |
+| [`docs/discord.md`](docs/discord.md) | Discord integration |
+| [`docs/webhook.md`](docs/webhook.md) | Webhooks and external triggers |
+| [`docs/gmail-pubsub.md`](docs/gmail-pubsub.md) | Gmail event hooks |
+| [`docs/security.md`](docs/security.md) | Security model |
+| [`docs/ios/connect.md`](docs/ios/connect.md) | iOS node setup |
+| [`docs/clawdis-mac.md`](docs/clawdis-mac.md) | macOS app guide |
+
+---
+
+<p align="center">
+  <sub>Built by <a href="https://github.com/mbelinky">mbelinky</a>. Follow development at <a href="https://x.com/clawdisAI">@clawdisAI</a>.</sub><br/>
+  <sub>A local-first, multi-surface AI assistant runtime. One user. One identity. Every device.</sub>
+</p>
+
+---
+
+## Bags Hackathon
+
+<p align="center">
+  <a href="https://bags.fm/2yDL2okKMtkxtSomVWVfr6Y8JDBuidRX3e4Qx8hBBAGS">
+    <img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/69b890e3d8a9d85211b0b160_HCx_bWaXcAAyC4s.jpg" alt="Bags Hackathon" width="720" />
+  </a>
+</p>
+
+Clawdis is participating in **[The Bags Hackathon](https://bags.fm/2yDL2okKMtkxtSomVWVfr6Y8JDBuidRX3e4Qx8hBBAGS)** -- $4,000,000 in funding for developers building on Bags.fm.
+
+- **$1M in grants** distributed to 100 teams that ship real products with real traction
+- **$3M Bags Fund** for ongoing builder support with capital, distribution, and more
+- Winners selected based on **real traction**: onchain performance, app usage, and growth potential
+- Early traction and growth trajectory weigh heavily in evaluation
+- Applications reviewed on a rolling basis
+
+Build good tech, win cash, start companies.
+
+**[Apply now](https://bags.fm/2yDL2okKMtkxtSomVWVfr6Y8JDBuidRX3e4Qx8hBBAGS)** to be accepted into the first cohort.
