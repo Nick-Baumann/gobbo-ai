@@ -312,3 +312,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-15: clarified a comment
 - 2026-03-15: clarified a comment
 - 2026-03-16: tightened type signatures
+- 2026-03-16: fixed an off-by-one in the buffer iter
