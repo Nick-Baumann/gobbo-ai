@@ -311,3 +311,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-14: fixed a flaky test
 - 2026-03-15: clarified a comment
 - 2026-03-15: clarified a comment
+- 2026-03-16: tightened type signatures
