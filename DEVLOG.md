@@ -319,3 +319,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-21: added one more validation check
 - 2026-03-21: no regression in selfplay time
 - 2026-03-22: noticed a slow path in MCTS expand
+- 2026-03-22: swapped to a faster hashmap
