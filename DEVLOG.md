@@ -321,3 +321,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-22: noticed a slow path in MCTS expand
 - 2026-03-22: swapped to a faster hashmap
 - 2026-03-23: trained for 6 epochs instead of 8
+- 2026-03-23: raised batch size now that it's stable
