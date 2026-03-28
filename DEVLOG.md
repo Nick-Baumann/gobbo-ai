@@ -328,3 +328,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-26: fixed a panic on empty PGN
 - 2026-03-27: found a bug in resign logic
 - 2026-03-28: added a circuit breaker on coach calls
+- 2026-03-28: noticed a slow path in the encoder
