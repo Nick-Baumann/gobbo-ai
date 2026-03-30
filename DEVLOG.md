@@ -334,3 +334,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-30: found a bug in resign logic
 - 2026-03-30: added more telemetry
 - 2026-03-30: fixed a flaky test
+- 2026-03-30: clarified a comment
