@@ -333,3 +333,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-29: fixed an off-by-one in the buffer iter
 - 2026-03-30: found a bug in resign logic
 - 2026-03-30: added more telemetry
+- 2026-03-30: fixed a flaky test
