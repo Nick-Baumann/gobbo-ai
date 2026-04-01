@@ -337,3 +337,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-03-30: clarified a comment
 - 2026-03-31: fewer allocations in the hot loop
 - 2026-03-31: noticed a slow path in the encoder
+- 2026-04-01: coach output is now strict JSON
