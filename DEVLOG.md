@@ -342,3 +342,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-04-03: switched to AdamW
 - 2026-04-04: 1.4x throughput on inference
 - 2026-04-04: fixed a flaky test
+- 2026-04-05: dropped a buggy feature flag
