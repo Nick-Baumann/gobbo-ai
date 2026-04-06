@@ -344,3 +344,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-04-04: fixed a flaky test
 - 2026-04-05: dropped a buggy feature flag
 - 2026-04-06: found a bug in resign logic
+- 2026-04-06: tightened the coach prompt
