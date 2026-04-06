@@ -27,7 +27,7 @@
 
 Goblin is a single-user assistant runtime designed to live on a **Mac Mini M4** sitting on your desk. Always on. Always reachable. Every reasoning step runs through OpenAI's Codex CLI under the hood. The Mac Mini is the body; Codex is the brain.
 
-If you've used OpenClaw, the shape will be familiar. **Goblin is the Codex-native cousin, opinionated about the hardware it runs on.**
+It's opinionated: one backend (Codex), one hardware target (the Mini), one identity across every messaging surface you already use.
 
 ## At a glance
 
@@ -58,13 +58,13 @@ You can run Goblin on any Linux machine, but it's tuned for the Mini. Numbers in
 
 ## How it compares
 
-| Capability | Goblin | OpenClaw | Codex CLI alone |
+| Capability | Goblin | Generic agent runtime | Codex CLI alone |
 |---|:---:|:---:|:---:|
 | Codex Responses API | native | via provider trait | native |
 | Provider switching | Codex only | any LLM | n/a |
-| Messaging surfaces | built-in | built-in | none |
-| Skills (`SKILL.md`) | yes | yes | no |
-| Local control plane | yes | yes | yes |
+| Messaging surfaces | built-in | varies | none |
+| Skills as folders | yes | rare | no |
+| Local control plane | yes | varies | yes |
 | Apple Silicon tuned | yes | platform-agnostic | yes |
 | Mac Mini LaunchAgent | shipped | manual | manual |
 | Keychain credentials | yes | platform-agnostic | n/a |
