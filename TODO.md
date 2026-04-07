@@ -29,3 +29,4 @@ Loose tracker. Items here are nice-to-have, not promises.
 - [ ] renamed a confusing field
 - [ ] engine learned to fianchetto
 - [ ] added one more validation check
+- [ ] found a bug in resign logic
