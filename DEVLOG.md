@@ -346,3 +346,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-04-06: found a bug in resign logic
 - 2026-04-06: tightened the coach prompt
 - 2026-04-07: smaller checkpoints on disk now
+- 2026-04-08: trained for 6 epochs instead of 8
