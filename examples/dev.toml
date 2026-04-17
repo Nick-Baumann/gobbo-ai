@@ -1,0 +1,25 @@
+# Dev profile: short iterations, small batches, no Lichess.
+
+[loop]
+iterations = 1
+samples_per_iter = 200
+
+[selfplay]
+games = 8
+simulations = 50
+
+[train]
+batch_size = 64
+epochs_per_iter = 2
+buffer_iterations = 1
+
+[arena]
+games = 12
+simulations = 80
+promotion_threshold = 0.50
+
+[coach]
+provider = "noop"
+
+[lichess]
+enabled = false
