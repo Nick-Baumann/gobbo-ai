@@ -12,7 +12,6 @@
 <p align="center">
   <a href="https://www.milton.bot/"><img src="https://img.shields.io/badge/site-milton.bot-000000?style=for-the-badge&logo=icloud&logoColor=white" alt="Site" /></a>
   <a href="https://x.com/TheMiltonBot"><img src="https://img.shields.io/badge/follow-@TheMiltonBot-1DA1F2?style=for-the-badge&logo=x&logoColor=white" alt="Twitter" /></a>
-  <a href="https://github.com/MiltonChess/milton"><img src="https://img.shields.io/badge/github-MiltonChess%2Fmilton-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
 </p>
 
 <p align="center">
@@ -24,10 +23,6 @@
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20iOS%20%7C%20Android%20%7C%20Linux-666?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/audit-verified-1a8917?style=flat-square&logo=letsencrypt&logoColor=white" alt="audit" />
   <img src="https://img.shields.io/badge/security-hardened-1a8917?style=flat-square&logo=protonvpn&logoColor=white" alt="security" />
-</p>
-
-<p align="center">
-  <code>Dev: EjBWT3jZVeAm2TA7tLcXY7z98smYzrsj9LoYs95SAdMd</code>
 </p>
 
 ---
@@ -746,8 +741,6 @@ Same Bridge pairing flow as iOS. Exposes Canvas, camera, and screen capture. Inc
 
 - Site: [milton.bot](https://www.milton.bot/)
 - Twitter: [@TheMiltonBot](https://x.com/TheMiltonBot)
-- GitHub: [MiltonChess/milton](https://github.com/MiltonChess/milton)
-- Dev address: `EjBWT3jZVeAm2TA7tLcXY7z98smYzrsj9LoYs95SAdMd`
 
 ---
 
