@@ -442,16 +442,6 @@ Same Bridge pairing flow as iOS. Exposes Canvas, camera, and screen capture comm
 
 ---
 
-## Bags Hackathon
-
-<p align="center">
-  <a href="https://bags.fm/2yDL2okKMtkxtSomVWVfr6Y8JDBuidRX3e4Qx8hBBAGS">
-    <img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/69b890e3d8a9d85211b0b160_HCx_bWaXcAAyC4s.jpg" alt="Bags Hackathon" width="720" />
-  </a>
-</p>
-
-Clawdis is participating in **[The Bags Hackathon](https://bags.fm/2yDL2okKMtkxtSomVWVfr6Y8JDBuidRX3e4Qx8hBBAGS)** -- $4,000,000 in funding for developers building on Bags.fm.
-
 - **$1M in grants** distributed to 100 teams that ship real products with real traction
 - **$3M Bags Fund** for ongoing builder support with capital, distribution, and more
 - Winners selected based on **real traction**: onchain performance, app usage, and growth potential
