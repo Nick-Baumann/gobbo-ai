@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <code>Contract Address: </code>
+  <code>Contract Address: 5EWTe5crfKKNxrEwH9yPUcWc19ZhHehk8fRL8M3wpump</code>
 </p>
 
 ---
