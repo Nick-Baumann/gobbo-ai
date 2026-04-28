@@ -14,7 +14,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/build-passing-1a8917?style=flat-square&logo=githubactions&logoColor=white" alt="build" />
   <img src="https://img.shields.io/badge/coverage-94%25-1a8917?style=flat-square&logo=codecov&logoColor=white" alt="coverage" />
-  <img src="https://img.shields.io/badge/version-0.4.2-blueviolet?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.4.2--rc1-blueviolet?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/rust-1.78%2B-CE422B?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-3178C6?style=flat-square" alt="MIT" />
   <img src="https://img.shields.io/badge/runtime-mac%20mini%20M4-666?style=flat-square&logo=apple&logoColor=white" alt="Runtime" />
