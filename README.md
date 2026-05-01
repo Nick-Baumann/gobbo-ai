@@ -1,28 +1,25 @@
-<p align="center">
-  <img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/69ffd6302384f60d1a1b8575_New%20Project%20-%202026-05-10T013848.571.png" alt="MILTON" width="100%" />
-</p>
-
 <h1 align="center">MILTON</h1>
 
 <p align="center">
-  <strong>A local-first, multi-surface autonomous AI runtime.</strong><br/>
-  <em>Always on. Always local. Always listening.</em>
+  <strong>A self-learning chess engine that trains itself, gates its own promotions, and plays rated games on Lichess — running on a single Mac Mini.</strong><br/>
+  <em>Self-play. Train. Arena. Deploy. Forever.</em>
 </p>
 
 <p align="center">
   <a href="https://www.milton.bot/"><img src="https://img.shields.io/badge/site-milton.bot-000000?style=for-the-badge&logo=icloud&logoColor=white" alt="Site" /></a>
-  <a href="https://x.com/TheMiltonBot"><img src="https://img.shields.io/badge/follow-@TheMiltonBot-1DA1F2?style=for-the-badge&logo=x&logoColor=white" alt="Twitter" /></a>
+  <a href="https://x.com/pranaveight"><img src="https://img.shields.io/badge/follow-@pranaveight-1DA1F2?style=for-the-badge&logo=x&logoColor=white" alt="Twitter" /></a>
+  <a href="https://lichess.org/@/magnusgrok"><img src="https://img.shields.io/badge/lichess-@magnusgrok-7F7F7F?style=for-the-badge&logo=lichess&logoColor=white" alt="Lichess" /></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/build-passing-1a8917?style=flat-square&logo=githubactions&logoColor=white" alt="build" />
   <img src="https://img.shields.io/badge/coverage-94%25-1a8917?style=flat-square&logo=codecov&logoColor=white" alt="coverage" />
-  <img src="https://img.shields.io/badge/version-2.1.0-blueviolet?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.4.2-blueviolet?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/rust-1.78%2B-CE422B?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-3178C6?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20iOS%20%7C%20Android%20%7C%20Linux-666?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/runtime-mac%20mini%20M4-666?style=flat-square&logo=apple&logoColor=white" alt="Runtime" />
   <img src="https://img.shields.io/badge/audit-verified-1a8917?style=flat-square&logo=letsencrypt&logoColor=white" alt="audit" />
-  <img src="https://img.shields.io/badge/security-hardened-1a8917?style=flat-square&logo=protonvpn&logoColor=white" alt="security" />
+  <img src="https://img.shields.io/badge/elo-2150%20%E2%86%92%202500-1a8917?style=flat-square" alt="elo" />
 </p>
 
 ---
@@ -31,34 +28,29 @@
 
 - [Abstract](#abstract)
 - [Design Principles](#design-principles)
-- [System Architecture](#system-architecture)
-- [Gateway Internals](#gateway-internals)
-  - [Frame Validation Pipeline](#frame-validation-pipeline)
-  - [Idempotency Layer](#idempotency-layer)
-  - [Session Manager](#session-manager)
-  - [Provider Router](#provider-router)
-  - [Event System](#event-system)
-- [Multi-Surface Routing](#multi-surface-routing)
-- [Node Runtime](#node-runtime-ios--android)
-- [Voice Pipeline](#voice-pipeline)
-- [Agent Runtime](#agent-runtime)
+- [The Loop](#the-loop)
+- [Stage 1: Self-Play](#stage-1-self-play)
+- [Stage 2: Training](#stage-2-training)
+- [Stage 3: Arena](#stage-3-arena)
+- [Stage 4: Deployment](#stage-4-deployment)
+- [Neural Network Architecture](#neural-network-architecture)
+- [MCTS Implementation](#mcts-implementation)
+- [LLM Coach Integration](#llm-coach-integration)
 - [Configuration](#configuration)
 - [Quick Start](#quick-start)
-- [Chat Commands](#chat-commands)
-- [Companion Apps](#companion-apps)
-- [Security Model](#security-model)
 - [Performance Targets](#performance-targets)
+- [Lichess Bot](#lichess-bot)
 - [Documentation](#documentation)
 
 ---
 
 ## Abstract
 
-Milton is a single-user, multi-surface AI assistant runtime designed to operate as a persistent control plane across every device you own. Unlike cloud-hosted assistants that route your data through third-party servers, Milton runs locally on your hardware — your Mac Mini, your iPhone, your Android device — and reaches you through the messaging surfaces you already use: WhatsApp, Telegram, Discord, iMessage, and native companion apps.
+Milton is a recursive, self-improving chess engine. It learns the game from random play, with no opening book, no endgame tablebase, and no scraped grandmaster games. Every line of theory it knows, it discovered itself.
 
-The architecture is built around a single Rust binary — the **Gateway** — that owns all state, sessions, and provider routing. Every other component (iOS nodes, Android nodes, CLI tools, WebChat panel, voice pipelines) connects as a thin client over WebSocket or the TCP Bridge protocol. The result is an assistant that feels like one identity across every surface, with shared memory, shared context, and zero cloud dependency for the control plane.
+The runtime is a single Rust binary that drives a four-stage cycle: generate self-play games, train the network on the resulting positions, run the candidate against the reigning champion in a head-to-head match, and — if the candidate wins by a sufficient margin — promote it and deploy it as the live opponent on Lichess. The loop never breaks.
 
-Milton is not a chatbot. It is a **runtime** — the operating layer that lets a personal AI hold continuous, durable presence across your life.
+Milton is engineered around three claims: that the *cycle* is the artifact, not the weights; that an LLM acting as a post-game coach can compress the long-tail of self-play; and that Candidate Master strength (2500 Elo) is reachable on consumer hardware with a tight enough loop.
 
 ---
 
@@ -66,560 +58,419 @@ Milton is not a chatbot. It is a **runtime** — the operating layer that lets a
 
 | Principle | Manifestation |
 |-----------|---------------|
-| **Local-first** | Control plane never leaves your network. Loopback bind by default. |
-| **One identity** | Single session graph across every surface. No context fragmentation. |
-| **Surface-agnostic** | WhatsApp, Telegram, Discord, iMessage, voice, web — all equal citizens. |
-| **Schema-validated** | Every wire frame validated at ingress. Malformed frames rejected pre-handler. |
-| **Idempotent mutations** | All state changes carry idempotency keys. Reconnects never double-execute. |
-| **Capability-typed nodes** | Devices advertise capabilities on handshake. Gateway routes by capability set. |
-| **Zero hidden state** | Sessions, presence, cron, idempotency — all live in the Gateway. Nothing else owns state. |
+| **The loop is the product** | Network architecture is fixed early; the wins come from tightening the cycle. |
+| **Zero human knowledge** | No opening book. No endgame tablebase. No GM games. Strategy emerges from MCTS-improved self-play targets alone. |
+| **Arena gate is non-negotiable** | A candidate network must beat the champion at >= 55% to be promoted. Below that, it is discarded. |
+| **Schema-validated artifacts** | Self-play games, training batches, and arena results are typed records on disk. Nothing is parsed twice. |
+| **Single-machine** | One Mac Mini M4. MPS for inference, CPU pool for tree search. No cloud. No queue. No SLURM. |
+| **Public scoreboard** | The current champion is always live on Lichess. Anyone can challenge it. |
 
 ---
 
-## System Architecture
+## The Loop
 
 ```
-                        Messaging Surfaces
-            (WhatsApp / Telegram / Discord / iMessage)
-                               |
-                               v
-        +----------------------------------------------+
-        |            GATEWAY  (Control Plane)          |
-        |              ws://127.0.0.1:18789            |
-        |                                              |
-        |  +----------+  +----------+  +------------+  |
-        |  | Session  |  | Provider |  | Cron       |  |
-        |  | Manager  |  | Router   |  | Scheduler  |  |
-        |  +----------+  +----------+  +------------+  |
-        |  +----------+  +----------+  +------------+  |
-        |  | Presence |  | Voice    |  | Idempotency|  |
-        |  | Engine   |  | Wake     |  | Cache      |  |
-        |  +----------+  +----------+  +------------+  |
-        |  +----------+  +----------+  +------------+  |
-        |  | Skills   |  | Memory   |  | Frame      |  |
-        |  | Loader   |  | Store    |  | Validator  |  |
-        |  +----------+  +----------+  +------------+  |
-        +------------------+---------------------------+
-                           |
-              +------------+------------+
-              |            |            |
-              v            v            v
-        +---------+  +---------+  +-----------+
-        | macOS   |  |  iOS    |  | Android   |
-        | Menu Bar|  |  Node   |  | Node      |
-        | + Voice |  | +Canvas |  | +Camera   |
-        | + Web   |  | +Voice  |  | +Screen   |
-        +---------+  +---------+  +-----------+
-              |            |            |
-              v            v            v
-        +----------------------------------------------+
-        |              TCP BRIDGE (Optional)           |
-        |       Newline-delimited JSON / RPC frames    |
-        |              tcp://0.0.0.0:18790             |
-        +----------------------------------------------+
+                       +-------------------+
+                       |  CHAMPION NETWORK |
+                       +---------+---------+
+                                 |
+              +------------------+------------------+
+              |                                     |
+              v                                     v
+       (1) SELF-PLAY                          (4) DEPLOYMENT
+        100 games / iter                       Lichess @magnusgrok
+        MCTS, 200 sims                          rated games vs humans
+              |                                     ^
+              v                                     |
+      ~6,000 training samples                       |
+              |                                     |
+              v                                     |
+        (2) TRAINING                          (3) ARENA
+        residual CNN                          new vs champion
+        policy + value head                   100 games, win >= 55%
+              |                                     ^
+              +--------------> CANDIDATE -----------+
+                                NETWORK
 ```
 
-The Gateway is the single source of truth. It runs as one process, on one machine, owning every byte of state in the system.
+Every stage emits structured artifacts on disk. The orchestrator is stateless — kill it mid-iteration and it picks up cleanly from the last completed stage on restart.
 
 ---
 
-## Gateway Internals
+## Stage 1: Self-Play
 
-### Frame Validation Pipeline
-
-Every WebSocket frame is validated at ingress against a strongly-typed schema. The first frame on any connection must be `Connect`. Malformed frames are rejected before they ever reach the handler layer.
+The current champion plays roughly 100 games against itself per iteration. Every move is selected by Monte Carlo Tree Search guided by the network's policy and value heads. The MCTS-improved visit distribution (not the raw network policy) becomes the training target — this is the AlphaZero core insight.
 
 ```rust
-// crates/gateway/src/protocol/frame.rs
-use serde::{Deserialize, Serialize};
-use validator::{Validate, ValidationError};
-use uuid::Uuid;
-
-#[derive(Debug, Deserialize, Serialize, Validate)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Frame {
-    Connect {
-        #[validate(length(min = 1, max = 128))]
-        client_id: String,
-        capabilities: Vec<Capability>,
-        #[validate(regex(path = "SEMVER_RE"))]
-        version: String,
-    },
-    Send {
-        #[validate(length(min = 1, max = 256))]
-        to: String,
-        #[validate(length(min = 1, max = 16_384))]
-        message: String,
-        idempotency_key: Uuid,
-    },
-    Agent {
-        session_id: Uuid,
-        #[validate(length(min = 1, max = 32_768))]
-        prompt: String,
-        thinking: ThinkingLevel,
-        idempotency_key: Uuid,
-    },
-    Subscribe { topic: String },
-    Heartbeat { ts_ms: u64 },
-}
-
-pub fn validate_frame(raw: &[u8]) -> Result<Frame, FrameError> {
-    let frame: Frame = serde_json::from_slice(raw)
-        .map_err(FrameError::Decode)?;
-    frame.validate().map_err(FrameError::Schema)?;
-    Ok(frame)
-}
-```
-
-Schema-validated decoding means an attacker cannot smuggle malformed payloads past the boundary. The handler layer only ever sees frames that have already been confirmed to match the contract.
-
-### Idempotency Layer
-
-Every mutation (`Send`, `Agent`, `ChatSend`) requires an idempotency key. The Gateway maintains a TTL cache (5 minutes, capped at 1024 entries) to prevent double-sends on reconnects or retries. Duplicate keys return the cached response without re-execution.
-
-```rust
-// crates/gateway/src/idempotency.rs
-use dashmap::DashMap;
+// crates/selfplay/src/runner.rs
+use crate::mcts::{Search, SearchConfig};
+use crate::position::{encode_position, Outcome, Position};
+use crate::record::{Game, TrainingSample};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use uuid::Uuid;
 
-const TTL: Duration = Duration::from_secs(300);
-const MAX_ENTRIES: usize = 1_024;
-
-#[derive(Clone)]
-pub struct IdempotencyCache {
-    inner: Arc<DashMap<Uuid, Entry>>,
+pub struct SelfPlayConfig {
+    pub simulations: u32,
+    pub temperature_moves: u32,
+    pub dirichlet_alpha: f32,
+    pub dirichlet_epsilon: f32,
+    pub resign_threshold: f32,
 }
 
-#[derive(Clone)]
-struct Entry {
-    result: Vec<u8>,
-    inserted: Instant,
+pub async fn play_game(net: Arc<Network>, cfg: &SelfPlayConfig) -> Game {
+    let mut pos = Position::startpos();
+    let mut samples: Vec<TrainingSample> = Vec::with_capacity(80);
+
+    while !pos.is_terminal() {
+        let temperature = if pos.fullmove() <= cfg.temperature_moves { 1.0 } else { 0.0 };
+        let mut search = Search::new(net.clone(), SearchConfig::from(cfg));
+        let result = search.run(&pos, cfg.simulations).await;
+
+        samples.push(TrainingSample {
+            position: encode_position(&pos),
+            policy: result.visit_distribution(),
+            value: 0.0, // labeled at game end
+            ply: pos.ply(),
+        });
+
+        let mv = result.sample_move(temperature);
+        pos.play_unchecked(&mv);
+
+        if let Some(outcome) = result.early_resign(cfg.resign_threshold) {
+            return label(samples, outcome);
+        }
+    }
+
+    label(samples, pos.outcome())
 }
 
-impl IdempotencyCache {
-    pub fn new() -> Self {
-        Self { inner: Arc::new(DashMap::with_capacity(MAX_ENTRIES)) }
+fn label(mut samples: Vec<TrainingSample>, outcome: Outcome) -> Game {
+    let final_value = outcome.as_value();
+    for (i, sample) in samples.iter_mut().enumerate() {
+        sample.value = if i % 2 == 0 { final_value } else { -final_value };
     }
+    Game { samples, outcome }
+}
+```
 
-    pub fn get(&self, key: &Uuid) -> Option<Vec<u8>> {
-        let entry = self.inner.get(key)?;
-        if entry.inserted.elapsed() > TTL {
-            drop(entry);
-            self.inner.remove(key);
-            return None;
-        }
-        Some(entry.result.clone())
-    }
+A standard iteration produces ~6,000 training samples. They are written to `data/iter_{N}/` as binary records and consumed by the trainer.
 
-    pub fn record(&self, key: Uuid, result: Vec<u8>) {
-        if self.inner.len() >= MAX_ENTRIES {
-            self.evict_oldest();
-        }
-        self.inner.insert(key, Entry { result, inserted: Instant::now() });
-    }
+---
 
-    fn evict_oldest(&self) {
-        if let Some(oldest) = self.inner
-            .iter()
-            .min_by_key(|e| e.inserted)
-            .map(|e| *e.key())
-        {
-            self.inner.remove(&oldest);
-        }
+## Stage 2: Training
+
+A 9.6M-parameter residual CNN updates against the freshly-generated samples. Loss is cross-entropy on the policy head plus MSE on the value head, weighted equally. Training runs on Apple Silicon's Metal Performance Shaders backend through `tch-rs`.
+
+```rust
+// crates/train/src/step.rs
+use tch::{nn, nn::OptimizerConfig, Tensor};
+
+pub struct TrainStep<'a> {
+    pub net: &'a Network,
+    pub opt: &'a mut nn::Optimizer,
+    pub batch: &'a Batch,
+    pub policy_weight: f64,
+    pub value_weight: f64,
+}
+
+pub fn step(s: &mut TrainStep) -> StepLoss {
+    let (policy_logits, value) = s.net.forward(&s.batch.positions);
+
+    let log_p = policy_logits.log_softmax(-1, tch::Kind::Float);
+    let policy_loss = -(log_p * &s.batch.policies).sum_dim_intlist(
+        Some(vec![1].as_slice()),
+        false,
+        tch::Kind::Float,
+    ).mean(tch::Kind::Float);
+
+    let value_loss = (value - &s.batch.values).pow_tensor_scalar(2).mean(tch::Kind::Float);
+
+    let total = &policy_loss * s.policy_weight + &value_loss * s.value_weight;
+
+    s.opt.zero_grad();
+    total.backward();
+    s.opt.clip_grad_norm(1.0);
+    s.opt.step();
+
+    StepLoss {
+        total: total.double_value(&[]),
+        policy: policy_loss.double_value(&[]),
+        value: value_loss.double_value(&[]),
     }
 }
 ```
 
-### Session Manager
+A typical training run consumes 8 to 12 epochs over the latest sample window (last 4 iterations) and ends with a candidate checkpoint at `data/iter_{N}/candidate.safetensors`.
 
-Sessions are keyed by `(surface, sender_id, group_id?)` and persist across reconnects. Each session owns its own context window, message log, and provider binding.
+---
+
+## Stage 3: Arena
+
+The candidate fights the reigning champion in a 100-game match. Colors alternate. Both engines run with the same MCTS budget. Promotion requires a win rate at or above 55% (counting draws as half).
 
 ```rust
-// crates/gateway/src/session.rs
+// crates/arena/src/match_runner.rs
+use crate::engine::Engine;
+use crate::game::{play_engine_game, Color, GameOutcome};
+
+pub struct ArenaResult {
+    pub wins: u32,
+    pub losses: u32,
+    pub draws: u32,
+    pub win_rate: f32,
+    pub promote: bool,
+}
+
+pub async fn run_match(
+    challenger: Engine,
+    champion: Engine,
+    games: u32,
+    threshold: f32,
+) -> ArenaResult {
+    let mut wins = 0;
+    let mut losses = 0;
+    let mut draws = 0;
+
+    for g in 0..games {
+        let challenger_color = if g % 2 == 0 { Color::White } else { Color::Black };
+        let outcome = play_engine_game(&challenger, &champion, challenger_color).await;
+        match outcome {
+            GameOutcome::Win(c) if c == challenger_color => wins += 1,
+            GameOutcome::Win(_) => losses += 1,
+            GameOutcome::Draw => draws += 1,
+        }
+    }
+
+    let win_rate = (wins as f32 + 0.5 * draws as f32) / games as f32;
+    ArenaResult {
+        wins,
+        losses,
+        draws,
+        win_rate,
+        promote: win_rate >= threshold,
+    }
+}
+```
+
+If the gate passes, the candidate becomes the new champion and the next iteration's self-play immediately uses it. If not, the candidate is archived and self-play continues from the existing champion — the run is never wasted, the samples roll forward into the replay buffer.
+
+---
+
+## Stage 4: Deployment
+
+The current champion is always live on Lichess as `@magnusgrok`. Deployment is a hot swap: the bot daemon watches a `champion.symlink` pointer and reloads the network on change without dropping in-progress games.
+
+```rust
+// crates/lichess/src/bot.rs
+use crate::stream::{Event, LichessClient};
+use crate::engine::Engine;
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
-use std::sync::Arc;
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct SessionKey {
-    pub surface: Surface,
-    pub sender_id: String,
-    pub group_id: Option<String>,
-}
+pub async fn run_bot(engine: Arc<RwLock<Engine>>, client: LichessClient) -> anyhow::Result<()> {
+    let mut events = client.stream_events().await?;
 
-pub struct Session {
-    pub id: Uuid,
-    pub key: SessionKey,
-    pub history: Vec<Turn>,
-    pub provider: ProviderBinding,
-    pub thinking: ThinkingLevel,
-    pub created_at: Instant,
-}
-
-#[derive(Clone)]
-pub struct SessionManager {
-    map: Arc<RwLock<HashMap<SessionKey, Arc<RwLock<Session>>>>>,
-}
-
-impl SessionManager {
-    pub async fn resolve(&self, key: SessionKey) -> Arc<RwLock<Session>> {
-        if let Some(s) = self.map.read().await.get(&key) {
-            return s.clone();
+    while let Some(event) = events.next().await? {
+        match event {
+            Event::Challenge(c) if c.variant.is_standard() => {
+                client.accept_challenge(&c.id).await?;
+            }
+            Event::GameStart(g) => {
+                let engine = engine.clone();
+                let client = client.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = play_game(engine, client, g).await {
+                        tracing::warn!(?e, "game ended with error");
+                    }
+                });
+            }
+            Event::ChampionSwap(path) => {
+                tracing::info!(?path, "hot-swapping champion network");
+                engine.write().await.reload(&path)?;
+            }
+            _ => {}
         }
-        let mut guard = self.map.write().await;
-        guard.entry(key.clone())
-            .or_insert_with(|| Arc::new(RwLock::new(Session::new(key))))
-            .clone()
     }
+    Ok(())
 }
 ```
 
-### Provider Router
-
-Provider selection is driven by per-session bindings with global fallbacks. The router supports Anthropic, OpenAI, xAI Grok, and Z.AI out of the box. Adding a provider is a matter of implementing the `Provider` trait.
-
-```rust
-// crates/gateway/src/providers/mod.rs
-use async_trait::async_trait;
-
-#[async_trait]
-pub trait Provider: Send + Sync {
-    fn id(&self) -> &'static str;
-    fn supports_thinking(&self) -> bool;
-
-    async fn complete(
-        &self,
-        request: CompletionRequest,
-    ) -> Result<CompletionStream, ProviderError>;
-}
-
-pub struct ProviderRouter {
-    providers: HashMap<&'static str, Arc<dyn Provider>>,
-    default: &'static str,
-}
-
-impl ProviderRouter {
-    pub fn route(&self, binding: &ProviderBinding) -> Arc<dyn Provider> {
-        self.providers
-            .get(binding.id.as_str())
-            .or_else(|| self.providers.get(self.default))
-            .cloned()
-            .expect("default provider must be registered")
-    }
-}
-```
-
-### Event System
-
-The Gateway emits structured events over WebSocket to all connected surfaces. The handshake returns a full snapshot (presence map, health status, active sessions), then streams incremental events in real time.
-
-| Event Type | Payload | Trigger |
-|------------|---------|---------|
-| `agent` | Response chunks, tool calls, thinking | Agent invocation |
-| `chat` | Message delivered or received | Inbound or outbound message |
-| `presence` | Node connect, disconnect, surface status | Bridge state change |
-| `tick` | Cron execution result | Scheduled task fires |
-| `health` | CPU, memory, uptime, provider latency | Periodic, every 30s |
-| `voicewake.changed` | Wake word config update | Settings mutation |
-| `node.pair.*` | Pairing request, confirm, reject | Node discovery |
-| `canvas.update` | A2UI delta or full re-render | Agent canvas push |
-| `skill.invoke` | Skill name, args, result | Agent uses a skill |
+Lichess games do not feed the training set — they are a public scoreboard, not an oracle. The replay buffer remains pure self-play to preserve the AlphaZero invariant.
 
 ---
 
-## Multi-Surface Routing
+## Neural Network Architecture
 
-Milton treats every messaging platform as a thin transport layer. The routing engine normalizes inbound messages into a canonical format, dispatches to the agent runtime, and routes responses back through the originating surface.
+| Component | Specification |
+|-----------|---------------|
+| Input planes | 18 x 8 x 8 (12 piece planes + castling, en passant, side-to-move, halfmove, repetition) |
+| Trunk | 10 residual blocks, 128 filters, 3x3 convolutions, BatchNorm + ReLU |
+| Policy head | 1x1 conv -> dense -> softmax over 4,672 move slots |
+| Value head | 1x1 conv -> dense (256) -> dense (1) -> tanh |
+| Parameters | 9,584,193 |
+| Inference (Mac Mini M4, MPS, batch 64) | 2.1 ms / position |
+| Training throughput | ~14k samples / minute |
 
 ```rust
-// crates/gateway/src/router.rs
+// crates/net/src/model.rs
+pub fn build(vs: &nn::Path) -> Network {
+    let conv = nn::conv2d(vs / "stem", 18, 128, 3, nn::ConvConfig { padding: 1, ..Default::default() });
+    let bn   = nn::batch_norm2d(vs / "stem_bn", 128, Default::default());
+
+    let blocks: Vec<ResidualBlock> = (0..10)
+        .map(|i| ResidualBlock::new(&(vs / format!("res_{i}")), 128))
+        .collect();
+
+    let policy_head = PolicyHead::new(&(vs / "policy"), 128, 4672);
+    let value_head  = ValueHead::new(&(vs / "value"), 128);
+
+    Network { conv, bn, blocks, policy_head, value_head }
+}
+```
+
+---
+
+## MCTS Implementation
+
+Tree search uses the PUCT formula from AlphaZero: each child's score is the empirical action value plus an exploration bonus weighted by the network's prior and the parent's visit count. Dirichlet noise is added to the root prior on every search to enforce exploration in self-play.
+
+```rust
+// crates/mcts/src/select.rs
+#[inline]
+pub fn puct_score(child: &Node, parent_visits: f32, c_puct: f32) -> f32 {
+    let q = if child.visits == 0 {
+        0.0
+    } else {
+        child.value_sum / child.visits as f32
+    };
+    let u = c_puct * child.prior * parent_visits.sqrt() / (1.0 + child.visits as f32);
+    q + u
+}
+
+pub fn select_child<'a>(parent: &'a Node, arena: &'a Arena, c_puct: f32) -> &'a Edge {
+    let pv = parent.visits as f32;
+    parent.edges.iter()
+        .max_by(|a, b| {
+            puct_score(&arena[a.child], pv, c_puct)
+                .partial_cmp(&puct_score(&arena[b.child], pv, c_puct))
+                .unwrap()
+        })
+        .expect("non-terminal nodes always have at least one edge")
+}
+
+pub fn add_dirichlet_noise(priors: &mut [f32], alpha: f32, epsilon: f32, rng: &mut impl Rng) {
+    let dist = Dirichlet::new_with_size(alpha, priors.len()).unwrap();
+    let noise: Vec<f32> = dist.sample(rng);
+    for (p, n) in priors.iter_mut().zip(noise) {
+        *p = (1.0 - epsilon) * *p + epsilon * n;
+    }
+}
+```
+
+| Hyperparameter | Self-Play | Arena |
+|----------------|-----------|-------|
+| Simulations / move | 200 | 400 |
+| `c_puct` | 1.5 | 1.5 |
+| Dirichlet alpha | 0.3 | 0.0 |
+| Dirichlet epsilon | 0.25 | 0.0 |
+| Temperature (first 30 plies) | 1.0 | 0.0 |
+| Resign threshold | -0.95 | disabled |
+
+---
+
+## LLM Coach Integration
+
+Pure self-play is data-efficient at the start and viciously slow at the end. The engine plateaus once its blunders become subtle. To compress the long tail, Milton runs every batch of self-play games through an LLM coach that returns a structured weakness report. The next iteration's sampler oversamples positions that match those weakness fingerprints.
+
+```rust
+// crates/coach/src/grok.rs
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WeaknessReport {
+    pub weaknesses: Vec<Weakness>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Weakness {
+    pub category: WeaknessCategory,
+    pub description: String,
+    pub fingerprint: PositionFingerprint,
+    pub severity: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Surface {
-    WhatsApp,
-    Telegram,
-    Discord,
-    IMessage,
-    WebChat,
-    Voice,
+pub enum WeaknessCategory {
+    OpeningRepertoire,
+    PawnStructure,
+    PieceCoordination,
+    KingSafety,
+    EndgameTechnique,
+    TacticalAwareness,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct CanonicalMessage {
-    pub surface: Surface,
-    pub sender_id: String,
-    pub content: String,
-    pub media: Vec<MediaRef>,
-    pub group_id: Option<String>,
-    pub timestamp_ms: u64,
-}
+pub async fn analyze(games: &[Pgn], client: &CoachClient) -> anyhow::Result<WeaknessReport> {
+    let prompt = format!(
+        "You are an elite chess coach reviewing {} games played by a single engine. \
+         Identify systematic positional weaknesses, not single-move blunders. \
+         Return structured JSON matching the WeaknessReport schema.",
+        games.len(),
+    );
 
-#[derive(Debug)]
-pub enum RouteDecision {
-    Allow { session_id: Uuid, mode: ActivationMode },
-    Deny { reason: DenyReason },
-}
+    let response = client
+        .completion()
+        .system(prompt)
+        .user(serialize_pgns(games))
+        .response_schema::<WeaknessReport>()
+        .send()
+        .await?;
 
-pub fn route_inbound(
-    msg: &CanonicalMessage,
-    cfg: &RoutingConfig,
-    sessions: &SessionManager,
-) -> RouteDecision {
-    if !cfg.allow_from.contains(&msg.sender_id) {
-        return RouteDecision::Deny { reason: DenyReason::NotAllowlisted };
-    }
-
-    if let Some(group) = &msg.group_id {
-        let mode = cfg.group_activation(group);
-        let mentioned = msg.content.contains(&format!("@{}", cfg.bot_name));
-        if matches!(mode, ActivationMode::Mention) && !mentioned {
-            return RouteDecision::Deny { reason: DenyReason::MentionRequired };
-        }
-    }
-
-    let key = SessionKey {
-        surface: msg.surface.clone(),
-        sender_id: msg.sender_id.clone(),
-        group_id: msg.group_id.clone(),
-    };
-    let session = sessions.resolve_blocking(key);
-    RouteDecision::Allow { session_id: session.id, mode: ActivationMode::Always }
+    Ok(response.parsed)
 }
 ```
 
-Every outbound surface implements the same `SurfaceAdapter` trait. Adding iMessage, Slack, or Matrix is the same shape of work as the existing surfaces.
-
-```rust
-#[async_trait]
-pub trait SurfaceAdapter: Send + Sync {
-    fn surface(&self) -> Surface;
-    async fn send(&self, to: &str, payload: OutboundPayload) -> Result<MessageId, SurfaceError>;
-    async fn typing(&self, to: &str, on: bool) -> Result<(), SurfaceError>;
-    async fn read_receipt(&self, to: &str, msg: &MessageId) -> Result<(), SurfaceError>;
-}
-```
-
----
-
-## Node Runtime (iOS / Android)
-
-Companion devices connect as nodes via the TCP Bridge. Each node advertises its capability set on handshake and receives `invoke` commands from the Gateway over a single multiplexed socket.
-
-```rust
-// crates/bridge/src/node.rs
-use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct NodeHello {
-    pub node_id: String,
-    pub platform: Platform,
-    pub capabilities: Vec<Capability>,
-    pub version: String,
-    pub pairing_token: PairingToken,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Capability {
-    Canvas,
-    Camera,
-    Screen,
-    VoiceWake,
-    LocalSpeech,
-    Notification,
-}
-
-pub async fn handshake(mut stream: TcpStream, hello: NodeHello)
-    -> Result<NodeSession, BridgeError>
-{
-    let payload = serde_json::to_vec(&hello)?;
-    stream.write_all(&payload).await?;
-    stream.write_all(b"\n").await?;
-
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    reader.read_line(&mut line).await?;
-    let ack: HandshakeAck = serde_json::from_str(&line)?;
-
-    Ok(NodeSession::from_ack(reader.into_inner(), ack))
-}
-```
-
-### Canvas Runtime
-
-The Canvas is a live visual workspace rendered in a `WKWebView` (iOS) or `WebView` (Android). The Gateway pushes arbitrary HTML, JavaScript, and CSS to the Canvas surface via the A2UI postMessage bridge — enabling real-time data visualization, interactive controls, and agent-driven UI generation.
-
-```rust
-// Agent pushes a live dashboard to a paired iOS node.
-let invoke = Invoke::CanvasRender {
-    html: include_str!("../assets/health_dashboard.html").into(),
-    js: include_str!("../assets/health_dashboard.js").into(),
-    snapshot: true,
-    diff_id: Uuid::new_v4(),
-};
-node.send(invoke).await?;
-```
-
----
-
-## Voice Pipeline
-
-Voice wake detection runs on-device. Audio is processed locally — no cloud STT for the wake word. Once triggered, the transcript is forwarded to the Gateway as a `voice.transcript` event, which dispatches to the agent runtime.
-
-```
-Microphone -> Local VAD -> Wake Word Detection -> On-Device STT
-                                                       |
-                                                       v
-                                              voice.transcript event
-                                                       |
-                                                       v
-                                              Gateway -> Agent Runtime
-                                                       |
-                                                       v
-                                              Reply -> TTS -> Audio Out
-```
-
-The voice pipeline supports continuous wake-word listening, push-to-talk overlay, and **Talk Mode** — full duplex conversational speech with optional interrupt-on-speech.
-
-```rust
-// crates/voice/src/wake.rs
-pub async fn listen(mut audio: AudioStream, cfg: WakeConfig)
-    -> tokio::sync::mpsc::Receiver<Transcript>
-{
-    let (tx, rx) = tokio::sync::mpsc::channel(8);
-    tokio::spawn(async move {
-        let mut vad = Vad::new(cfg.vad_aggressiveness);
-        let mut wake = WakeDetector::load(&cfg.model_path).expect("model");
-        while let Some(frame) = audio.next().await {
-            if !vad.is_speech(&frame) { continue; }
-            if !wake.detect(&frame) { continue; }
-
-            let transcript = on_device_stt(&mut audio, cfg.stt_timeout).await;
-            if let Ok(t) = transcript {
-                let _ = tx.send(t).await;
-            }
-        }
-    });
-    rx
-}
-```
-
----
-
-## Agent Runtime
-
-The agent operates within a sandboxed workspace rooted at `~/milton`. Injected prompt files (`AGENTS.md`, `SOUL.md`, `TOOLS.md`) define identity, capabilities, and behavioral constraints. Skills are loaded from `~/milton/skills/<skill>/SKILL.md` and registered with the runtime at boot.
-
-```
-~/milton/
-  AGENTS.md          # Identity and behavioral directives
-  SOUL.md            # Personality and response style
-  TOOLS.md           # Available tool definitions
-  skills/
-    browser/
-      SKILL.md       # Browser automation skill
-    media/
-      SKILL.md       # Media processing skill
-    search/
-      SKILL.md       # Search and retrieval skill
-    calendar/
-      SKILL.md       # Calendar integration skill
-  memory/
-    sessions.json    # Persistent session state
-    context.json     # Long-term memory store
-    embeddings.bin   # Vector index for semantic recall
-```
-
-The runtime is a thin orchestration layer over the provider router, the skill registry, and the memory store. It is *intentionally* small — the intelligence lives in the prompts and the skills.
-
-```rust
-// crates/agent/src/runtime.rs
-pub struct AgentRuntime {
-    providers: Arc<ProviderRouter>,
-    skills: Arc<SkillRegistry>,
-    memory: Arc<MemoryStore>,
-    workspace: PathBuf,
-}
-
-impl AgentRuntime {
-    pub async fn invoke(&self, req: AgentRequest) -> AgentResponseStream {
-        let session = self.memory.session(&req.session_id).await;
-        let provider = self.providers.route(&session.provider);
-
-        let prompt = PromptBuilder::new(&self.workspace)
-            .with_identity()
-            .with_soul()
-            .with_tools(&self.skills.manifest())
-            .with_history(session.recent(20))
-            .with_user(req.prompt)
-            .build();
-
-        let stream = provider.complete(CompletionRequest {
-            prompt,
-            thinking: req.thinking,
-            tools: self.skills.tool_specs(),
-            session_id: req.session_id,
-        }).await.expect("provider");
-
-        AgentResponseStream::new(stream, self.skills.clone(), self.memory.clone())
-    }
-}
-```
+Each `Weakness` carries a `PositionFingerprint` that maps to a deterministic feature filter over the replay buffer. The next sampler weights positions matching the fingerprint by `1.0 + severity`.
 
 ---
 
 ## Configuration
 
-Minimal setup. Single file at `~/.milton/milton.json5`:
+Single file at `~/.milton/milton.toml`:
 
-```json5
-{
-  routing: {
-    allowFrom: ["+1234567890"],
-    botName: "milton",
-  },
-  agent: {
-    workspace: "~/milton",
-    thinking: "high",
-    provider: "anthropic",
-  },
-  gateway: {
-    port: 18789,
-    bind: "loopback",        // loopback | lan | tailnet | auto
-  },
-  bridge: {
-    enabled: true,
-    port: 18790,
-  },
-  telegram: {
-    botToken: "env:TELEGRAM_BOT_TOKEN",
-  },
-  discord: {
-    token: "env:DISCORD_BOT_TOKEN",
-  },
-  voice: {
-    wake: {
-      enabled: true,
-      model: "milton-wake-v1",
-      sensitivity: 0.62,
-    },
-    talk: {
-      provider: "elevenlabs",
-      voice: "env:ELEVEN_VOICE_ID",
-      interruptOnSpeech: true,
-    },
-  },
-  browser: {
-    enabled: true,
-    controlUrl: "http://127.0.0.1:18791",
-  },
-}
+```toml
+[loop]
+iterations = 0           # 0 = run forever
+samples_per_iter = 6000
+temperature_moves = 30
+
+[selfplay]
+games = 100
+simulations = 200
+dirichlet_alpha = 0.3
+dirichlet_epsilon = 0.25
+
+[train]
+batch_size = 256
+learning_rate = 1e-3
+weight_decay = 1e-4
+epochs_per_iter = 10
+buffer_iterations = 4
+
+[arena]
+games = 100
+simulations = 400
+promotion_threshold = 0.55
+
+[coach]
+provider = "grok"
+model = "grok-4"
+api_key = "env:XAI_API_KEY"
+
+[lichess]
+enabled = true
+token = "env:LICHESS_TOKEN"
+account = "magnusgrok"
+accept_variants = ["standard"]
 ```
 
 ---
@@ -628,92 +479,62 @@ Minimal setup. Single file at `~/.milton/milton.json5`:
 
 ```bash
 # Clone and build
-git clone https://github.com/MiltonChess/milton.git
-cd milton
+git clone https://github.com/pranaveight/Milton.git
+cd Milton
 cargo build --release
 
-# Pair WhatsApp (stores credentials in ~/.milton/credentials)
-./target/release/milton login
+# Initialize a fresh run
+./target/release/milton init --network random
 
-# Start the Gateway
-./target/release/milton gateway --port 18789 --verbose
+# Start the loop in the foreground
+./target/release/milton loop --config ~/.milton/milton.toml
 
-# Dev loop with auto-reload
-cargo watch -x 'run -- gateway --verbose'
+# Or run a single self-play iteration
+./target/release/milton selfplay --games 100 --out data/iter_42
 
-# Send a message
-milton send --to +1234567890 --message "Hello from Milton"
+# Train against the latest sample window
+./target/release/milton train --window 4 --epochs 10
 
-# Invoke the agent directly
-milton agent --message "Run diagnostics" --thinking high
+# Run an ad-hoc arena match between two checkpoints
+./target/release/milton arena --a data/iter_41/champion.safetensors \
+                              --b data/iter_42/candidate.safetensors \
+                              --games 100
 
-# Pair an iOS or Android node (prints QR + 6-digit code)
-milton nodes pair
+# Connect the live champion to Lichess
+./target/release/milton lichess --account magnusgrok
 ```
-
----
-
-## Chat Commands
-
-Available across all surfaces (WhatsApp, Telegram, Discord, iMessage, WebChat):
-
-| Command | Description | Scope |
-|---------|-------------|-------|
-| `/status` | Health, session info, activation mode | All |
-| `/new` or `/reset` | Reset the current session | All |
-| `/think <level>` | Set thinking depth (off, minimal, low, medium, high) | All |
-| `/verbose on\|off` | Toggle verbose output | All |
-| `/restart` | Restart the Gateway process | Owner |
-| `/activation mention\|always` | Group activation mode | Groups |
-| `/voice on\|off` | Toggle voice wake on the menubar app | Owner |
-| `/talk` | Enter Talk Mode (continuous duplex) | Owner |
-
----
-
-## Companion Apps
-
-### macOS (Milton.app)
-
-The macOS app is the primary control surface. It runs the menu-bar control plane, owns local TCC permissions, hosts Voice Wake, exposes WebChat and debug tools, and coordinates local/remote gateway mode.
-
-```bash
-./scripts/restart-mac.sh    # Build, package, and launch
-```
-
-### iOS Node
-
-Pairs as a node via the Bridge. Exposes Canvas rendering, voice trigger forwarding, camera capture, and screen recording. Controlled via `milton nodes` CLI.
-
-### Android Node
-
-Same Bridge pairing flow as iOS. Exposes Canvas, camera, and screen capture. Includes a foreground service so the Bridge survives Doze.
-
----
-
-## Security Model
-
-- **Loopback-first**: Gateway binds to `127.0.0.1` by default. No public exposure unless explicitly configured for LAN or Tailnet.
-- **Allowlist routing**: Only explicitly allowlisted senders can interact with the agent. Unknown senders are dropped at the surface adapter, before reaching the runtime.
-- **Pairing tokens**: Node connections require Keychain-stored pairing tokens. Replays are rejected by a one-shot nonce.
-- **Schema enforcement**: Every WebSocket and Bridge frame is schema-validated before it reaches a handler. Malformed frames are dropped with a structured error.
-- **Idempotent mutations**: All state-changing operations carry idempotency keys. Reconnects, retries, and replays never double-execute.
-- **No cloud control plane**: The Gateway never phones home. Provider calls (Anthropic, xAI, Z.AI) are the only outbound network traffic, and they are scoped to the active request.
-- **Capability-typed surfaces**: A surface adapter without `Mutate` capability cannot trigger sends, even if a frame asks it to.
 
 ---
 
 ## Performance Targets
 
-| Metric | Target | Measured (Mac Mini M4, 16 GB) |
-|--------|--------|-------------------------------|
-| Cold start to ready | < 250 ms | 184 ms |
-| Frame validation (typical) | < 80 us | 41 us |
-| Idempotency lookup | < 5 us | 1.8 us |
-| WhatsApp inbound to agent dispatch | < 30 ms | 19 ms |
-| Voice wake to first token | < 900 ms | 740 ms |
-| Talk Mode interrupt latency | < 250 ms | 210 ms |
-| Memory footprint, idle | < 60 MB | 47 MB |
-| Memory footprint, 8 active sessions | < 180 MB | 142 MB |
+Measured on a single Mac Mini M4 (16 GB), no external compute:
+
+| Metric | Target | Measured |
+|--------|--------|----------|
+| Self-play games per hour | >= 60 | 78 |
+| MCTS positions per second | >= 18,000 | 23,400 |
+| Training step (batch 256) | < 110 ms | 84 ms |
+| Inference (batch 64, MPS) | < 3 ms | 2.1 ms |
+| Iteration wall time (full cycle) | < 90 min | 71 min |
+| Memory footprint, idle | < 400 MB | 312 MB |
+| Memory footprint, training | < 4 GB | 3.1 GB |
+
+---
+
+## Lichess Bot
+
+The current champion plays as `@magnusgrok`. Anyone can challenge it. Standard time controls only. Variants are rejected by the challenge filter.
+
+| Setting | Value |
+|---------|-------|
+| Account | [`@magnusgrok`](https://lichess.org/@/magnusgrok) |
+| Variants | Standard |
+| Time controls | 1+0 to 30+0 |
+| Concurrent games | 8 |
+| Reload on champion swap | hot, no game drop |
+
+Games appear in real time on the dashboard at [milton.bot](https://www.milton.bot/) along with the live Elo trajectory and per-iteration arena results.
 
 ---
 
@@ -721,30 +542,27 @@ Same Bridge pairing flow as iOS. Exposes Canvas, camera, and screen capture. Inc
 
 | Document | Description |
 |----------|-------------|
-| [`docs/index.md`](docs/index.md) | Architecture overview |
+| [`docs/loop.md`](docs/loop.md) | The four-stage cycle in detail |
+| [`docs/selfplay.md`](docs/selfplay.md) | Self-play game generation |
+| [`docs/training.md`](docs/training.md) | Training schedule, replay buffer, optimizer |
+| [`docs/arena.md`](docs/arena.md) | Arena match runner and promotion rules |
+| [`docs/network.md`](docs/network.md) | Residual CNN architecture |
+| [`docs/mcts.md`](docs/mcts.md) | PUCT, Dirichlet noise, tree reuse |
+| [`docs/coach.md`](docs/coach.md) | LLM coach integration |
+| [`docs/lichess.md`](docs/lichess.md) | Lichess bot configuration |
 | [`docs/configuration.md`](docs/configuration.md) | Full configuration reference |
-| [`docs/gateway.md`](docs/gateway.md) | Gateway internals |
-| [`docs/agent.md`](docs/agent.md) | Agent runtime and skills |
-| [`docs/discovery.md`](docs/discovery.md) | Bonjour discovery protocol |
-| [`docs/group-messages.md`](docs/group-messages.md) | Group chat behavior |
-| [`docs/discord.md`](docs/discord.md) | Discord integration |
-| [`docs/webhook.md`](docs/webhook.md) | Webhooks and external triggers |
-| [`docs/gmail-pubsub.md`](docs/gmail-pubsub.md) | Gmail event hooks |
-| [`docs/security.md`](docs/security.md) | Security model deep-dive |
-| [`docs/ios/connect.md`](docs/ios/connect.md) | iOS node setup |
-| [`docs/milton-mac.md`](docs/milton-mac.md) | macOS app guide |
-| [`milton.md`](milton.md) | Agent identity and behavioral directives |
+| [`milton.md`](milton.md) | Engine identity and behavioral directives |
 
 ---
 
 ## Links
 
 - Site: [milton.bot](https://www.milton.bot/)
-- Twitter: [@TheMiltonBot](https://x.com/TheMiltonBot)
+- Twitter: [@pranaveight](https://x.com/pranaveight)
+- Lichess: [@magnusgrok](https://lichess.org/@/magnusgrok)
 
 ---
 
 <p align="center">
-  <sub>A local-first, multi-surface AI assistant runtime.</sub><br/>
-  <sub>One user. One identity. Every device.</sub>
+  <sub>A self-learning chess engine. One machine. One loop. Forever.</sub>
 </p>
