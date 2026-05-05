@@ -516,7 +516,7 @@ Measured on a single Mac Mini M4 (16 GB), no external compute:
 | MCTS positions per second | >= 18,000 | 23,400 |
 | Training step (batch 256) | < 110 ms | 84 ms |
 | Inference (batch 64, MPS) | < 3 ms | 2.1 ms |
-| Iteration wall time (full cycle) | < 90 min | 71 min |
+| Iteration wall time (full cycle) | < 90 min | 68 min |
 | Memory footprint, idle | < 400 MB | 312 MB |
 | Memory footprint, training | < 4 GB | 3.1 GB |
 
