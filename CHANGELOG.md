@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.2 - Unreleased
+## 0.4.2 - 2026-05-06
 
 ### Features
 - LLM coach: structured weakness reports drive replay buffer reweighting.
