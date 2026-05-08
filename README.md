@@ -48,7 +48,7 @@
 
 Milton is a recursive, self-improving chess engine. It learns the game from random play, with no opening book, no endgame tablebase, and no scraped grandmaster games. Every line of theory it knows, it discovered itself.
 
-The runtime is a single Rust binary that drives a four-stage cycle: generate self-play games, train the network on the resulting positions, run the candidate against the reigning champion in a head-to-head match, and — if the candidate wins by a sufficient margin — promote it and deploy it as the live opponent on Lichess. The loop never breaks.
+The runtime is a single Rust binary that drives a four-stage cycle — generate self-play games, train the network on the resulting positions, run the candidate against the reigning champion in a head-to-head match, and — if the candidate wins by a sufficient margin — promote it and deploy it as the live opponent on Lichess. The loop never breaks.
 
 Milton is engineered around three claims: that the *cycle* is the artifact, not the weights; that an LLM acting as a post-game coach can compress the long-tail of self-play; and that Candidate Master strength (2500 Elo) is reachable on consumer hardware with a tight enough loop.
 
