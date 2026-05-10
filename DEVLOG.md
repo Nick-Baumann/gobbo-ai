@@ -350,3 +350,4 @@ A running notebook of changes, observations, and small experiments.
 - 2026-04-09: fixed a flaky lichess reconnect
 - 2026-04-09: trained for 6 epochs instead of 8
 - 2026-04-09: fixed a flaky test
+- 2026-05-10: ping (verify indexer refresh)
