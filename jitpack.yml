@@ -1,5 +1,0 @@
-jdk:
-  - openjdk17
-
-before_install:
-  - cd snapo-link-android

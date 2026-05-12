@@ -1,0 +1,18 @@
+[package]
+name = "gobbo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "gobbo"
+path = "src/main.rs"
+
+[dependencies]
+gobbo-codex = { path = "../gobbo-codex" }
+gobbo-gateway = { path = "../gobbo-gateway" }
+gobbo-skills = { path = "../gobbo-skills" }
+gobbo-surfaces = { path = "../gobbo-surfaces" }

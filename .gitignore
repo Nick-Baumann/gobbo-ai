@@ -1,41 +1,7 @@
-# working files
-.modulecache/
-
-# macOS system files
+target/
+data/
+**/*.safetensors
+**/*.onnx
+.env
+.env.local
 .DS_Store
-.AppleDouble
-.LSOverride
-.Icon?
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.DocumentRevisions-V100
-.fseventsd
-._*
-.com.apple.timemachine.donotpresent
-
-# Linux system files
-*~
-.fuse_hidden*
-.directory
-.Trash-*
-.nfs*
-
-# Windows system files
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs*.db
-Desktop.ini
-$RECYCLE.BIN/
-*.lnk
-
-# Vim
-[._]*.s[a-v][a-z]
-[._]*.sw[a-p]
-[._]s[a-rt-v][a-z]
-[._]ss[a-gi-z]
-Session.vim
-Sessionx.vim
-.netrwhist
-[._]*.un~
-tags

@@ -1,0 +1,37 @@
+import Foundation
+
+let launchdLabel = "com.nickbaumann.gobbo"
+let gatewayLaunchdLabel = "com.nickbaumann.gobbo.gateway"
+let onboardingVersionKey = "gobbo.onboardingVersion"
+let currentOnboardingVersion = 7
+let pauseDefaultsKey = "gobbo.pauseEnabled"
+let iconAnimationsEnabledKey = "gobbo.iconAnimationsEnabled"
+let swabbleEnabledKey = "gobbo.swabbleEnabled"
+let swabbleTriggersKey = "gobbo.swabbleTriggers"
+let voiceWakeTriggerChimeKey = "gobbo.voiceWakeTriggerChime"
+let voiceWakeSendChimeKey = "gobbo.voiceWakeSendChime"
+let showDockIconKey = "gobbo.showDockIcon"
+let defaultVoiceWakeTriggers = ["clawd", "claude"]
+let voiceWakeMicKey = "gobbo.voiceWakeMicID"
+let voiceWakeLocaleKey = "gobbo.voiceWakeLocaleID"
+let voiceWakeAdditionalLocalesKey = "gobbo.voiceWakeAdditionalLocaleIDs"
+let voicePushToTalkEnabledKey = "gobbo.voicePushToTalkEnabled"
+let talkEnabledKey = "gobbo.talkEnabled"
+let iconOverrideKey = "gobbo.iconOverride"
+let connectionModeKey = "gobbo.connectionMode"
+let remoteTargetKey = "gobbo.remoteTarget"
+let remoteIdentityKey = "gobbo.remoteIdentity"
+let remoteProjectRootKey = "gobbo.remoteProjectRoot"
+let remoteCliPathKey = "gobbo.remoteCliPath"
+let canvasEnabledKey = "gobbo.canvasEnabled"
+let cameraEnabledKey = "gobbo.cameraEnabled"
+let peekabooBridgeEnabledKey = "gobbo.peekabooBridgeEnabled"
+let deepLinkKeyKey = "gobbo.deepLinkKey"
+let modelCatalogPathKey = "gobbo.modelCatalogPath"
+let modelCatalogReloadKey = "gobbo.modelCatalogReload"
+let attachExistingGatewayOnlyKey = "gobbo.gateway.attachExistingOnly"
+let heartbeatsEnabledKey = "gobbo.heartbeatsEnabled"
+let debugFileLogEnabledKey = "gobbo.debug.fileLogEnabled"
+let appLogLevelKey = "gobbo.debug.appLogLevel"
+let voiceWakeSupported: Bool = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
+let cliHelperSearchPaths = ["/usr/local/bin", "/opt/homebrew/bin"]

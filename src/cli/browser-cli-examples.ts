@@ -1,0 +1,32 @@
+export const browserCoreExamples = [
+  "gobbo browser status",
+  "gobbo browser start",
+  "gobbo browser stop",
+  "gobbo browser tabs",
+  "gobbo browser open https://example.com",
+  "gobbo browser focus abcd1234",
+  "gobbo browser close abcd1234",
+  "gobbo browser screenshot",
+  "gobbo browser screenshot --full-page",
+  "gobbo browser screenshot --ref 12",
+  "gobbo browser snapshot",
+  "gobbo browser snapshot --format aria --limit 200",
+];
+
+export const browserActionExamples = [
+  "gobbo browser navigate https://example.com",
+  "gobbo browser resize 1280 720",
+  "gobbo browser click 12 --double",
+  'gobbo browser type 23 "hello" --submit',
+  "gobbo browser press Enter",
+  "gobbo browser hover 44",
+  "gobbo browser drag 10 11",
+  "gobbo browser select 9 OptionA OptionB",
+  "gobbo browser upload /tmp/file.pdf",
+  'gobbo browser fill --fields \'[{"ref":"1","value":"Ada"}]\'',
+  "gobbo browser dialog --accept",
+  'gobbo browser wait --text "Done"',
+  "gobbo browser evaluate --fn '(el) => el.textContent' --ref 7",
+  "gobbo browser console --level error",
+  "gobbo browser pdf",
+];

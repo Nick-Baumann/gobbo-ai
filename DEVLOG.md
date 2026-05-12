@@ -1,0 +1,355 @@
+# Development Log
+
+A running notebook of changes, observations, and small experiments.
+
+- 2025-05-12: 1.4x throughput on inference
+- 2025-05-12: fixed an off-by-one in the buffer iter
+- 2025-05-13: engine learned to fianchetto
+- 2025-05-13: moved a cargo dep to workspace
+- 2025-05-14: candidate failed gate, archived
+- 2025-05-14: switched to AdamW
+- 2025-05-15: tightened type signatures
+- 2025-05-15: swapped to a faster hashmap
+- 2025-05-16: lowered batch size for stability
+- 2025-05-17: fixed a flaky lichess reconnect
+- 2025-05-17: added one more validation check
+- 2025-05-19: added a regression test
+- 2025-05-21: discovered another sicilian line
+- 2025-05-21: noticed a slow path in the encoder
+- 2025-05-23: noticed a slow path in MCTS expand
+- 2025-05-24: dropped a buggy feature flag
+- 2025-05-26: renamed a confusing field
+- 2025-05-27: coach output is now strict JSON
+- 2025-06-02: swapped to a faster hashmap
+- 2025-06-02: candidate passed at 56%
+- 2025-06-03: discovered another sicilian line
+- 2025-06-03: no regression in selfplay time
+- 2025-06-05: switched to AdamW
+- 2025-06-05: added a quick benchmark
+- 2025-06-06: fixed a panic on empty PGN
+- 2025-06-06: engine learned to fianchetto
+- 2025-06-07: added schema validation on coach output
+- 2025-06-08: coach output is now strict JSON
+- 2025-06-10: promoted
+- 2025-06-11: kept Adam, AdamW was worse here
+- 2025-06-16: noticed a slow path in MCTS expand
+- 2025-06-18: added more telemetry
+- 2025-06-19: trained for 6 epochs instead of 8
+- 2025-06-20: candidate passed at 56%
+- 2025-06-21: added one more validation check
+- 2025-06-23: candidate passed at 61%
+- 2025-06-24: promoted
+- 2025-06-24: swapped to a faster hashmap
+- 2025-06-24: fixed an off-by-one in the buffer iter
+- 2025-06-25: lowered batch size for stability
+- 2025-06-25: lowered batch size for stability
+- 2025-06-26: switched to AdamW
+- 2025-06-27: tightened type signatures
+- 2025-06-27: wrote a quick repro
+- 2025-07-01: clarified a comment
+- 2025-07-01: added more telemetry
+- 2025-07-03: added schema validation on coach output
+- 2025-07-06: wrote a quick repro
+- 2025-07-07: clarified a comment
+- 2025-07-11: candidate passed at 58%
+- 2025-07-11: fixed a panic on empty PGN
+- 2025-07-12: fewer allocations in the hot loop
+- 2025-07-13: fewer allocations in the hot loop
+- 2025-07-13: added schema validation on coach output
+- 2025-07-15: found a bug in resign logic
+- 2025-07-15: smaller checkpoints on disk now
+- 2025-07-16: added schema validation on coach output
+- 2025-07-16: split a long function
+- 2025-07-17: swapped to a faster hashmap
+- 2025-07-20: candidate passed at 61%
+- 2025-07-22: trained for 6 epochs instead of 8
+- 2025-07-22: swapped to a faster hashmap
+- 2025-07-23: candidate passed at 61%
+- 2025-07-24: fixed an off-by-one in the buffer iter
+- 2025-07-24: loss curve smoother now
+- 2025-07-26: fixed a flaky test
+- 2025-07-27: clarified a comment
+- 2025-07-29: engine learned to fianchetto
+- 2025-07-29: kept Adam, AdamW was worse here
+- 2025-07-29: renamed a confusing field
+- 2025-07-30: trained for 6 epochs instead of 8
+- 2025-07-30: added one more validation check
+- 2025-07-30: coach output is now strict JSON
+- 2025-08-02: candidate failed gate, archived
+- 2025-08-05: 1.4x throughput on inference
+- 2025-08-05: clarified a comment
+- 2025-08-05: candidate passed at 61%
+- 2025-08-06: fixed a panic on empty PGN
+- 2025-08-06: renamed a confusing field
+- 2025-08-07: added a quick benchmark
+- 2025-08-07: engine learned to fianchetto
+- 2025-08-08: noticed a slow path in MCTS expand
+- 2025-08-08: split a long function
+- 2025-08-10: split a long function
+- 2025-08-11: no regression in selfplay time
+- 2025-08-17: fixed a flaky test
+- 2025-08-20: noticed a slow path in the encoder
+- 2025-08-25: dropped a buggy feature flag
+- 2025-08-25: fixed a flaky test
+- 2025-08-28: fixed an off-by-one in the buffer iter
+- 2025-08-28: discovered another sicilian line
+- 2025-08-29: tightened the coach prompt
+- 2025-08-29: added a circuit breaker on coach calls
+- 2025-09-03: removed noisy log line
+- 2025-09-08: fixed a panic on empty PGN
+- 2025-09-09: tightened the coach prompt
+- 2025-09-11: fixed a flaky test
+- 2025-09-12: candidate failed gate, archived
+- 2025-09-16: fixed a flaky test
+- 2025-09-20: dropped a buggy feature flag
+- 2025-09-24: discovered another sicilian line
+- 2025-09-26: kept Adam, AdamW was worse here
+- 2025-09-26: clarified a comment
+- 2025-09-27: tightened the coach prompt
+- 2025-09-27: candidate failed gate, archived
+- 2025-09-27: added more telemetry
+- 2025-09-28: candidate failed gate, archived
+- 2025-09-30: tightened the coach prompt
+- 2025-10-02: added a quick benchmark
+- 2025-10-02: wrote a quick repro
+- 2025-10-03: candidate passed at 56%
+- 2025-10-03: fixed a flaky test
+- 2025-10-04: loss curve smoother now
+- 2025-10-04: fixed a flaky lichess reconnect
+- 2025-10-05: split a long function
+- 2025-10-05: loss curve smoother now
+- 2025-10-07: noticed a slow path in MCTS expand
+- 2025-10-07: tightened the coach prompt
+- 2025-10-07: found a bug in resign logic
+- 2025-10-08: kept Adam, AdamW was worse here
+- 2025-10-08: fixed a panic on empty PGN
+- 2025-10-09: removed dead code path
+- 2025-10-09: fewer allocations in the hot loop
+- 2025-10-10: smaller checkpoints on disk now
+- 2025-10-11: wrote a quick repro
+- 2025-10-11: fewer allocations in the hot loop
+- 2025-10-12: coach output is now strict JSON
+- 2025-10-12: trained for 6 epochs instead of 8
+- 2025-10-15: removed dead code path
+- 2025-10-15: 1.4x throughput on inference
+- 2025-10-21: coach output is now strict JSON
+- 2025-10-21: added schema validation on coach output
+- 2025-10-23: loss curve smoother now
+- 2025-10-23: added a quick benchmark
+- 2025-10-24: swapped to a faster hashmap
+- 2025-10-24: removed dead code path
+- 2025-10-24: candidate passed at 61%
+- 2025-10-25: candidate passed at 56%
+- 2025-10-25: wrote a quick repro
+- 2025-10-26: fixed a panic on empty PGN
+- 2025-10-27: kept Adam, AdamW was worse here
+- 2025-10-27: wrote a quick repro
+- 2025-10-27: found a bug in resign logic
+- 2025-10-28: added a quick benchmark
+- 2025-10-29: added one more validation check
+- 2025-10-30: no regression in selfplay time
+- 2025-10-31: moved a cargo dep to workspace
+- 2025-10-31: added schema validation on coach output
+- 2025-10-31: renamed a confusing field
+- 2025-11-01: fixed an off-by-one in the buffer iter
+- 2025-11-02: added a quick benchmark
+- 2025-11-05: candidate passed at 61%
+- 2025-11-05: added one more validation check
+- 2025-11-08: noticed a slow path in the encoder
+- 2025-11-08: removed dead code path
+- 2025-11-09: engine learned to fianchetto
+- 2025-11-09: noticed a slow path in MCTS expand
+- 2025-11-10: added a regression test
+- 2025-11-10: small win in arena
+- 2025-11-11: tightened the coach prompt
+- 2025-11-11: clarified a comment
+- 2025-11-13: dropped a buggy feature flag
+- 2025-11-13: dropped a buggy feature flag
+- 2025-11-15: removed noisy log line
+- 2025-11-15: removed dead code path
+- 2025-11-16: added a circuit breaker on coach calls
+- 2025-11-16: candidate failed gate, archived
+- 2025-11-16: no regression in selfplay time
+- 2025-11-17: candidate passed at 56%
+- 2025-11-17: trained for 6 epochs instead of 8
+- 2025-11-18: split a long function
+- 2025-11-18: fewer allocations in the hot loop
+- 2025-11-19: fixed a flaky lichess reconnect
+- 2025-11-19: kept Adam, AdamW was worse here
+- 2025-11-19: clarified a comment
+- 2025-11-21: switched to AdamW
+- 2025-11-21: fixed a panic on empty PGN
+- 2025-11-21: coach output is now strict JSON
+- 2025-11-22: wrote a quick repro
+- 2025-11-22: no regression in selfplay time
+- 2025-11-23: candidate passed at 61%
+- 2025-11-23: fixed a flaky lichess reconnect
+- 2025-11-24: small win in arena
+- 2025-11-25: swapped to a faster hashmap
+- 2025-11-26: added schema validation on coach output
+- 2025-11-26: fixed a panic on empty PGN
+- 2025-11-27: noticed a slow path in MCTS expand
+- 2025-11-27: added one more validation check
+- 2025-11-27: tightened the coach prompt
+- 2025-12-03: discovered another sicilian line
+- 2025-12-04: candidate failed gate, archived
+- 2025-12-04: trained for 6 epochs instead of 8
+- 2025-12-06: split a long function
+- 2025-12-06: trained for 6 epochs instead of 8
+- 2025-12-09: 1.4x throughput on inference
+- 2025-12-09: added one more validation check
+- 2025-12-10: tightened type signatures
+- 2025-12-10: fixed a flaky test
+- 2025-12-12: noticed a slow path in the encoder
+- 2025-12-13: found a bug in resign logic
+- 2025-12-15: added schema validation on coach output
+- 2025-12-18: fixed a flaky test
+- 2025-12-24: candidate passed at 56%
+- 2025-12-24: added more telemetry
+- 2025-12-30: dropped a buggy feature flag
+- 2025-12-31: smaller checkpoints on disk now
+- 2026-01-02: wrote a quick repro
+- 2026-01-02: removed dead code path
+- 2026-01-03: noticed a slow path in MCTS expand
+- 2026-01-03: candidate passed at 58%
+- 2026-01-04: tightened the coach prompt
+- 2026-01-04: added a quick benchmark
+- 2026-01-04: loss curve smoother now
+- 2026-01-05: fixed a flaky test
+- 2026-01-05: small win in arena
+- 2026-01-06: found a bug in resign logic
+- 2026-01-07: candidate passed at 56%
+- 2026-01-08: removed noisy log line
+- 2026-01-09: fewer allocations in the hot loop
+- 2026-01-09: promoted
+- 2026-01-09: added a circuit breaker on coach calls
+- 2026-01-09: no regression in selfplay time
+- 2026-01-10: loss curve smoother now
+- 2026-01-10: lowered batch size for stability
+- 2026-01-11: renamed a confusing field
+- 2026-01-11: promoted
+- 2026-01-12: 1.4x throughput on inference
+- 2026-01-12: fixed an off-by-one in the buffer iter
+- 2026-01-14: dropped a buggy feature flag
+- 2026-01-14: candidate passed at 58%
+- 2026-01-15: tightened the coach prompt
+- 2026-01-15: lowered batch size for stability
+- 2026-01-16: renamed a confusing field
+- 2026-01-16: raised batch size now that it's stable
+- 2026-01-18: engine learned to fianchetto
+- 2026-01-21: noticed a slow path in the encoder
+- 2026-01-21: small win in arena
+- 2026-01-22: moved a cargo dep to workspace
+- 2026-01-24: removed noisy log line
+- 2026-01-25: moved a cargo dep to workspace
+- 2026-01-25: tightened the coach prompt
+- 2026-01-26: candidate failed gate, archived
+- 2026-01-27: fewer allocations in the hot loop
+- 2026-01-28: clarified a comment
+- 2026-01-29: dropped a buggy feature flag
+- 2026-01-29: removed dead code path
+- 2026-01-29: removed dead code path
+- 2026-01-30: added one more validation check
+- 2026-01-31: added a regression test
+- 2026-01-31: 1.4x throughput on inference
+- 2026-02-01: swapped to a faster hashmap
+- 2026-02-01: noticed a slow path in MCTS expand
+- 2026-02-02: removed dead code path
+- 2026-02-02: split a long function
+- 2026-02-02: added a regression test
+- 2026-02-03: split a long function
+- 2026-02-03: added a circuit breaker on coach calls
+- 2026-02-03: added a quick benchmark
+- 2026-02-05: fewer allocations in the hot loop
+- 2026-02-05: added one more validation check
+- 2026-02-05: tightened type signatures
+- 2026-02-06: clarified a comment
+- 2026-02-08: fixed a flaky test
+- 2026-02-09: tightened type signatures
+- 2026-02-09: engine learned to fianchetto
+- 2026-02-12: tightened type signatures
+- 2026-02-12: small win in arena
+- 2026-02-13: found a bug in resign logic
+- 2026-02-13: raised batch size now that it's stable
+- 2026-02-14: kept Adam, AdamW was worse here
+- 2026-02-15: loss curve smoother now
+- 2026-02-15: coach output is now strict JSON
+- 2026-02-16: candidate passed at 61%
+- 2026-02-16: discovered another sicilian line
+- 2026-02-17: candidate passed at 61%
+- 2026-02-17: added more telemetry
+- 2026-02-17: candidate failed gate, archived
+- 2026-02-18: swapped to a faster hashmap
+- 2026-02-18: small win in arena
+- 2026-02-18: coach output is now strict JSON
+- 2026-02-19: tightened type signatures
+- 2026-02-20: tightened type signatures
+- 2026-02-20: kept Adam, AdamW was worse here
+- 2026-02-20: loss curve smoother now
+- 2026-02-21: clarified a comment
+- 2026-02-22: 1.4x throughput on inference
+- 2026-02-25: moved a cargo dep to workspace
+- 2026-02-25: switched to AdamW
+- 2026-02-26: moved a cargo dep to workspace
+- 2026-02-27: coach output is now strict JSON
+- 2026-02-27: candidate passed at 58%
+- 2026-02-27: noticed a slow path in MCTS expand
+- 2026-02-28: candidate passed at 61%
+- 2026-02-28: wrote a quick repro
+- 2026-03-02: tightened the coach prompt
+- 2026-03-05: candidate passed at 58%
+- 2026-03-07: 1.4x throughput on inference
+- 2026-03-07: added more telemetry
+- 2026-03-08: kept Adam, AdamW was worse here
+- 2026-03-10: tightened the coach prompt
+- 2026-03-10: smaller checkpoints on disk now
+- 2026-03-11: discovered another sicilian line
+- 2026-03-11: removed dead code path
+- 2026-03-11: removed noisy log line
+- 2026-03-13: promoted
+- 2026-03-13: fixed a flaky test
+- 2026-03-14: fixed a flaky test
+- 2026-03-15: clarified a comment
+- 2026-03-15: clarified a comment
+- 2026-03-16: tightened type signatures
+- 2026-03-16: fixed an off-by-one in the buffer iter
+- 2026-03-17: wrote a quick repro
+- 2026-03-18: fixed a panic on empty PGN
+- 2026-03-18: loss curve smoother now
+- 2026-03-21: added one more validation check
+- 2026-03-21: no regression in selfplay time
+- 2026-03-22: noticed a slow path in MCTS expand
+- 2026-03-22: swapped to a faster hashmap
+- 2026-03-23: trained for 6 epochs instead of 8
+- 2026-03-23: raised batch size now that it's stable
+- 2026-03-25: added one more validation check
+- 2026-03-25: added schema validation on coach output
+- 2026-03-26: switched to AdamW
+- 2026-03-26: fixed a panic on empty PGN
+- 2026-03-27: found a bug in resign logic
+- 2026-03-28: added a circuit breaker on coach calls
+- 2026-03-28: noticed a slow path in the encoder
+- 2026-03-28: noticed a slow path in MCTS expand
+- 2026-03-29: fixed an off-by-one in the buffer iter
+- 2026-03-30: found a bug in resign logic
+- 2026-03-30: added more telemetry
+- 2026-03-30: fixed a flaky test
+- 2026-03-30: clarified a comment
+- 2026-03-31: fewer allocations in the hot loop
+- 2026-03-31: noticed a slow path in the encoder
+- 2026-04-01: coach output is now strict JSON
+- 2026-04-01: engine learned to fianchetto
+- 2026-04-03: switched to AdamW
+- 2026-04-04: 1.4x throughput on inference
+- 2026-04-04: fixed a flaky test
+- 2026-04-05: dropped a buggy feature flag
+- 2026-04-06: found a bug in resign logic
+- 2026-04-06: tightened the coach prompt
+- 2026-04-07: smaller checkpoints on disk now
+- 2026-04-08: trained for 6 epochs instead of 8
+- 2026-04-09: fixed a flaky lichess reconnect
+- 2026-04-09: trained for 6 epochs instead of 8
+- 2026-04-09: fixed a flaky test
+- 2026-05-10: ping (verify indexer refresh)
+
+- 2026-05-11: cache bust

@@ -1,0 +1,74 @@
+---
+summary: "Browser-based control UI for the Gateway (chat, nodes, config)"
+read_when:
+  - You want to operate the Gateway from a browser
+  - You want Tailnet access without SSH tunnels
+---
+# Control UI (browser)
+
+The Control UI is a small **Vite + Lit** single-page app served by the Gateway under:
+
+- `http://<host>:18789/`
+
+It speaks **directly to the Gateway WebSocket** on the same port.
+
+Auth is supplied during the WebSocket handshake via:
+- `connect.params.auth.token`
+- `connect.params.auth.password`
+The dashboard settings panel lets you store a token; passwords are not persisted.
+
+## What it can do (today)
+- Chat with the model via Gateway WS (`chat.history`, `chat.send`, `chat.abort`)
+- Connections: WhatsApp/Telegram status + QR login + Telegram config (`providers.status`, `web.login.*`, `config.set`)
+- Instances: presence list + refresh (`system-presence`)
+- Sessions: list + per-session thinking/verbose overrides (`sessions.list`, `sessions.patch`)
+- Cron jobs: list/add/run/enable/disable + run history (`cron.*`)
+- Skills: status, enable/disable, install, API key updates (`skills.*`)
+- Nodes: list + caps (`node.list`)
+- Config: view/edit `~/.gobbo/gobbo.json` (`config.get`, `config.set`)
+- Debug: status/health/models snapshots + event log + manual RPC calls (`status`, `health`, `models.list`)
+
+## Tailnet access (recommended)
+
+### Integrated Tailscale Serve (preferred)
+
+Keep the Gateway on loopback and let Tailscale Serve proxy it with HTTPS:
+
+```bash
+gobbo gateway --tailscale serve
+```
+
+Open:
+- `https://<magicdns>/ui/`
+
+By default, the gateway trusts Tailscale identity headers in serve mode. You can still set
+`GOBBO_GATEWAY_TOKEN` or `gateway.auth` if you want a shared secret instead.
+
+### Bind to tailnet + token (legacy)
+
+```bash
+gobbo gateway --bind tailnet --token "$(openssl rand -hex 32)"
+```
+
+Then open:
+- `http://<tailscale-ip>:18789/ui/`
+
+Paste the token into the UI settings (sent as `connect.params.auth.token`).
+
+## Building the UI
+
+The Gateway serves static files from `dist/control-ui`. Build them with:
+
+```bash
+pnpm ui:install
+pnpm ui:build
+```
+
+For local development (separate dev server):
+
+```bash
+pnpm ui:install
+pnpm ui:dev
+```
+
+Then point the UI at your Gateway WS URL (e.g. `ws://127.0.0.1:18789`).

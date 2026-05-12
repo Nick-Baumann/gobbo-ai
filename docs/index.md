@@ -1,0 +1,162 @@
+---
+summary: "Top-level overview of Gobbo, features, and purpose"
+read_when:
+  - Introducing Gobbo to newcomers
+---
+<!-- {% raw %} -->
+# GOBBO 🦞
+
+> *"EXFOLIATE! EXFOLIATE!"* — A space lobster, probably
+
+<p align="center">
+  <img src="whatsapp-clawd.jpg" alt="GOBBO" width="420">
+</p>
+
+<p align="center">
+  <strong>WhatsApp + Telegram + Discord gateway for AI agents (Pi).</strong><br>
+  Send a message, get an agent response — from your pocket.
+</p>
+
+<p align="center">
+  <a href="https://github.com/nickbaumann/gobbo">GitHub</a> ·
+  <a href="https://github.com/nickbaumann/gobbo/releases">Releases</a> ·
+  <a href="./clawd">Clawd setup</a>
+</p>
+
+GOBBO bridges WhatsApp (via WhatsApp Web / Baileys), Telegram (Bot API / grammY), and Discord (Bot API / discord.js) to coding agents like [Pi](https://github.com/badlogic/pi-mono).
+It’s built for [Clawd](https://clawd.me), a space lobster who needed a TARDIS.
+
+## How it works
+
+```
+WhatsApp / Telegram / Discord
+        │
+        ▼
+  ┌──────────────────────────┐
+  │          Gateway          │  ws://127.0.0.1:18789 (loopback-only)
+  │     (single source)       │  tcp://0.0.0.0:18790 (Bridge)
+  │                          │  http://<gateway-host>:18793/__gobbo__/canvas/ (Canvas host)
+  └───────────┬───────────────┘
+              │
+              ├─ Pi agent (RPC)
+              ├─ CLI (gobbo …)
+              ├─ Chat UI (SwiftUI)
+              ├─ macOS app (Gobbo.app)
+              └─ iOS node via Bridge + pairing
+```
+
+Most operations flow through the **Gateway** (`gobbo gateway`), a single long-running process that owns provider connections and the WebSocket control plane.
+
+## Network model
+
+- **One Gateway per host**: it is the only process allowed to own the WhatsApp Web session.
+- **Loopback-first**: Gateway WS defaults to `ws://127.0.0.1:18789`.
+  - For Tailnet access, run `gobbo gateway --bind tailnet --token ...` (token is required for non-loopback binds).
+- **Bridge for nodes**: optional LAN/tailnet-facing bridge on `tcp://0.0.0.0:18790` for paired nodes (Bonjour-discoverable).
+- **Canvas host**: HTTP file server on `canvasHost.port` (default `18793`), serving `/__gobbo__/canvas/` for node WebViews; see `docs/configuration.md` (`canvasHost`).
+- **Remote use**: SSH tunnel or tailnet/VPN; see `docs/remote.md` and `docs/discovery.md`.
+
+## Features (high level)
+
+- 📱 **WhatsApp Integration** — Uses Baileys for WhatsApp Web protocol
+- ✈️ **Telegram Bot** — DMs + groups via grammY
+- 🎮 **Discord Bot** — DMs + guild channels via discord.js
+- 🤖 **Agent bridge** — Pi (RPC mode) with tool streaming
+- 💬 **Sessions** — Direct chats collapse into shared `main` (default); groups are isolated
+- 👥 **Group Chat Support** — Mention-based by default; owner can toggle `/activation always|mention`
+- 📎 **Media Support** — Send and receive images, audio, documents
+- 🎤 **Voice notes** — Optional transcription hook
+- 🖥️ **WebChat + macOS app** — Local UI + menu bar companion for ops and voice wake
+- 📱 **iOS node** — Pairs as a node and exposes a Canvas surface
+
+Note: legacy Claude/Codex/Gemini/Opencode paths have been removed; Pi is the only coding-agent path.
+
+## Quick start
+
+Runtime requirement: **Node ≥ 22**.
+
+```bash
+# From source (recommended while the npm package is still settling)
+pnpm install
+pnpm build
+pnpm link --global
+
+# Pair WhatsApp Web (shows QR)
+gobbo login
+
+# Run the Gateway (leave running)
+gobbo gateway --port 18789
+```
+
+Send a test message (requires a running Gateway):
+
+```bash
+gobbo send --to +15555550123 --message "Hello from GOBBO"
+```
+
+## Configuration (optional)
+
+Config lives at `~/.gobbo/gobbo.json`.
+
+- If you **do nothing**, GOBBO uses the bundled Pi binary in RPC mode with per-sender sessions.
+- If you want to lock it down, start with `routing.allowFrom` and (for groups) mention rules.
+
+Example:
+
+```json5
+{
+  routing: {
+    allowFrom: ["+15555550123"],
+    groupChat: { requireMention: true, mentionPatterns: ["@clawd"] }
+  }
+}
+```
+
+## Docs
+
+- Start here:
+  - [Configuration](./configuration.md)
+  - [Clawd personal assistant setup](./clawd.md)
+  - [Skills](./skills.md)
+  - [Workspace templates](./templates/AGENTS.md)
+  - [Gateway runbook](./gateway.md)
+  - [Nodes (iOS/Android)](./nodes.md)
+  - [Web surfaces (Control UI)](./web.md)
+  - [Discovery + transports](./discovery.md)
+  - [Remote access](./remote.md)
+- Providers and UX:
+  - [WebChat](./webchat.md)
+  - [Control UI (browser)](./control-ui.md)
+  - [Telegram](./telegram.md)
+  - [Discord](./discord.md)
+  - [Group messages](./group-messages.md)
+  - [Media: images](./images.md)
+  - [Media: audio](./audio.md)
+- Ops and safety:
+  - [Sessions](./session.md)
+  - [Cron + wakeups](./cron.md)
+  - [Security](./security.md)
+  - [Troubleshooting](./troubleshooting.md)
+
+## The name
+
+**GOBBO = CLAW + TARDIS** — because every space lobster needs a time-and-space machine.
+
+---
+
+*"We're all just playing with our own prompts."* — an AI, probably high on tokens
+<!-- {% endraw %} -->
+
+## Credits
+
+- **Peter Steinberger** ([@nickbaumann](https://twitter.com/nickbaumann)) — Creator, lobster whisperer
+- **Mario Zechner** ([@badlogicc](https://twitter.com/badlogicgames)) — Pi creator, security pen-tester
+- **Clawd** — The space lobster who demanded a better name
+
+## License
+
+MIT — Free as a lobster in the ocean 🦞
+
+---
+
+*"We're all just playing with our own prompts."* — An AI, probably high on tokens

@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gobbo",
+    "crates/gobbo-codex",
+    "crates/gobbo-gateway",
+    "crates/gobbo-skills",
+    "crates/gobbo-surfaces",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/nick-baumann/Gobbo"
+authors = ["Nick Baumann"]
+version = "0.6.1"
+rust-version = "1.78"

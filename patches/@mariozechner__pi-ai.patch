@@ -1,0 +1,12 @@
+diff --git a/dist/providers/openai-responses.js b/dist/providers/openai-responses.js
+index 20fb0a22aaa28f7ff7c2f44a8b628fa1d9d7d936..c2bc63f483f3285b00755901ba97db810221cea6 100644
+--- a/dist/providers/openai-responses.js
++++ b/dist/providers/openai-responses.js
+@@ -486,7 +486,6 @@ function convertTools(tools) {
+         name: tool.name,
+         description: tool.description,
+         parameters: tool.parameters, // TypeBox already generates JSON Schema
+-        strict: null,
+     }));
+ }
+ function mapStopReason(status) {

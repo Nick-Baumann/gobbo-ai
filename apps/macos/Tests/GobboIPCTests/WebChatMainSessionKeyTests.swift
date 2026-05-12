@@ -1,0 +1,57 @@
+import Foundation
+import Testing
+@testable import Gobbo
+
+@Suite struct WebChatMainSessionKeyTests {
+    @Test func configGetSnapshotMainKeyFallsBackToMainWhenMissing() throws {
+        let json = """
+        {
+          "path": "/Users/pete/.gobbo/gobbo.json",
+          "exists": true,
+          "raw": null,
+          "parsed": {},
+          "valid": true,
+          "config": {},
+          "issues": []
+        }
+        """
+        let key = try GatewayConnection.mainSessionKey(fromConfigGetData: Data(json.utf8))
+        #expect(key == "main")
+    }
+
+    @Test func configGetSnapshotMainKeyTrimsAndUsesValue() throws {
+        let json = """
+        {
+          "path": "/Users/pete/.gobbo/gobbo.json",
+          "exists": true,
+          "raw": null,
+          "parsed": {},
+          "valid": true,
+          "config": { "session": { "mainKey": "  primary  " } },
+          "issues": []
+        }
+        """
+        let key = try GatewayConnection.mainSessionKey(fromConfigGetData: Data(json.utf8))
+        #expect(key == "primary")
+    }
+
+    @Test func configGetSnapshotMainKeyFallsBackWhenEmptyOrWhitespace() throws {
+        let json = """
+        {
+          "config": { "session": { "mainKey": "   " } }
+        }
+        """
+        let key = try GatewayConnection.mainSessionKey(fromConfigGetData: Data(json.utf8))
+        #expect(key == "main")
+    }
+
+    @Test func configGetSnapshotMainKeyFallsBackWhenConfigNull() throws {
+        let json = """
+        {
+          "config": null
+        }
+        """
+        let key = try GatewayConnection.mainSessionKey(fromConfigGetData: Data(json.utf8))
+        #expect(key == "main")
+    }
+}
